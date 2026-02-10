@@ -1,0 +1,24 @@
+{
+  "name": "gs-ssi-toolkit",
+  "version": "1.0.0",
+  "description": "A place to develop and track changes for the ssi-toolkit",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/propublica/gs-ssi-toolkit.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/propublica/gs-ssi-toolkit/issues"
+  },
+  "homepage": "https://github.com/propublica/gs-ssi-toolkit#readme",
+  "devDependencies": {
+    "@google/clasp": "^3.2.0"
+  }
+}
