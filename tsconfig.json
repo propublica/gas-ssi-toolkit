@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    /* Apps Script runs on V8, which supports ES2019 features. */
+    "target": "ES2019",
+    "lib": ["ES2019"],
+
+    /* Use ESNext modules so Rollup can tree-shake and bundle them. */
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+
+    /* Output directory — Rollup handles this, but tsc needs it for type checking. */
+    "outDir": "./dist",
+    "rootDir": "./src",
+
+    /* Strict type checking. */
+    "strict": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+
+    /* Interop helpers. */
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+
+    /* Emit declarations alongside JS for IDE support. */
+    "declaration": true,
+    "declarationDir": "./dist/types",
+    "sourceMap": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "__tests__"]
+}
