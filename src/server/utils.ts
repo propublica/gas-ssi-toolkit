@@ -21,10 +21,7 @@ export function extractId(input: unknown): string {
  * Check whether a string looks like a Google Drive link.
  */
 export function isValidDriveLink(input: unknown): boolean {
-  return (
-    typeof input === "string" &&
-    (input.includes("drive.google.com") || input.includes("/d/"))
-  );
+  return typeof input === "string" && (input.includes("drive.google.com") || input.includes("/d/"));
 }
 
 /**

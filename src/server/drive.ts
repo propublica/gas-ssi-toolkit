@@ -10,15 +10,14 @@
  * Check that the Drive Advanced Service is available.
  * Returns truthy if available, false (and shows alert) if not.
  */
-export function checkDriveService(
-  ui: GoogleAppsScript.Base.Ui,
-): boolean {
+export function checkDriveService(ui: GoogleAppsScript.Base.Ui): boolean {
   try {
     // Accessing Drive.Files will throw if the advanced service isn't enabled.
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     Drive.Files;
     return true;
   } catch (_e) {
+    // eslint-disable-line @typescript-eslint/no-unused-vars
     ui.alert(
       "🛑 Setup Required",
       'Please enable "Drive API" in the Services list (+ icon on left).',
@@ -51,10 +50,7 @@ export function extractTextUniversal(fileId: string): string {
         mimeType: MimeType.GOOGLE_DOCS,
       };
       // Drive.Files.create with content triggers server-side OCR
-      const tempFile = Drive.Files.create(
-        resource,
-        file.getBlob(),
-      );
+      const tempFile = Drive.Files.create(resource, file.getBlob());
       const tempId = tempFile.id!;
       const text = DocumentApp.openById(tempId).getBody().getText();
       Drive.Files.remove(tempId);

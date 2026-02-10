@@ -15,8 +15,6 @@ import { extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive }
 import { HTML_TEMPLATE } from "./dialog";
 import type { AIMode, ColumnMap } from "../shared/types";
 
-declare const global: Record<string, unknown>;
-
 // ==========================================
 // 🚀 MENU & INITIALIZATION
 // ==========================================
@@ -37,9 +35,7 @@ export function onOpen(): void {
 // ==========================================
 
 export function showSourceDialog(): void {
-  const htmlOutput = HtmlService.createHtmlOutput(HTML_TEMPLATE)
-    .setWidth(400)
-    .setHeight(300);
+  const htmlOutput = HtmlService.createHtmlOutput(HTML_TEMPLATE).setWidth(400).setHeight(300);
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, "Choose AI Data Source");
 }
 
@@ -166,9 +162,7 @@ export function sampleRowsToEvaluation(): void {
     return;
   }
 
-  const allData = sourceSheet
-    .getRange(2, 1, lastRow - 1, sourceSheet.getLastColumn())
-    .getValues();
+  const allData = sourceSheet.getRange(2, 1, lastRow - 1, sourceSheet.getLastColumn()).getValues();
 
   // Sample size
   const countResponse = ui.prompt(
@@ -257,7 +251,12 @@ export function runBatchAI(mode: AIMode): void {
     output: headers.indexOf(CONFIG.COLUMNS.OUTPUT),
   };
 
-  if (map.source_drive === -1 || map.sys_prompt === -1 || map.user_prompt === -1 || map.output === -1) {
+  if (
+    map.source_drive === -1 ||
+    map.sys_prompt === -1 ||
+    map.user_prompt === -1 ||
+    map.output === -1
+  ) {
     ui.alert(
       "Error: Missing Columns",
       `Ensure headers exist: ${Object.values(CONFIG.COLUMNS).join(", ")}`,
