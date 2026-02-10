@@ -315,16 +315,3 @@ export function runBatchAI(mode: AIMode): void {
   }
   SpreadsheetApp.getActive().toast(`Complete! Processed ${processed} rows.`, "Success", 5);
 }
-
-// ==========================================
-// 🌐 EXPOSE TO APPS SCRIPT GLOBAL SCOPE
-// ==========================================
-// Every function callable from Sheets UI (menu items, triggers,
-// dialog callbacks) must be assigned here.
-
-// global.onOpen = onOpen;
-// global.importDriveLinks = importDriveLinks;
-// global.extractTextFromSelection = extractTextFromSelection;
-// global.sampleRowsToEvaluation = sampleRowsToEvaluation;
-// global.showSourceDialog = showSourceDialog;
-// global.handleDialogSelection = handleDialogSelection;
