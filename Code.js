@@ -9,11 +9,11 @@
 // ==========================================
 const CONFIG = {
   API_KEY_PROPERTY: 'GEMINI_API_KEY',
-  MODEL_NAME: 'gemini-2.0-flash', 
+  MODEL_NAME: 'gemini-2.0-flash',
   MAX_FILE_SIZE_BYTES: 25 * 1024 * 1024, // 25MB Apps Script Limit
   COLUMNS: {
     SOURCE_DRIVE: 'source_drive',
-    SOURCE_TEXT: 'source_text', 
+    SOURCE_TEXT: 'source_text',
     SYS_PROMPT: 'system_prompt',
     USER_PROMPT: 'user_prompt',
     OUTPUT: 'ai_inference'
@@ -25,13 +25,13 @@ const CONFIG = {
 // ==========================================
 function onOpen() {
   SpreadsheetApp.getUi()
-      .createMenu('⚡ SSI Tools')
-      .addItem('1. Import Drive Links (Folder)', 'importDriveLinks')
-      .addItem('2. Extract Text from Selected Cells', 'extractTextFromSelection')
-      .addSeparator()
-      .addItem('3. 🎲 Sample Rows for Evaluation', 'sampleRowsToEvaluation')
-      .addItem('4. ▶️ Run AI on Selected Rows', 'showSourceDialog')
-      .addToUi();
+    .createMenu('⚡ SSI Tools')
+    .addItem('1. Import Drive Links (Folder)', 'importDriveLinks')
+    .addItem('2. Extract Text from Selected Cells', 'extractTextFromSelection')
+    .addSeparator()
+    .addItem('3. 🎲 Sample Rows for Evaluation', 'sampleRowsToEvaluation')
+    .addItem('4. ▶️ Run AI on Selected Rows', 'showSourceDialog')
+    .addToUi();
 }
 
 // ==========================================
@@ -39,8 +39,8 @@ function onOpen() {
 // ==========================================
 function showSourceDialog() {
   const htmlOutput = HtmlService.createHtmlOutput(HTML_TEMPLATE)
-      .setWidth(400)
-      .setHeight(300);
+    .setWidth(400)
+    .setHeight(300);
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Choose AI Data Source');
 }
 
@@ -62,19 +62,19 @@ function importDriveLinks() {
 
   // 2. Get Location
   const activeA1 = sheet.getActiveCell().getA1Notation();
-  const cellResponse = ui.prompt('Step 2/2: Confirm Location', 
-      `Importing links starting at cell ${activeA1}.\nClick OK to proceed or type a new cell below:`, 
-      ui.ButtonSet.OK_CANCEL);
-  
+  const cellResponse = ui.prompt('Step 2/2: Confirm Location',
+    `Importing links starting at cell ${activeA1}.\nClick OK to proceed or type a new cell below:`,
+    ui.ButtonSet.OK_CANCEL);
+
   if (cellResponse.getSelectedButton() !== ui.Button.OK) return;
   const startCell = cellResponse.getResponseText().trim() || activeA1;
 
   try {
     const parentFolder = DriveApp.getFolderById(folderId);
     const targetRange = sheet.getRange(startCell);
-    
+
     SpreadsheetApp.getActive().toast('Scanning folder...', 'Listing', -1);
-    
+
     let allFiles = [];
     getAllFilesRecursive(parentFolder, allFiles);
 
@@ -97,7 +97,7 @@ function importDriveLinks() {
 function extractTextFromSelection() {
   const ui = SpreadsheetApp.getUi();
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  
+
   if (!checkDriveService(ui)) return;
 
   const range = sheet.getActiveRange();
@@ -113,18 +113,18 @@ function extractTextFromSelection() {
 
   for (let i = 0; i < totalRows; i++) {
     const cellValue = values[i][0];
-    
+
     if (isValidDriveLink(cellValue)) {
       const fileId = extractId(cellValue);
       SpreadsheetApp.getActive().toast(`Extracting (${i + 1}/${totalRows})`, 'Processing', -1);
-      
+
       let text = extractTextUniversal(fileId);
       if (text.length > 49000) text = text.substring(0, 49000) + "... [TRUNCATED]";
-      
+
       // Write result to the cell immediately to the right
       range.getCell(i + 1, 2).setValue(text);
       processedCount++;
-      SpreadsheetApp.flush(); 
+      SpreadsheetApp.flush();
     }
   }
   SpreadsheetApp.getActive().toast(`Done! Extracted ${processedCount} files.`, 'Complete', 5);
@@ -149,13 +149,13 @@ function sampleRowsToEvaluation() {
     ui.alert('Error', `The sheet "${sourceName}" appears to be empty.`, ui.ButtonSet.OK);
     return;
   }
-  
+
   const allData = sourceSheet.getRange(2, 1, lastRow - 1, sourceSheet.getLastColumn()).getValues();
 
   // 3. User Prompts
   const countResponse = ui.prompt('Sample Data', `Found ${allData.length} rows in "${sourceName}".\nHow many rows would you like to sample to "${targetName}"?`, ui.ButtonSet.OK_CANCEL);
   if (countResponse.getSelectedButton() !== ui.Button.OK) return;
-  
+
   const sampleSize = parseInt(countResponse.getResponseText());
   if (isNaN(sampleSize) || sampleSize < 1 || sampleSize > allData.length) {
     ui.alert('Error', `Please enter a valid number between 1 and ${allData.length}.`, ui.ButtonSet.OK);
@@ -182,13 +182,13 @@ function sampleRowsToEvaluation() {
     const j = Math.floor(seededRandom() * (i + 1));
     [indices[i], indices[j]] = [indices[j], indices[i]];
   }
-  
+
   const selectedRows = indices.slice(0, sampleSize).map(index => allData[index]);
-  
+
   // 6. Write to Target
   const targetRow = targetSheet.getLastRow() + 1;
   targetSheet.getRange(targetRow, 1, selectedRows.length, selectedRows[0].length).setValues(selectedRows);
-  
+
   ss.setActiveSheet(targetSheet);
   ui.alert('Success', `Copied ${sampleSize} rows from "${sourceName}" to "${targetName}" using seed ${seed}.`, ui.ButtonSet.OK);
 }
@@ -211,7 +211,7 @@ function runBatchAI(mode) {
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const map = {
     source_drive: headers.indexOf(CONFIG.COLUMNS.SOURCE_DRIVE),
-    source_text: headers.findIndex(h => h.includes(CONFIG.COLUMNS.SOURCE_TEXT)), 
+    source_text: headers.findIndex(h => h.includes(CONFIG.COLUMNS.SOURCE_TEXT)),
     sys_prompt: headers.indexOf(CONFIG.COLUMNS.SYS_PROMPT),
     user_prompt: headers.indexOf(CONFIG.COLUMNS.USER_PROMPT),
     output: headers.indexOf(CONFIG.COLUMNS.OUTPUT)
@@ -246,7 +246,7 @@ function runBatchAI(mode) {
           } else {
             result = "[Skipped: No valid text]";
           }
-        } 
+        }
         else if (mode === 'FILE') {
           const link = row[map.source_drive];
           if (isValidDriveLink(link)) {
@@ -272,7 +272,7 @@ function runBatchAI(mode) {
 
 function callGeminiAPI(apiKey, systemPrompt, userPrompt, context) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.MODEL_NAME}:generateContent?key=${apiKey}`;
-  
+
   const payload = {
     "system_instruction": { "parts": [{ "text": systemPrompt || "You are a helpful assistant." }] },
     "contents": [{ "role": "user", "parts": [{ "text": userPrompt }] }]
@@ -281,15 +281,15 @@ function callGeminiAPI(apiKey, systemPrompt, userPrompt, context) {
   if (context.textContext) {
     const lastPart = payload.contents[0].parts.length - 1;
     payload.contents[0].parts[lastPart].text += `\n\n--- CONTEXT ---\n${context.textContext}`;
-  } 
+  }
   else if (context.fileId) {
     const file = DriveApp.getFileById(context.fileId);
     if (file.getSize() > CONFIG.MAX_FILE_SIZE_BYTES) throw new Error(`File too large (>25MB).`);
-    
+
     payload.contents[0].parts.push({
-      "inline_data": { 
-        "mime_type": file.getMimeType(), 
-        "data": Utilities.base64Encode(file.getBlob().getBytes()) 
+      "inline_data": {
+        "mime_type": file.getMimeType(),
+        "data": Utilities.base64Encode(file.getBlob().getBytes())
       }
     });
   }
@@ -312,9 +312,9 @@ function extractTextUniversal(fileId) {
   try {
     const file = DriveApp.getFileById(fileId);
     const mimeType = file.getMimeType();
-    
+
     if (mimeType === MimeType.GOOGLE_DOCS) return DocumentApp.openById(fileId).getBody().getText();
-    
+
     if (mimeType === MimeType.PDF || mimeType.includes('image/')) {
       const resource = { name: "Temp_" + file.getName(), mimeType: MimeType.GOOGLE_DOCS };
       const tempId = Drive.Files.create(resource, file.getBlob()).id; // v3 create
@@ -336,7 +336,7 @@ function checkDriveService(ui) {
 function createSeededRandom(seed) {
   let m = 0x80000000, a = 1103515245, c = 12345;
   let state = seed ? seed : Math.floor(Math.random() * (m - 1));
-  return function() { state = (a * state + c) % m; return state / (m - 1); };
+  return function () { state = (a * state + c) % m; return state / (m - 1); };
 }
 
 function getAllFilesRecursive(folder, fileList) {
