@@ -1,2 +1,10 @@
-node_modules
-*.md
+# .claspignore — evaluated relative to rootDir (./dist)
+# Ignore everything, then allow back only what Apps Script needs.
+
+**/**
+!appsscript.json
+!**/*.js
+
+# Exclude source maps and type declarations from the push
+**/*.js.map
+types/**

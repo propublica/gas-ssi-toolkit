@@ -1,0 +1,4 @@
+{
+  "scriptId": "YOUR_PROD_SCRIPT_ID_HERE",
+  "rootDir": "./dist"
+}
