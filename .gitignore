@@ -22,3 +22,6 @@ Thumbs.db
 # Env
 .env
 .env.local
+
+# Gemini CLI internal
+.gemini/
