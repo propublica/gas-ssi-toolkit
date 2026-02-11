@@ -22,7 +22,7 @@ This plan outlines the steps to implement the "0. Quickstart" menu option, adher
     - [ ] Attach task summary with Git notes.
     - [ ] Get and record task commit SHA.
     - [ ] Commit plan update.
-- [ ] Task: Integrate `openQuickstartDoc` into the menu as the first option.
+- [x] Task: Integrate `openQuickstartDoc` into the menu as the first option. [7ba6d0d]
     - [ ] Write failing tests to confirm that "0. Quickstart" is the first menu item and calls `openQuickstartDoc` when clicked.
     - [ ] Modify the menu creation logic within `onOpen` to add "0. Quickstart" as the first menu item, linking it to `openQuickstartDoc`.
     - [ ] Refactor menu integration code.
