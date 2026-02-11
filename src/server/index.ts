@@ -22,12 +22,21 @@ import type { AIMode, ColumnMap } from "../shared/types";
 export function onOpen(): void {
   SpreadsheetApp.getUi()
     .createMenu("⚡ SSI Tools")
+    .addItem("0. Quickstart", "openQuickstartDoc")
     .addItem("1. Import Drive Links (Folder)", "importDriveLinks")
     .addItem("2. Extract Text from Selected Cells", "extractTextFromSelection")
     .addSeparator()
     .addItem("3. 🎲 Sample Rows for Evaluation", "sampleRowsToEvaluation")
     .addItem("4. ▶️ Run AI on Selected Rows", "showSourceDialog")
     .addToUi();
+}
+
+// ==========================================
+// 🚀 QUICKSTART
+// ==========================================
+
+export function openQuickstartDoc(): void {
+  // Placeholder for now
 }
 
 // ==========================================
