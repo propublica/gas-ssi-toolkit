@@ -13,7 +13,7 @@ This plan outlines the steps to implement the "0. Quickstart" menu option, adher
     - [ ] Attach task summary with Git notes.
     - [ ] Get and record task commit SHA.
     - [ ] Commit plan update.
-- [ ] Task: Implement `openQuickstartDoc` function.
+- [x] Task: Implement `openQuickstartDoc` function. [bc55d2a]
     - [ ] Write failing tests for the `openQuickstartDoc` function, ensuring it correctly opens the specified URL in a new tab.
     - [ ] Implement the `openQuickstartDoc` function to open `https://docs.google.com/document/d/1BQJzBHiE6L0hvU6NMD0jaQE71VWRpWH-vNQu3UtGjBA/edit?usp=sharing` in a new browser tab.
     - [ ] Refactor the `openQuickstartDoc` function.
