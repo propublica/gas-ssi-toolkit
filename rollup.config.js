@@ -41,6 +41,7 @@ function handleDialogSelection(mode) { _GASEntry.handleDialogSelection(mode); }
 function importDriveLinks() { _GASEntry.importDriveLinks(); }
 function extractTextFromSelection() { _GASEntry.extractTextFromSelection(); }
 function sampleRowsToEvaluation() { _GASEntry.sampleRowsToEvaluation(); }
+function openQuickstartDoc() { _GASEntry.openQuickstartDoc(); }
 `,
   },
   plugins: [
