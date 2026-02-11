@@ -2,7 +2,7 @@
 
 This plan outlines the steps to implement the "0. Quickstart" menu option, adhering to the project's workflow and TDD principles.
 
-## Phase 1: Implement "0. Quickstart" Menu Option
+## Phase 1: Implement "0. Quickstart" Menu Option [checkpoint: 86b56d4]
 
 - [x] Task: Add `onOpen` trigger and menu creation logic. [70bd0cc]
     - [ ] Write failing tests for the `onOpen` function, ensuring it creates the "SSI Toolkit" menu.
