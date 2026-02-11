@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+coverage/
 
 # Clasp auth (contains tokens — never commit)
 .clasprc.json
