@@ -36,7 +36,14 @@ export function onOpen(): void {
 // ==========================================
 
 export function openQuickstartDoc(): void {
-  // Placeholder for now
+  const url =
+    "https://docs.google.com/document/d/1BQJzBHiE6L0hvU6NMD0jaQE71VWRpWH-vNQu3UtGjBA/edit?usp=sharing";
+  const htmlOutput = HtmlService.createHtmlOutput(
+    `<script>window.open('${url}', '_blank');google.script.host.close();</script>`,
+  )
+    .setWidth(10) // Small, almost invisible dialog
+    .setHeight(10); // Small, almost invisible dialog
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, "Opening Quickstart Guide");
 }
 
 // ==========================================
