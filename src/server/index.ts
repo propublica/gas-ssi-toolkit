@@ -11,7 +11,14 @@
 import { CONFIG } from "./config";
 import { callGeminiAPI } from "./api";
 import { checkDriveService, extractTextUniversal } from "./drive";
-import { extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive } from "./utils";
+import {
+  extractId,
+  getAIContext,
+  isValidDriveLink,
+  getAllFilesRecursive,
+  sampleRows,
+  truncateText,
+} from "./utils";
 import { HTML_TEMPLATE } from "./dialog";
 import type { AIMode, ColumnMap } from "../shared/types";
 
@@ -39,10 +46,10 @@ export function openQuickstartDoc(): void {
   const url =
     "https://docs.google.com/document/d/1BQJzBHiE6L0hvU6NMD0jaQE71VWRpWH-vNQu3UtGjBA/edit?usp=sharing";
   const htmlOutput = HtmlService.createHtmlOutput(
-    `<script>window.open('${url}', '_blank');</script>`,
+    `<script>window.open('${url}', '_blank');google.script.host.close();</script>`,
   )
-    .setWidth(30)
-    .setHeight(30);
+    .setWidth(10)
+    .setHeight(10);
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, "Opening Quickstart Guide");
 }
 
@@ -148,8 +155,7 @@ export function extractTextFromSelection(): void {
       const fileId = extractId(cellValue);
       SpreadsheetApp.getActive().toast(`Extracting (${i + 1}/${totalRows})`, "Processing", -1);
 
-      let text = extractTextUniversal(fileId);
-      if (text.length > 49000) text = text.substring(0, 49000) + "... [TRUNCATED]";
+      const text = truncateText(extractTextUniversal(fileId), 49000);
 
       range.getCell(i + 1, 2).setValue(text);
       processedCount++;
@@ -214,15 +220,7 @@ export function sampleRowsToEvaluation(): void {
     targetSheet.getRange(1, 1, 1, headers[0].length).setValues(headers);
   }
 
-  // Fisher-Yates shuffle with seeded random
-  const seededRandom = createSeededRandom(seed);
-  const indices = allData.map((_, i) => i);
-  for (let i = indices.length - 1; i > 0; i--) {
-    const j = Math.floor(seededRandom() * (i + 1));
-    [indices[i], indices[j]] = [indices[j], indices[i]];
-  }
-
-  const selectedRows = indices.slice(0, sampleSize).map((index) => allData[index]);
+  const selectedRows = sampleRows(allData, sampleSize, seed);
 
   // Write to target
   const targetRow = targetSheet.getLastRow() + 1;
@@ -302,24 +300,11 @@ export function runBatchAI(mode: AIMode): void {
       let result = "";
 
       try {
-        if (mode === "TEXT") {
-          const txt = map.source_text > -1 ? (row[map.source_text] as string) : "";
-          if (txt && txt.length > 5 && !txt.includes("Error")) {
-            result = callGeminiAPI(apiKey, row[map.sys_prompt] as string, usrPrompt, {
-              textContext: txt,
-            });
-          } else {
-            result = "[Skipped: No valid text]";
-          }
-        } else if (mode === "FILE") {
-          const link = row[map.source_drive] as string;
-          if (isValidDriveLink(link)) {
-            result = callGeminiAPI(apiKey, row[map.sys_prompt] as string, usrPrompt, {
-              fileId: extractId(link),
-            });
-          } else {
-            result = "[Skipped: No valid Drive Link]";
-          }
+        const context = getAIContext(row, map, mode);
+        if (context) {
+          result = callGeminiAPI(apiKey, row[map.sys_prompt] as string, usrPrompt, context);
+        } else {
+          result = mode === "TEXT" ? "[Skipped: No valid text]" : "[Skipped: No valid Drive Link]";
         }
         sheet.getRange(realRowIndex, map.output + 1).setValue(result);
         processed++;

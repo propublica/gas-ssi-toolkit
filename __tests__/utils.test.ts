@@ -5,7 +5,15 @@
  * globals, so they need no mocking at all.
  */
 
-import { extractId, isValidDriveLink, createSeededRandom } from "../src/server/utils";
+import {
+  extractId,
+  isValidDriveLink,
+  createSeededRandom,
+  sampleRows,
+  truncateText,
+  getAIContext,
+} from "../src/server/utils";
+import type { ColumnMap } from "../src/shared/types";
 
 describe("extractId", () => {
   it("extracts ID from a standard Drive file URL", () => {
@@ -79,5 +87,102 @@ describe("createSeededRandom", () => {
       expect(val).toBeGreaterThanOrEqual(0);
       expect(val).toBeLessThan(1);
     }
+  });
+});
+
+describe("sampleRows", () => {
+  const data = [["a"], ["b"], ["c"], ["d"], ["e"]];
+
+  it("returns the correct number of rows", () => {
+    expect(sampleRows(data, 3, 42)).toHaveLength(3);
+  });
+
+  it("produces reproducible output for the same seed", () => {
+    const first = sampleRows(data, 3, 42);
+    const second = sampleRows(data, 3, 42);
+    expect(first).toEqual(second);
+  });
+
+  it("produces different output for different seeds", () => {
+    const first = sampleRows(data, 3, 42);
+    const second = sampleRows(data, 3, 99);
+    expect(first).not.toEqual(second);
+  });
+
+  it("returns all rows when sampleSize equals data length", () => {
+    const result = sampleRows(data, 5, 42);
+    expect(result).toHaveLength(5);
+    expect(result).toEqual(expect.arrayContaining(data));
+  });
+});
+
+describe("truncateText", () => {
+  it("returns short text unchanged", () => {
+    expect(truncateText("hello", 100)).toBe("hello");
+  });
+
+  it("returns text at exact limit unchanged", () => {
+    const text = "a".repeat(100);
+    expect(truncateText(text, 100)).toBe(text);
+  });
+
+  it("truncates text over the limit and appends suffix", () => {
+    const text = "a".repeat(101);
+    const result = truncateText(text, 100);
+    expect(result).toBe("a".repeat(100) + "... [TRUNCATED]");
+  });
+});
+
+describe("getAIContext", () => {
+  const baseMap: ColumnMap = {
+    source_drive: 0,
+    source_text: 1,
+    sys_prompt: 2,
+    user_prompt: 3,
+    output: 4,
+  };
+
+  describe("TEXT mode", () => {
+    it("returns textContext when source text is valid", () => {
+      const row = [
+        "https://drive.google.com/file/d/abc",
+        "This is valid text for the AI",
+        "",
+        "",
+        "",
+      ];
+      expect(getAIContext(row, baseMap, "TEXT")).toEqual({
+        textContext: "This is valid text for the AI",
+      });
+    });
+
+    it("returns null when source text is too short (5 chars or fewer)", () => {
+      const row = ["", "hi", "", "", ""];
+      expect(getAIContext(row, baseMap, "TEXT")).toBeNull();
+    });
+
+    it("returns null when source text contains 'Error'", () => {
+      const row = ["", "[Error: something went wrong]", "", "", ""];
+      expect(getAIContext(row, baseMap, "TEXT")).toBeNull();
+    });
+
+    it("returns null when source_text column is missing (index -1)", () => {
+      const mapNoText = { ...baseMap, source_text: -1 };
+      const row = ["", "some text", "", "", ""];
+      expect(getAIContext(row, mapNoText, "TEXT")).toBeNull();
+    });
+  });
+
+  describe("FILE mode", () => {
+    it("returns fileId when a valid Drive link is present", () => {
+      const row = ["https://drive.google.com/file/d/abc123defgh456ijklm789nop", "", "", "", ""];
+      const result = getAIContext(row, baseMap, "FILE");
+      expect(result).toEqual({ fileId: "abc123defgh456ijklm789nop" });
+    });
+
+    it("returns null when Drive link is invalid", () => {
+      const row = ["not-a-drive-link", "", "", "", ""];
+      expect(getAIContext(row, baseMap, "FILE")).toBeNull();
+    });
   });
 });

@@ -33,6 +33,7 @@ export default defineConfig([globalIgnores(["**/dist/", "**/node_modules/", "**/
     rules: {
         "@typescript-eslint/no-unused-vars": ["error", {
             argsIgnorePattern: "^_",
+            caughtErrorsIgnorePattern: "^_",
         }],
 
         "@typescript-eslint/explicit-function-return-type": "warn",
