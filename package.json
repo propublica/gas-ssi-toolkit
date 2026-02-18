@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "rimraf dist && rollup -c && cp appsscript.json dist/",
-    "build:watch": "rollup -c --watch",
+    "build:watch": "mkdir -p dist && cp appsscript.json dist/ && rollup -c --watch",
     "deploy:dev": "npm run build && cp .clasp.dev.json .clasp.json && clasp push",
     "deploy:prod": "npm run build && cp .clasp.prod.json .clasp.json && clasp push",
     "deploy:watch:dev": "cp .clasp.dev.json .clasp.json && npm-run-all --parallel build:watch push:watch",
