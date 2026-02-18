@@ -4,8 +4,15 @@ module.exports = {
   testEnvironment: "node",
   roots: ["<rootDir>/__tests__"],
   moduleNameMapper: {
-    // Map imports to src so tests can import from the same paths
     "^@server/(.*)$": "<rootDir>/src/server/$1",
     "^@shared/(.*)$": "<rootDir>/src/shared/$1",
+  },
+  coverageThreshold: {
+    global: {
+      statements: 23,
+      branches: 42,
+      functions: 33,
+      lines: 24,
+    },
   },
 };
