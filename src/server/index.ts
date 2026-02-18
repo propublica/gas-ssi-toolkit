@@ -56,33 +56,28 @@ export function showSidebar(): void {
 // 📂 TOOL 1: IMPORT DRIVE LINKS
 // ==========================================
 
-/**
- * Entry point invoked from the sidebar. Opens a modal dialog where the user
- * enters a Drive folder URL; the dialog's submit handler calls
- * runImportDriveLinks() via google.script.run.
- */
 export function importDriveLinks(): void {
   const ui = SpreadsheetApp.getUi();
-  const html = HtmlService.createHtmlOutput(
-    `<p>Paste a Google Drive Folder link below:</p>
-     <input id="url" type="text" style="width:100%">
-     <button onclick="google.script.run.runImportDriveLinks(document.getElementById('url').value);google.script.host.close();">Import</button>`,
-  )
-    .setWidth(400)
-    .setHeight(120);
-  ui.showModalDialog(html, "Import Drive Links");
-}
-
-/**
- * Performs the actual folder scan and writes file URLs to the active sheet.
- * Called by the Import Drive Links dialog via google.script.run.
- */
-export function runImportDriveLinks(folderUrl: string): void {
-  const ui = SpreadsheetApp.getUi();
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  const startCell = sheet.getActiveCell().getA1Notation();
 
-  const folderId = extractId(folderUrl.trim());
+  // 1. Get Folder
+  const folderResponse = ui.prompt(
+    "Step 1/2: Select Folder",
+    "Paste the Google Drive Folder Link or ID:",
+    ui.ButtonSet.OK_CANCEL,
+  );
+  if (folderResponse.getSelectedButton() !== ui.Button.OK) return;
+  const folderId = extractId(folderResponse.getResponseText().trim());
+
+  // 2. Get Location
+  const activeA1 = sheet.getActiveCell().getA1Notation();
+  const cellResponse = ui.prompt(
+    "Step 2/2: Confirm Location",
+    `Importing links starting at cell ${activeA1}.\nClick OK to proceed or type a new cell below:`,
+    ui.ButtonSet.OK_CANCEL,
+  );
+  if (cellResponse.getSelectedButton() !== ui.Button.OK) return;
+  const startCell = cellResponse.getResponseText().trim() || activeA1;
 
   try {
     const parentFolder = DriveApp.getFolderById(folderId);

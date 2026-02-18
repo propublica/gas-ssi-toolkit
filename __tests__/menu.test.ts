@@ -13,13 +13,37 @@ const mockMenu = {
 const mockCreateMenu = jest.fn().mockReturnValue(mockMenu);
 const mockShowModalDialog = jest.fn();
 const mockShowSidebarFn = jest.fn();
+const mockPromptResponse = {
+  getSelectedButton: jest.fn().mockReturnValue("CANCEL"),
+  getResponseText: jest.fn().mockReturnValue(""),
+};
 const mockUi = {
   createMenu: mockCreateMenu,
   showModalDialog: mockShowModalDialog,
   showSidebar: mockShowSidebarFn,
+  Button: { OK: "OK", YES: "YES", NO: "NO", CANCEL: "CANCEL" },
+  ButtonSet: { OK_CANCEL: "OK_CANCEL", YES_NO: "YES_NO", OK: "OK" },
+  prompt: jest.fn().mockReturnValue(mockPromptResponse),
+  alert: jest.fn(),
+};
+const mockActiveSheet = {
+  getActiveCell: jest.fn().mockReturnValue({ getA1Notation: jest.fn().mockReturnValue("A1") }),
+  getActiveRange: jest.fn(),
+  getLastRow: jest.fn().mockReturnValue(0),
+  getLastColumn: jest.fn().mockReturnValue(0),
+  getRange: jest.fn(),
+  getName: jest.fn().mockReturnValue("Sheet1"),
 };
 const mockSpreadsheetApp = {
   getUi: jest.fn().mockReturnValue(mockUi),
+  getActiveSpreadsheet: jest.fn().mockReturnValue({
+    getActiveSheet: jest.fn().mockReturnValue(mockActiveSheet),
+    getSheetByName: jest.fn().mockReturnValue(null),
+    insertSheet: jest.fn().mockReturnValue(mockActiveSheet),
+    setActiveSheet: jest.fn(),
+    toast: jest.fn(),
+  }),
+  getActive: jest.fn().mockReturnValue({ toast: jest.fn() }),
 };
 
 const mockEvaluate = jest.fn().mockReturnValue({
@@ -88,7 +112,7 @@ describe("showSidebar", () => {
 
 describe("runTool", () => {
   it("dispatches 'importDriveLinks' without throwing", () => {
-    // importDriveLinks calls SpreadsheetApp.getUi() — already mocked above
+    // importDriveLinks calls ui.prompt() which is mocked to return CANCEL (early exit)
     expect(() => runTool("importDriveLinks")).not.toThrow();
   });
 
