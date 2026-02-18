@@ -36,12 +36,13 @@ export default {
  * Global Handshake — Explicit function stubs for Google Apps Script discovery.
  */
 function onOpen(e) { _GASEntry.onOpen(e); }
+function showSidebar() { _GASEntry.showSidebar(); }
+function runTool(fn) { _GASEntry.runTool(fn); }
 function showSourceDialog() { _GASEntry.showSourceDialog(); }
 function handleDialogSelection(mode) { _GASEntry.handleDialogSelection(mode); }
 function importDriveLinks() { _GASEntry.importDriveLinks(); }
 function extractTextFromSelection() { _GASEntry.extractTextFromSelection(); }
 function sampleRowsToEvaluation() { _GASEntry.sampleRowsToEvaluation(); }
-function openQuickstartDoc() { _GASEntry.openQuickstartDoc(); }
 `,
   },
   plugins: [
