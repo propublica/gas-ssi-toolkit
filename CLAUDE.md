@@ -15,14 +15,20 @@ Built with TypeScript, bundled by Rollup into a single IIFE, deployed via clasp.
 ## Commands
 
 ```bash
-npm run build          # Clean build to dist/ (rimraf + rollup + copy appsscript.json)
-npm test               # Run Jest tests
-npm run test:watch     # Jest in watch mode
-npm run lint           # ESLint on src/
-npm run lint:fix       # ESLint with auto-fix
-npm run format         # Prettier on src/
-npm run deploy:dev     # Build + clasp push to dev script
-npm run deploy:prod    # Build + clasp push to prod script
+npm run build               # Clean build to dist/ (rimraf + rollup + copy appsscript.json)
+npm run build:watch         # Continuous rebuild on file changes
+npm test                    # Run Jest tests
+npm run test:watch          # Jest in watch mode
+npm run lint                # ESLint on src/
+npm run lint:fix            # ESLint with auto-fix
+npm run format              # Prettier on src/
+npm run deploy:dev          # Build + clasp push to dev script
+npm run deploy:prod         # Build + clasp push to prod script
+npm run deploy:watch:dev    # Continuous build + clasp push watch (dev)
+npm run deploy:watch:prod   # Continuous build + clasp push watch (prod)
+npm run clasp:open          # Open the Apps Script editor in browser
+npm run clasp:logs          # Tail execution logs from Apps Script
+npm run clasp:login         # Authenticate clasp (required before first deploy)
 ```
 
 Run a single test file: `npx jest __tests__/utils.test.ts`
@@ -51,14 +57,16 @@ If you skip step 2, the function will exist in the bundle but Apps Script won't 
 ### Module Dependency Graph
 
 ```
-index.ts  (entry point — menu, 4 tool orchestrators, UI handlers)
-├── config.ts   (CONFIG object: API key property name, model, column names, limits)
-├── api.ts      (callGeminiAPI — text or multimodal via UrlFetchApp + base64)
-├── drive.ts    (extractTextUniversal, checkDriveService — OCR via Drive Advanced Service)
-├── dialog.ts   (HTML_TEMPLATE string for AI mode selection modal)
-├── utils.ts    (extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive)
-└── types.ts    (shared interfaces: AppConfig, AIMode, ColumnMap, AIContext variants)
+src/server/index.ts   (entry point — menu, 4 tool orchestrators, UI handlers)
+├── src/server/config.ts   (CONFIG object: API key property name, model, column names, limits)
+├── src/server/api.ts      (callGeminiAPI — text or multimodal via UrlFetchApp + base64)
+├── src/server/drive.ts    (extractTextUniversal, checkDriveService — OCR via Drive Advanced Service)
+├── src/server/dialog.ts   (HTML_TEMPLATE string for AI mode selection modal)
+├── src/server/utils.ts    (extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive, sampleRows, truncateText, getAIContext)
+└── src/shared/types.ts    (shared interfaces: AppConfig, AIMode, ColumnMap, AIContext variants)
 ```
+
+Source files use relative imports (e.g. `../shared/types`). The `@server/*` and `@shared/*` aliases are **Jest-only** (mapped in `jest.config.cjs`) and are not available in TypeScript source.
 
 Only `index.ts` should reference Google Apps Script UI services (SpreadsheetApp, HtmlService, PropertiesService). Other modules use injected values or specific GAS globals documented in their headers.
 
@@ -67,6 +75,20 @@ Only `index.ts` should reference Google Apps Script UI services (SpreadsheetApp,
 Jest with ts-jest preset. Tests live in `__tests__/`. Path aliases `@server/*` and `@shared/*` are mapped in `jest.config.cjs`.
 
 **Pattern for mocking GAS globals:** Declare mocks (UrlFetchApp, DriveApp, SpreadsheetApp, etc.) as `globalThis` properties **before** importing the module under test, since imports execute immediately.
+
+### Tool 4 — Spreadsheet Column Requirements
+
+`runBatchAI` maps column headers by name. The active sheet must contain these exact headers (case-sensitive):
+
+| Config key | Column header |
+| --- | --- |
+| `SOURCE_DRIVE` | `source_drive` |
+| `SOURCE_TEXT` | `source_text` |
+| `SYS_PROMPT` | `system_prompt` |
+| `USER_PROMPT` | `user_prompt` |
+| `OUTPUT` | `ai_inference` |
+
+The Gemini API key must be set as a Script Property (`GEMINI_API_KEY`) in Apps Script > Project Settings > Script Properties before Tool 4 will run.
 
 ### Key Constraints
 
@@ -80,6 +102,7 @@ Jest with ts-jest preset. Tests live in `__tests__/`. Path aliases `@server/*` a
 ## Code Style
 
 Follows Google TypeScript Style Guide (enforced by ESLint + Prettier + pre-commit hooks via husky/lint-staged):
+
 - Named exports only (no default exports)
 - `const` by default, no `var`, no `namespace`
 - `===` always, avoid `any` (prefer `unknown`)
