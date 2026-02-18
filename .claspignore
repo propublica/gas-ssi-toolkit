@@ -4,6 +4,7 @@
 **/**
 !appsscript.json
 !**/*.js
+!**/*.html
 
 # Exclude source maps and type declarations from the push
 **/*.js.map

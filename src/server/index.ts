@@ -28,29 +28,9 @@ import type { AIMode, ColumnMap } from "../shared/types";
 
 export function onOpen(): void {
   SpreadsheetApp.getUi()
-    .createMenu("⚡ SSI Tools")
-    .addItem("0. Quickstart", "openQuickstartDoc")
-    .addItem("1. Import Drive Links (Folder)", "importDriveLinks")
-    .addItem("2. Extract Text from Selected Cells", "extractTextFromSelection")
-    .addSeparator()
-    .addItem("3. 🎲 Sample Rows for Evaluation", "sampleRowsToEvaluation")
-    .addItem("4. ▶️ Run AI on Selected Rows", "showSourceDialog")
+    .createMenu("⚡ SSI Toolkit")
+    .addItem("🚀 Open SSI Sidebar", "showSidebar")
     .addToUi();
-}
-
-// ==========================================
-// 🚀 QUICKSTART
-// ==========================================
-
-export function openQuickstartDoc(): void {
-  const url =
-    "https://docs.google.com/document/d/1BQJzBHiE6L0hvU6NMD0jaQE71VWRpWH-vNQu3UtGjBA/edit?usp=sharing";
-  const htmlOutput = HtmlService.createHtmlOutput(
-    `<script>window.open('${url}', '_blank');google.script.host.close();</script>`,
-  )
-    .setWidth(10)
-    .setHeight(10);
-  SpreadsheetApp.getUi().showModalDialog(htmlOutput, "Opening Quickstart Guide");
 }
 
 // ==========================================
@@ -64,6 +44,12 @@ export function showSourceDialog(): void {
 
 export function handleDialogSelection(mode: string): void {
   runBatchAI(mode as AIMode);
+}
+
+export function showSidebar(): void {
+  const html = HtmlService.createTemplateFromFile("Sidebar");
+  const output = html.evaluate().setTitle("SSI Toolkit").setWidth(300);
+  SpreadsheetApp.getUi().showSidebar(output);
 }
 
 // ==========================================
@@ -315,4 +301,21 @@ export function runBatchAI(mode: AIMode): void {
     }
   }
   SpreadsheetApp.getActive().toast(`Complete! Processed ${processed} rows.`, "Success", 5);
+}
+
+// ==========================================
+// 🔀 SIDEBAR DISPATCHER
+// ==========================================
+
+const TOOLS: Record<string, () => void> = {
+  importDriveLinks,
+  showSourceDialog,
+  sampleRowsToEvaluation,
+  extractTextFromSelection,
+};
+
+export function runTool(functionName: string): void {
+  const fn = TOOLS[functionName];
+  if (!fn) throw new Error("Function not found: " + functionName);
+  fn();
 }
