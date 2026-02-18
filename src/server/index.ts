@@ -39,10 +39,10 @@ export function openQuickstartDoc(): void {
   const url =
     "https://docs.google.com/document/d/1BQJzBHiE6L0hvU6NMD0jaQE71VWRpWH-vNQu3UtGjBA/edit?usp=sharing";
   const htmlOutput = HtmlService.createHtmlOutput(
-    `<script>window.open('${url}', '_blank');</script>`,
+    `<script>window.open('${url}', '_blank');google.script.host.close();</script>`,
   )
-    .setWidth(30)
-    .setHeight(30);
+    .setWidth(10)
+    .setHeight(10);
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, "Opening Quickstart Guide");
 }
 
