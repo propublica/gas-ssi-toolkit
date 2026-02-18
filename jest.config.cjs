@@ -19,10 +19,8 @@ module.exports = {
     "!src/server/index.ts",
   ],
   coverageThreshold: {
-    // Thresholds are set ~5 points below observed full-suite coverage.
-    // utils.ts functions is set at 100% (above current 90%) intentionally:
-    // it acts as the TDD gate that requires getAllFilesRecursive to be tested
-    // (Task 3). All other thresholds are already met.
+    // Thresholds are set ~5 points below observed full-suite coverage to allow
+    // minor fluctuations without requiring constant updates.
     // config.ts, dialog.ts (pure exports) and shared/types.ts (interfaces only)
     // are included in collectCoverageFrom but need no explicit thresholds —
     // they contain no branching logic and are fully exercised by other tests.

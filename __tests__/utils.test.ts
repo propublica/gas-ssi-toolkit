@@ -1,8 +1,9 @@
 /**
  * Tests for src/server/utils.ts
  *
- * These are the pure functions that have zero dependency on Apps Script
- * globals, so they need no mocking at all.
+ * Most functions in utils.ts are purely computational with no GAS dependencies.
+ * getAllFilesRecursive accepts a GAS Folder type but is testable via duck-typed
+ * fake iterators — no globalThis mocking required.
  */
 
 import {
