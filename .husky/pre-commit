@@ -1,1 +1,2 @@
+npx jest --bail
 npx lint-staged
