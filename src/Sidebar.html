@@ -127,20 +127,20 @@
 
         <div class="section">
             <h3>Main Tools</h3>
-            <button class="tool-btn" onclick="run('importDriveLinks')">
+            <button class="tool-btn" onclick="run(event, 'importDriveLinks')">
                 <span class="icon">📂</span> Import Drive Links
             </button>
-            <button class="tool-btn" onclick="run('showSourceDialog')">
+            <button class="tool-btn" onclick="run(event, 'showSourceDialog')">
                 <span class="icon">▶️</span> Run AI Inference
             </button>
         </div>
 
         <div class="section">
             <h3>Extras</h3>
-            <button class="tool-btn" onclick="run('sampleRowsToEvaluation')">
+            <button class="tool-btn" onclick="run(event, 'sampleRowsToEvaluation')">
                 <span class="icon">🎲</span> Sample Rows
             </button>
-            <button class="tool-btn" onclick="run('extractTextFromSelection')">
+            <button class="tool-btn" onclick="run(event, 'extractTextFromSelection')">
                 <span class="icon">📜</span> Extract Text
             </button>
         </div>
@@ -153,8 +153,8 @@
     </div>
 
     <script>
-        function run(fn) {
-            const btn = event.currentTarget;
+        function run(e, fn) {
+            const btn = e.currentTarget;
             const originalContent = btn.innerHTML;
 
             btn.classList.add('loading');
