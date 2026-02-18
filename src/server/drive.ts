@@ -17,7 +17,6 @@ export function checkDriveService(ui: GoogleAppsScript.Base.Ui): boolean {
     Drive.Files;
     return true;
   } catch (_e) {
-    // eslint-disable-line @typescript-eslint/no-unused-vars
     ui.alert(
       "🛑 Setup Required",
       'Please enable "Drive API" in the Services list (+ icon on left).',
