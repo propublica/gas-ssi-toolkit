@@ -111,6 +111,10 @@ describe("showSidebar", () => {
 });
 
 describe("runTool", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it("dispatches 'importDriveLinks' without throwing", () => {
     // importDriveLinks calls ui.prompt() which is mocked to return CANCEL (early exit)
     expect(() => runTool("importDriveLinks")).not.toThrow();
