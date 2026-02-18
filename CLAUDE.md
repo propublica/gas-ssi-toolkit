@@ -19,9 +19,12 @@ npm run build               # Clean build to dist/ (rimraf + rollup + copy appss
 npm run build:watch         # Continuous rebuild on file changes
 npm test                    # Run Jest tests
 npm run test:watch          # Jest in watch mode
+npm run test:coverage       # Run Jest with coverage + enforce per-file thresholds
 npm run lint                # ESLint on src/
 npm run lint:fix            # ESLint with auto-fix
-npm run format              # Prettier on src/
+npm run format              # Prettier on src/ (rewrites files)
+npm run format:check        # Check Prettier formatting without modifying files
+npm run typecheck           # TypeScript type check without building (tsc --noEmit)
 npm run deploy:dev          # Build + clasp push to dev script
 npm run deploy:prod         # Build + clasp push to prod script
 npm run deploy:watch:dev    # Continuous build + clasp push watch (dev)
@@ -75,6 +78,10 @@ Only `index.ts` should reference Google Apps Script UI services (SpreadsheetApp,
 Jest with ts-jest preset. Tests live in `__tests__/`. Path aliases `@server/*` and `@shared/*` are mapped in `jest.config.cjs`.
 
 **Pattern for mocking GAS globals:** Declare mocks (UrlFetchApp, DriveApp, SpreadsheetApp, etc.) as `globalThis` properties **before** importing the module under test, since imports execute immediately.
+
+**Coverage:** Run `npm run test:coverage` to collect coverage and enforce per-file thresholds. Coverage is opt-in — the pre-commit hook runs `jest --bail` without `--coverage`. `src/server/index.ts` is excluded from coverage collection: `onOpen` and `openQuickstartDoc` are tested in `menu.test.ts`, but the four tool orchestrators are deeply coupled to SpreadsheetApp UI globals and are not unit-tested. See `docs/plans/2026-02-18-testing-coverage-design.md` for full rationale.
+
+**CI:** `.github/workflows/lint-typecheck-format-test.yml` runs on push to `main` and PRs targeting `main`: lint → typecheck → format check → test with coverage.
 
 ### Tool 4 — Spreadsheet Column Requirements
 
