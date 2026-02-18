@@ -9,11 +9,12 @@ import {
   extractId,
   isValidDriveLink,
   createSeededRandom,
+  getAllFilesRecursive,
   sampleRows,
   truncateText,
   getAIContext,
 } from "../src/server/utils";
-import type { ColumnMap } from "../src/shared/types";
+import type { ColumnMap, DriveFileInfo } from "../src/shared/types";
 
 describe("extractId", () => {
   it("extracts ID from a standard Drive file URL", () => {
@@ -184,5 +185,55 @@ describe("getAIContext", () => {
       const row = ["not-a-drive-link", "", "", "", ""];
       expect(getAIContext(row, baseMap, "FILE")).toBeNull();
     });
+  });
+});
+
+describe("getAllFilesRecursive", () => {
+  function makeFileIterator(urls: string[]) {
+    let i = 0;
+    return { hasNext: () => i < urls.length, next: () => ({ getUrl: () => urls[i++] }) };
+  }
+
+  function makeFolderIterator(folders: object[]) {
+    let i = 0;
+    return { hasNext: () => i < folders.length, next: () => folders[i++] };
+  }
+
+  function makeFolder(urls: string[], subfolders: object[] = []) {
+    return {
+      getFiles: () => makeFileIterator(urls),
+      getFolders: () => makeFolderIterator(subfolders),
+    };
+  }
+
+  it("collects file URLs from a flat folder", () => {
+    const folder = makeFolder([
+      "https://drive.google.com/file/d/abc",
+      "https://drive.google.com/file/d/def",
+    ]);
+    const result: DriveFileInfo[] = [];
+    getAllFilesRecursive(folder as any, result);
+    expect(result).toEqual([
+      { url: "https://drive.google.com/file/d/abc" },
+      { url: "https://drive.google.com/file/d/def" },
+    ]);
+  });
+
+  it("recurses into subfolders", () => {
+    const subfolder = makeFolder(["https://drive.google.com/file/d/xyz"]);
+    const rootFolder = makeFolder(["https://drive.google.com/file/d/abc"], [subfolder]);
+    const result: DriveFileInfo[] = [];
+    getAllFilesRecursive(rootFolder as any, result);
+    expect(result).toEqual([
+      { url: "https://drive.google.com/file/d/abc" },
+      { url: "https://drive.google.com/file/d/xyz" },
+    ]);
+  });
+
+  it("returns an empty list for an empty folder", () => {
+    const folder = makeFolder([]);
+    const result: DriveFileInfo[] = [];
+    getAllFilesRecursive(folder as any, result);
+    expect(result).toHaveLength(0);
   });
 });
