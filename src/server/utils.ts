@@ -70,3 +70,11 @@ export function sampleRows(data: unknown[][], sampleSize: number, seed: number):
   }
   return indices.slice(0, sampleSize).map((index) => data[index]);
 }
+
+/**
+ * Truncate text to maxLength characters, appending a suffix if truncated.
+ */
+export function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + "... [TRUNCATED]";
+}

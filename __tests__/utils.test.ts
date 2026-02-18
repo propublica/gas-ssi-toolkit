@@ -5,7 +5,13 @@
  * globals, so they need no mocking at all.
  */
 
-import { extractId, isValidDriveLink, createSeededRandom, sampleRows } from "../src/server/utils";
+import {
+  extractId,
+  isValidDriveLink,
+  createSeededRandom,
+  sampleRows,
+  truncateText,
+} from "../src/server/utils";
 
 describe("extractId", () => {
   it("extracts ID from a standard Drive file URL", () => {
@@ -105,5 +111,22 @@ describe("sampleRows", () => {
     const result = sampleRows(data, 5, 42);
     expect(result).toHaveLength(5);
     expect(result).toEqual(expect.arrayContaining(data));
+  });
+});
+
+describe("truncateText", () => {
+  it("returns short text unchanged", () => {
+    expect(truncateText("hello", 100)).toBe("hello");
+  });
+
+  it("returns text at exact limit unchanged", () => {
+    const text = "a".repeat(100);
+    expect(truncateText(text, 100)).toBe(text);
+  });
+
+  it("truncates text over the limit and appends suffix", () => {
+    const text = "a".repeat(101);
+    const result = truncateText(text, 100);
+    expect(result).toBe("a".repeat(100) + "... [TRUNCATED]");
   });
 });

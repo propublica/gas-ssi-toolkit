@@ -11,7 +11,13 @@
 import { CONFIG } from "./config";
 import { callGeminiAPI } from "./api";
 import { checkDriveService, extractTextUniversal } from "./drive";
-import { extractId, isValidDriveLink, getAllFilesRecursive, sampleRows } from "./utils";
+import {
+  extractId,
+  isValidDriveLink,
+  getAllFilesRecursive,
+  sampleRows,
+  truncateText,
+} from "./utils";
 import { HTML_TEMPLATE } from "./dialog";
 import type { AIMode, ColumnMap } from "../shared/types";
 
@@ -148,8 +154,7 @@ export function extractTextFromSelection(): void {
       const fileId = extractId(cellValue);
       SpreadsheetApp.getActive().toast(`Extracting (${i + 1}/${totalRows})`, "Processing", -1);
 
-      let text = extractTextUniversal(fileId);
-      if (text.length > 49000) text = text.substring(0, 49000) + "... [TRUNCATED]";
+      const text = truncateText(extractTextUniversal(fileId), 49000);
 
       range.getCell(i + 1, 2).setValue(text);
       processedCount++;
