@@ -13,6 +13,7 @@ import { callGeminiAPI } from "./api";
 import { checkDriveService, extractTextUniversal } from "./drive";
 import {
   extractId,
+  getAIContext,
   isValidDriveLink,
   getAllFilesRecursive,
   sampleRows,
@@ -299,24 +300,11 @@ export function runBatchAI(mode: AIMode): void {
       let result = "";
 
       try {
-        if (mode === "TEXT") {
-          const txt = map.source_text > -1 ? (row[map.source_text] as string) : "";
-          if (txt && txt.length > 5 && !txt.includes("Error")) {
-            result = callGeminiAPI(apiKey, row[map.sys_prompt] as string, usrPrompt, {
-              textContext: txt,
-            });
-          } else {
-            result = "[Skipped: No valid text]";
-          }
-        } else if (mode === "FILE") {
-          const link = row[map.source_drive] as string;
-          if (isValidDriveLink(link)) {
-            result = callGeminiAPI(apiKey, row[map.sys_prompt] as string, usrPrompt, {
-              fileId: extractId(link),
-            });
-          } else {
-            result = "[Skipped: No valid Drive Link]";
-          }
+        const context = getAIContext(row, map, mode);
+        if (context) {
+          result = callGeminiAPI(apiKey, row[map.sys_prompt] as string, usrPrompt, context);
+        } else {
+          result = mode === "TEXT" ? "[Skipped: No valid text]" : "[Skipped: No valid Drive Link]";
         }
         sheet.getRange(realRowIndex, map.output + 1).setValue(result);
         processed++;

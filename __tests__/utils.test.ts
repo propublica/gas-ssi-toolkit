@@ -11,7 +11,9 @@ import {
   createSeededRandom,
   sampleRows,
   truncateText,
+  getAIContext,
 } from "../src/server/utils";
+import type { ColumnMap } from "../src/shared/types";
 
 describe("extractId", () => {
   it("extracts ID from a standard Drive file URL", () => {
@@ -128,5 +130,59 @@ describe("truncateText", () => {
     const text = "a".repeat(101);
     const result = truncateText(text, 100);
     expect(result).toBe("a".repeat(100) + "... [TRUNCATED]");
+  });
+});
+
+describe("getAIContext", () => {
+  const baseMap: ColumnMap = {
+    source_drive: 0,
+    source_text: 1,
+    sys_prompt: 2,
+    user_prompt: 3,
+    output: 4,
+  };
+
+  describe("TEXT mode", () => {
+    it("returns textContext when source text is valid", () => {
+      const row = [
+        "https://drive.google.com/file/d/abc",
+        "This is valid text for the AI",
+        "",
+        "",
+        "",
+      ];
+      expect(getAIContext(row, baseMap, "TEXT")).toEqual({
+        textContext: "This is valid text for the AI",
+      });
+    });
+
+    it("returns null when source text is too short (5 chars or fewer)", () => {
+      const row = ["", "hi", "", "", ""];
+      expect(getAIContext(row, baseMap, "TEXT")).toBeNull();
+    });
+
+    it("returns null when source text contains 'Error'", () => {
+      const row = ["", "[Error: something went wrong]", "", "", ""];
+      expect(getAIContext(row, baseMap, "TEXT")).toBeNull();
+    });
+
+    it("returns null when source_text column is missing (index -1)", () => {
+      const mapNoText = { ...baseMap, source_text: -1 };
+      const row = ["", "some text", "", "", ""];
+      expect(getAIContext(row, mapNoText, "TEXT")).toBeNull();
+    });
+  });
+
+  describe("FILE mode", () => {
+    it("returns fileId when a valid Drive link is present", () => {
+      const row = ["https://drive.google.com/file/d/abc123defgh456ijklm789nop", "", "", "", ""];
+      const result = getAIContext(row, baseMap, "FILE");
+      expect(result).toEqual({ fileId: "abc123defgh456ijklm789nop" });
+    });
+
+    it("returns null when Drive link is invalid", () => {
+      const row = ["not-a-drive-link", "", "", "", ""];
+      expect(getAIContext(row, baseMap, "FILE")).toBeNull();
+    });
   });
 });

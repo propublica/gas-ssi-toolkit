@@ -5,7 +5,7 @@
  * trivially testable without mocking.
  */
 
-import type { DriveFileInfo } from "../shared/types";
+import type { AIContext, AIMode, ColumnMap, DriveFileInfo } from "../shared/types";
 
 /**
  * Extract a Google Drive file/folder ID from a URL or raw ID string.
@@ -77,4 +77,26 @@ export function sampleRows(data: unknown[][], sampleSize: number, seed: number):
 export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + "... [TRUNCATED]";
+}
+
+/**
+ * Determine the AI context for a row, or return null to skip it.
+ * Pure function — no GAS dependencies.
+ */
+export function getAIContext(row: unknown[], map: ColumnMap, mode: AIMode): AIContext | null {
+  if (mode === "TEXT") {
+    const txt = map.source_text > -1 ? (row[map.source_text] as string) : "";
+    if (txt && txt.length > 5 && !txt.includes("Error")) {
+      return { textContext: txt };
+    }
+    return null;
+  }
+  if (mode === "FILE") {
+    const link = row[map.source_drive] as string;
+    if (isValidDriveLink(link)) {
+      return { fileId: extractId(link) };
+    }
+    return null;
+  }
+  return null;
 }
