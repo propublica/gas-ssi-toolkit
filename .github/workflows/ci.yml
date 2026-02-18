@@ -25,8 +25,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Type check
+        run: npx tsc --noEmit
+
       - name: Check formatting
-        run: npx prettier --check 'src/**/*.ts'
+        run: npm run format:check
 
       - name: Test with coverage
         run: npm run test:coverage
