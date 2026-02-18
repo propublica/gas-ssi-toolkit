@@ -11,7 +11,7 @@
 import { CONFIG } from "./config";
 import { callGeminiAPI } from "./api";
 import { checkDriveService, extractTextUniversal } from "./drive";
-import { extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive } from "./utils";
+import { extractId, isValidDriveLink, getAllFilesRecursive, sampleRows } from "./utils";
 import { HTML_TEMPLATE } from "./dialog";
 import type { AIMode, ColumnMap } from "../shared/types";
 
@@ -214,15 +214,7 @@ export function sampleRowsToEvaluation(): void {
     targetSheet.getRange(1, 1, 1, headers[0].length).setValues(headers);
   }
 
-  // Fisher-Yates shuffle with seeded random
-  const seededRandom = createSeededRandom(seed);
-  const indices = allData.map((_, i) => i);
-  for (let i = indices.length - 1; i > 0; i--) {
-    const j = Math.floor(seededRandom() * (i + 1));
-    [indices[i], indices[j]] = [indices[j], indices[i]];
-  }
-
-  const selectedRows = indices.slice(0, sampleSize).map((index) => allData[index]);
+  const selectedRows = sampleRows(allData, sampleSize, seed);
 
   // Write to target
   const targetRow = targetSheet.getLastRow() + 1;

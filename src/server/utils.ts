@@ -56,3 +56,17 @@ export function getAllFilesRecursive(
     getAllFilesRecursive(subfolders.next(), fileList);
   }
 }
+
+/**
+ * Sample `sampleSize` rows from `data` using a seeded Fisher-Yates shuffle.
+ * Reproducible: same seed always produces the same selection.
+ */
+export function sampleRows(data: unknown[][], sampleSize: number, seed: number): unknown[][] {
+  const seededRandom = createSeededRandom(seed);
+  const indices = data.map((_, i) => i);
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(seededRandom() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  return indices.slice(0, sampleSize).map((index) => data[index]);
+}

@@ -5,7 +5,7 @@
  * globals, so they need no mocking at all.
  */
 
-import { extractId, isValidDriveLink, createSeededRandom } from "../src/server/utils";
+import { extractId, isValidDriveLink, createSeededRandom, sampleRows } from "../src/server/utils";
 
 describe("extractId", () => {
   it("extracts ID from a standard Drive file URL", () => {
@@ -79,5 +79,31 @@ describe("createSeededRandom", () => {
       expect(val).toBeGreaterThanOrEqual(0);
       expect(val).toBeLessThan(1);
     }
+  });
+});
+
+describe("sampleRows", () => {
+  const data = [["a"], ["b"], ["c"], ["d"], ["e"]];
+
+  it("returns the correct number of rows", () => {
+    expect(sampleRows(data, 3, 42)).toHaveLength(3);
+  });
+
+  it("produces reproducible output for the same seed", () => {
+    const first = sampleRows(data, 3, 42);
+    const second = sampleRows(data, 3, 42);
+    expect(first).toEqual(second);
+  });
+
+  it("produces different output for different seeds", () => {
+    const first = sampleRows(data, 3, 42);
+    const second = sampleRows(data, 3, 99);
+    expect(first).not.toEqual(second);
+  });
+
+  it("returns all rows when sampleSize equals data length", () => {
+    const result = sampleRows(data, 5, 42);
+    expect(result).toHaveLength(5);
+    expect(result).toEqual(expect.arrayContaining(data));
   });
 });
