@@ -1,42 +1,49 @@
 /**
- * Tests for src/server/index.ts (Menu related functions)
+ * Tests for src/server/index.ts (Menu and sidebar functions)
  */
 
 // ── Mock globals BEFORE imports ────────────────────────────────
 
-const mockAddItem = jest.fn().mockReturnThis(); // This allows chaining
-const mockAddSeparator = jest.fn().mockReturnThis();
+const mockAddItem = jest.fn().mockReturnThis();
 const mockAddToUi = jest.fn();
 const mockMenu = {
   addItem: mockAddItem,
-  addSeparator: mockAddSeparator,
   addToUi: mockAddToUi,
 };
 const mockCreateMenu = jest.fn().mockReturnValue(mockMenu);
-const mockShowModalDialog = jest.fn(); // Mock for showModalDialog
+const mockShowModalDialog = jest.fn();
+const mockShowSidebarFn = jest.fn();
 const mockUi = {
   createMenu: mockCreateMenu,
-  showModalDialog: mockShowModalDialog, // Added this
+  showModalDialog: mockShowModalDialog,
+  showSidebar: mockShowSidebarFn,
 };
 const mockSpreadsheetApp = {
   getUi: jest.fn().mockReturnValue(mockUi),
 };
 
+const mockEvaluate = jest.fn().mockReturnValue({
+  setTitle: jest.fn().mockReturnThis(),
+  setWidth: jest.fn().mockReturnThis(),
+});
+const mockCreateTemplateFromFile = jest.fn().mockReturnValue({
+  evaluate: mockEvaluate,
+});
 const mockCreateHtmlOutput = jest.fn().mockReturnValue({
-  // Mock methods that return 'this' for chaining
   setWidth: jest.fn().mockReturnThis(),
   setHeight: jest.fn().mockReturnThis(),
 });
 const mockHtmlService = {
   createHtmlOutput: mockCreateHtmlOutput,
+  createTemplateFromFile: mockCreateTemplateFromFile,
 };
 
 (globalThis as any).SpreadsheetApp = mockSpreadsheetApp;
-(globalThis as any).HtmlService = mockHtmlService; // Mock HtmlService
+(globalThis as any).HtmlService = mockHtmlService;
 
 // ── Import after mocks ─────────────────────────────────────────
 
-import { onOpen, openQuickstartDoc } from "../src/server/index"; // Import openQuickstartDoc
+import { onOpen, showSidebar, runTool } from "../src/server/index";
 
 // ── Tests ──────────────────────────────────────────────────────
 
@@ -45,41 +52,47 @@ describe("onOpen", () => {
     jest.clearAllMocks();
   });
 
-  it("should create an 'SSI Toolkit' menu", () => {
+  it("creates a menu named '⚡ SSI Toolkit'", () => {
     onOpen();
-    expect(mockSpreadsheetApp.getUi).toHaveBeenCalledTimes(1);
-    expect(mockCreateMenu).toHaveBeenCalledWith("⚡ SSI Tools");
+    expect(mockCreateMenu).toHaveBeenCalledWith("⚡ SSI Toolkit");
   });
 
-  it("should add '0. Quickstart' as the first menu item", () => {
+  it("adds a single item that opens the sidebar", () => {
     onOpen();
-    expect(mockAddItem).toHaveBeenNthCalledWith(1, "0. Quickstart", "openQuickstartDoc");
+    expect(mockAddItem).toHaveBeenCalledTimes(1);
+    expect(mockAddItem).toHaveBeenCalledWith("🚀 Open SSI Sidebar", "showSidebar");
   });
 
-  it("should add the menu to the UI", () => {
+  it("adds the menu to the UI", () => {
     onOpen();
     expect(mockAddToUi).toHaveBeenCalledTimes(1);
   });
 });
 
-describe("openQuickstartDoc", () => {
+describe("showSidebar", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it("should open the quickstart document in a new tab", () => {
-    openQuickstartDoc();
+  it("loads the sidebar from the 'Sidebar' template file", () => {
+    showSidebar();
+    expect(mockCreateTemplateFromFile).toHaveBeenCalledWith("Sidebar");
+  });
 
-    // Expect HtmlService.createHtmlOutput to be called with specific content
-    expect(mockCreateHtmlOutput).toHaveBeenCalledWith(
-      expect.stringContaining(
-        "window.open('https://docs.google.com/document/d/1BQJzBHiE6L0hvU6NMD0jaQE71VWRpWH-vNQu3UtGjBA/edit?usp=sharing', '_blank');google.script.host.close();",
-      ),
-    );
+  it("evaluates the template and shows the sidebar", () => {
+    showSidebar();
+    expect(mockEvaluate).toHaveBeenCalledTimes(1);
+    expect(mockShowSidebarFn).toHaveBeenCalledTimes(1);
+  });
+});
 
-    // Expect showModalDialog to be called
-    expect(mockShowModalDialog).toHaveBeenCalledTimes(1);
-    expect(mockCreateHtmlOutput().setWidth).toHaveBeenCalledWith(10); // Check for arbitrary width
-    expect(mockCreateHtmlOutput().setHeight).toHaveBeenCalledWith(10); // Check for arbitrary height
+describe("runTool", () => {
+  it("dispatches 'importDriveLinks' without throwing", () => {
+    // importDriveLinks calls SpreadsheetApp.getUi() — already mocked above
+    expect(() => runTool("importDriveLinks")).not.toThrow();
+  });
+
+  it("throws for an unknown function name", () => {
+    expect(() => runTool("doesNotExist")).toThrow("Function not found: doesNotExist");
   });
 });
