@@ -28,29 +28,9 @@ import type { AIMode, ColumnMap } from "../shared/types";
 
 export function onOpen(): void {
   SpreadsheetApp.getUi()
-    .createMenu("⚡ SSI Tools")
-    .addItem("0. Quickstart", "openQuickstartDoc")
-    .addItem("1. Import Drive Links (Folder)", "importDriveLinks")
-    .addItem("2. Extract Text from Selected Cells", "extractTextFromSelection")
-    .addSeparator()
-    .addItem("3. 🎲 Sample Rows for Evaluation", "sampleRowsToEvaluation")
-    .addItem("4. ▶️ Run AI on Selected Rows", "showSourceDialog")
+    .createMenu("⚡ SSI Toolkit")
+    .addItem("🚀 Open SSI Sidebar", "showSidebar")
     .addToUi();
-}
-
-// ==========================================
-// 🚀 QUICKSTART
-// ==========================================
-
-export function openQuickstartDoc(): void {
-  const url =
-    "https://docs.google.com/document/d/1BQJzBHiE6L0hvU6NMD0jaQE71VWRpWH-vNQu3UtGjBA/edit?usp=sharing";
-  const htmlOutput = HtmlService.createHtmlOutput(
-    `<script>window.open('${url}', '_blank');google.script.host.close();</script>`,
-  )
-    .setWidth(10)
-    .setHeight(10);
-  SpreadsheetApp.getUi().showModalDialog(htmlOutput, "Opening Quickstart Guide");
 }
 
 // ==========================================
@@ -66,32 +46,43 @@ export function handleDialogSelection(mode: string): void {
   runBatchAI(mode as AIMode);
 }
 
+export function showSidebar(): void {
+  const html = HtmlService.createTemplateFromFile("Sidebar");
+  const output = html.evaluate().setTitle("SSI Toolkit").setWidth(300);
+  SpreadsheetApp.getUi().showSidebar(output);
+}
+
 // ==========================================
 // 📂 TOOL 1: IMPORT DRIVE LINKS
 // ==========================================
 
+/**
+ * Entry point invoked from the sidebar. Opens a modal dialog where the user
+ * enters a Drive folder URL; the dialog's submit handler calls
+ * runImportDriveLinks() via google.script.run.
+ */
 export function importDriveLinks(): void {
   const ui = SpreadsheetApp.getUi();
+  const html = HtmlService.createHtmlOutput(
+    `<p>Paste a Google Drive Folder link below:</p>
+     <input id="url" type="text" style="width:100%">
+     <button onclick="google.script.run.runImportDriveLinks(document.getElementById('url').value);google.script.host.close();">Import</button>`,
+  )
+    .setWidth(400)
+    .setHeight(120);
+  ui.showModalDialog(html, "Import Drive Links");
+}
+
+/**
+ * Performs the actual folder scan and writes file URLs to the active sheet.
+ * Called by the Import Drive Links dialog via google.script.run.
+ */
+export function runImportDriveLinks(folderUrl: string): void {
+  const ui = SpreadsheetApp.getUi();
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const startCell = sheet.getActiveCell().getA1Notation();
 
-  // 1. Get Folder
-  const folderResponse = ui.prompt(
-    "Step 1/2: Select Folder",
-    "Paste the Google Drive Folder Link or ID:",
-    ui.ButtonSet.OK_CANCEL,
-  );
-  if (folderResponse.getSelectedButton() !== ui.Button.OK) return;
-  const folderId = extractId(folderResponse.getResponseText().trim());
-
-  // 2. Get Location
-  const activeA1 = sheet.getActiveCell().getA1Notation();
-  const cellResponse = ui.prompt(
-    "Step 2/2: Confirm Location",
-    `Importing links starting at cell ${activeA1}.\nClick OK to proceed or type a new cell below:`,
-    ui.ButtonSet.OK_CANCEL,
-  );
-  if (cellResponse.getSelectedButton() !== ui.Button.OK) return;
-  const startCell = cellResponse.getResponseText().trim() || activeA1;
+  const folderId = extractId(folderUrl.trim());
 
   try {
     const parentFolder = DriveApp.getFolderById(folderId);
@@ -315,4 +306,21 @@ export function runBatchAI(mode: AIMode): void {
     }
   }
   SpreadsheetApp.getActive().toast(`Complete! Processed ${processed} rows.`, "Success", 5);
+}
+
+// ==========================================
+// 🔀 SIDEBAR DISPATCHER
+// ==========================================
+
+const TOOLS: Record<string, () => void> = {
+  importDriveLinks,
+  showSourceDialog,
+  sampleRowsToEvaluation,
+  extractTextFromSelection,
+};
+
+export function runTool(functionName: string): void {
+  const fn = TOOLS[functionName];
+  if (!fn) throw new Error("Function not found: " + functionName);
+  fn();
 }
