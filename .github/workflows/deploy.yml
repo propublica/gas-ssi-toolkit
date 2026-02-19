@@ -54,7 +54,7 @@ jobs:
       # Note: the existing deploy:dev npm script calls clasp push without --adc,
       # so we inline the commands here instead.
       - name: Deploy to dev
-        run: npm run build && cp .clasp.dev.json .clasp.json && clasp push --adc
+        run: npm run build && cp .clasp.dev.json .clasp.json && npx clasp push --adc
 
   deploy-prod:
     # Same gate logic, but only fires on pushes to main
@@ -90,4 +90,4 @@ jobs:
 
       # Build + copy .clasp.prod.json + push using ADC credentials from the step above.
       - name: Deploy to prod
-        run: npm run build && cp .clasp.prod.json .clasp.json && clasp push --adc
+        run: npm run build && cp .clasp.prod.json .clasp.json && npx clasp push --adc
