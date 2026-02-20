@@ -89,6 +89,13 @@ describe("createSeededRandom", () => {
       expect(val).toBeLessThan(1);
     }
   });
+
+  it("produces values in [0, 1) when called without a seed", () => {
+    const rng = createSeededRandom();
+    const val = rng();
+    expect(val).toBeGreaterThanOrEqual(0);
+    expect(val).toBeLessThan(1);
+  });
 });
 
 describe("sampleRows", () => {
