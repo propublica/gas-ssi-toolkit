@@ -42,19 +42,36 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Exchange GitHub's OIDC token for a short-lived GCP access token
-      # via Workload Identity Federation. Sets GOOGLE_APPLICATION_CREDENTIALS.
+      # Exchange GitHub's OIDC token for a short-lived OAuth 2.0 access token
+      # via Workload Identity Federation. token_format: access_token is required
+      # because clasp cannot parse the external_account credential file that WIF
+      # writes by default — this gives clasp a concrete token it can use directly.
       - name: Authenticate to Google Cloud
+        id: auth
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+          token_format: 'access_token'
+          access_token_scopes: 'https://www.googleapis.com/auth/script.projects,https://www.googleapis.com/auth/drive.file,https://www.googleapis.com/auth/script.deployments'
 
-      # Build + copy .clasp.dev.json + push using ADC credentials from the step above.
-      # Note: the existing deploy:dev npm script calls clasp push without --adc,
-      # so we inline the commands here instead.
+      # Write the access token to ~/.clasprc.json where clasp reads credentials.
+      # expiry_date is set far in the future to prevent clasp attempting a refresh
+      # (there is no refresh token — the 1-hour access token is sufficient for a push).
+      # ACCESS_TOKEN is passed via env to avoid shell interpolation exposure.
+      - name: Write clasp credentials
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: |
+          python3 -c "
+          import json, os
+          json.dump({'token': {'access_token': os.environ['ACCESS_TOKEN'], 'token_type': 'Bearer', 'expiry_date': 9999999999999}}, open(os.path.expanduser('~/.clasprc.json'), 'w'))
+          "
+
+      # Build, copy dev clasp config, and push. Clasp reads credentials from
+      # ~/.clasprc.json written in the previous step.
       - name: Deploy to dev
-        run: npm run build && cp .clasp.dev.json .clasp.json && npx clasp push --adc
+        run: npm run build && cp .clasp.dev.json .clasp.json && npx clasp push
 
   deploy-prod:
     # Same gate logic, but only fires on pushes to main
@@ -80,14 +97,33 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Exchange GitHub's OIDC token for a short-lived GCP access token
-      # via Workload Identity Federation. Sets GOOGLE_APPLICATION_CREDENTIALS.
+      # Exchange GitHub's OIDC token for a short-lived OAuth 2.0 access token
+      # via Workload Identity Federation. token_format: access_token is required
+      # because clasp cannot parse the external_account credential file that WIF
+      # writes by default — this gives clasp a concrete token it can use directly.
       - name: Authenticate to Google Cloud
+        id: auth
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+          token_format: 'access_token'
+          access_token_scopes: 'https://www.googleapis.com/auth/script.projects,https://www.googleapis.com/auth/drive.file,https://www.googleapis.com/auth/script.deployments'
 
-      # Build + copy .clasp.prod.json + push using ADC credentials from the step above.
+      # Write the access token to ~/.clasprc.json where clasp reads credentials.
+      # expiry_date is set far in the future to prevent clasp attempting a refresh
+      # (there is no refresh token — the 1-hour access token is sufficient for a push).
+      # ACCESS_TOKEN is passed via env to avoid shell interpolation exposure.
+      - name: Write clasp credentials
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: |
+          python3 -c "
+          import json, os
+          json.dump({'token': {'access_token': os.environ['ACCESS_TOKEN'], 'token_type': 'Bearer', 'expiry_date': 9999999999999}}, open(os.path.expanduser('~/.clasprc.json'), 'w'))
+          "
+
+      # Build, copy prod clasp config, and push. Clasp reads credentials from
+      # ~/.clasprc.json written in the previous step.
       - name: Deploy to prod
-        run: npm run build && cp .clasp.prod.json .clasp.json && npx clasp push --adc
+        run: npm run build && cp .clasp.prod.json .clasp.json && npx clasp push
