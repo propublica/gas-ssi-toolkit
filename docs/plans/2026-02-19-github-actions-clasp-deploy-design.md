@@ -191,7 +191,11 @@ The only path to service account authentication against the Apps Script API is *
 
 ### Current state of `deploy.yml`
 
-The workflow file exists on `develop` with the full credential-writing implementation (Attempt 2 above). The WIF infrastructure (GCP pool, provider, service account, GitHub Environments) is fully configured. Everything works except the final Apps Script API call. The file is left in place as a reference but deploys will fail at the `npx clasp push` step until the auth approach is changed.
+The workflow file has been removed from the repo. The last working version (full credential-writing implementation, WIF infrastructure fully wired up, fails only at the Apps Script API call) is preserved at commit `407df59` on the `develop` branch. To restore it:
+
+```bash
+git show 407df59:.github/workflows/deploy.yml > .github/workflows/deploy.yml
+```
 
 ### Path forward
 
