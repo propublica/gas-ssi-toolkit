@@ -55,9 +55,11 @@ jobs:
           token_format: 'access_token'
           access_token_scopes: 'https://www.googleapis.com/auth/script.projects,https://www.googleapis.com/auth/drive.file,https://www.googleapis.com/auth/script.deployments'
 
-      # Write the access token to ~/.clasprc.json where clasp reads credentials.
-      # expiry_date is set far in the future to prevent clasp attempting a refresh
-      # (there is no refresh token — the 1-hour access token is sufficient for a push).
+      # Write credentials to ~/.clasprc.json. UserRefreshClient.fromJSON() requires
+      # type, client_id, client_secret, and refresh_token to be present or it throws.
+      # client_id/client_secret are clasp's own public OAuth client (embedded in the
+      # npm package). refresh_token is a dummy — it is never called because
+      # expiry_date is far in the future, so the WIF access_token is used directly.
       # ACCESS_TOKEN is passed via env to avoid shell interpolation exposure.
       - name: Write clasp credentials
         env:
@@ -65,7 +67,7 @@ jobs:
         run: |
           python3 -c "
           import json, os
-          json.dump({'tokens': {'default': {'type': 'authorized_user', 'access_token': os.environ['ACCESS_TOKEN'], 'token_type': 'Bearer', 'expiry_date': 9999999999999}}}, open(os.path.expanduser('~/.clasprc.json'), 'w'))
+          json.dump({'tokens': {'default': {'type': 'authorized_user', 'client_id': '1072944905499-vm2v2i5dvn0a0d2o4ca36i1vge8cvbn0.apps.googleusercontent.com', 'client_secret': 'v6V3fKV_zWU7iw1DrpO1rknX', 'refresh_token': 'not-used', 'access_token': os.environ['ACCESS_TOKEN'], 'token_type': 'Bearer', 'expiry_date': 9999999999999}}}, open(os.path.expanduser('~/.clasprc.json'), 'w'))
           "
 
       # Build, copy dev clasp config, and push. Clasp reads credentials from
@@ -114,9 +116,11 @@ jobs:
           token_format: 'access_token'
           access_token_scopes: 'https://www.googleapis.com/auth/script.projects,https://www.googleapis.com/auth/drive.file,https://www.googleapis.com/auth/script.deployments'
 
-      # Write the access token to ~/.clasprc.json where clasp reads credentials.
-      # expiry_date is set far in the future to prevent clasp attempting a refresh
-      # (there is no refresh token — the 1-hour access token is sufficient for a push).
+      # Write credentials to ~/.clasprc.json. UserRefreshClient.fromJSON() requires
+      # type, client_id, client_secret, and refresh_token to be present or it throws.
+      # client_id/client_secret are clasp's own public OAuth client (embedded in the
+      # npm package). refresh_token is a dummy — it is never called because
+      # expiry_date is far in the future, so the WIF access_token is used directly.
       # ACCESS_TOKEN is passed via env to avoid shell interpolation exposure.
       - name: Write clasp credentials
         env:
@@ -124,7 +128,7 @@ jobs:
         run: |
           python3 -c "
           import json, os
-          json.dump({'tokens': {'default': {'type': 'authorized_user', 'access_token': os.environ['ACCESS_TOKEN'], 'token_type': 'Bearer', 'expiry_date': 9999999999999}}}, open(os.path.expanduser('~/.clasprc.json'), 'w'))
+          json.dump({'tokens': {'default': {'type': 'authorized_user', 'client_id': '1072944905499-vm2v2i5dvn0a0d2o4ca36i1vge8cvbn0.apps.googleusercontent.com', 'client_secret': 'v6V3fKV_zWU7iw1DrpO1rknX', 'refresh_token': 'not-used', 'access_token': os.environ['ACCESS_TOKEN'], 'token_type': 'Bearer', 'expiry_date': 9999999999999}}}, open(os.path.expanduser('~/.clasprc.json'), 'w'))
           "
 
       # Build, copy prod clasp config, and push. Clasp reads credentials from
