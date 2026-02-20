@@ -14,6 +14,7 @@
 // ── Import after mocks ─────────────────────────────────────────
 
 import { buildGeminiPayload, callGeminiAPI } from "../src/server/api";
+import { CONFIG } from "../src/server/config";
 import type { GeminiRequest } from "../src/shared/types";
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -124,6 +125,6 @@ describe("callGeminiAPI", () => {
     mockFetchResponse({ candidates: [{ content: { parts: [{ text: "ok" }] } }] });
     callGeminiAPI(baseReq);
     const url = (UrlFetchApp.fetch as jest.Mock).mock.calls[0][0];
-    expect(url).toContain("gemini-2.0-flash");
+    expect(url).toContain(CONFIG.MODEL_NAME);
   });
 });

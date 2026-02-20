@@ -61,5 +61,8 @@ export function callGeminiAPI(req: GeminiRequest): string {
   const json = JSON.parse(response.getContentText()) as Record<string, unknown>;
 
   if (json.error) throw new Error((json.error as { message: string }).message);
-  return (json.candidates as any)?.[0]?.content?.parts?.[0]?.text ?? "No response.";
+  const candidates = json.candidates as
+    | Array<{ content: { parts: Array<{ text: string }> } }>
+    | undefined;
+  return candidates?.[0]?.content?.parts?.[0]?.text ?? "No response.";
 }
