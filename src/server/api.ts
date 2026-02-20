@@ -1,69 +1,65 @@
 /**
- * api.ts — Gemini API interaction via UrlFetchApp. test change
+ * api.ts — Gemini API interaction via UrlFetchApp.
+ *
+ * Pure HTTP adapter. All preprocessing (Drive file fetching, base64 encoding,
+ * text assembly) is the caller's responsibility.
  *
  * Requires oauth scope: https://www.googleapis.com/auth/script.external_request
  */
 
 import { CONFIG } from "./config";
-import type { AIContext } from "../shared/types";
+import type { GeminiInlineData, GeminiRequest } from "../shared/types";
+
+interface GeminiPart {
+  text?: string;
+  inline_data?: GeminiInlineData;
+}
 
 /**
- * Call the Gemini generateContent endpoint.
- *
- * Supports two context modes:
- * - textContext: appends text to the user prompt (fast, text-only)
- * - fileId: base64-encodes the Drive file as inline_data (multimodal)
+ * Assemble the Gemini generateContent request payload from a GeminiRequest.
+ * Pure function — no GAS globals. Independently testable.
  */
-export function callGeminiAPI(
-  apiKey: string,
-  systemPrompt: string,
-  userPrompt: string,
-  context: AIContext,
-): string {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.MODEL_NAME}:generateContent?key=${apiKey}`;
+export function buildGeminiPayload(req: GeminiRequest): Record<string, unknown> {
+  const parts: GeminiPart[] = req.userTexts.map((text) => ({ text }));
+  if (req.inlineData) {
+    parts.push({ inline_data: req.inlineData });
+  }
 
   const payload: Record<string, unknown> = {
     system_instruction: {
-      parts: [{ text: systemPrompt || "You are a helpful assistant." }],
+      parts: [{ text: req.systemPrompt || "You are a helpful assistant." }],
     },
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: userPrompt }],
-      },
-    ],
+    contents: [{ role: "user", parts }],
   };
 
-  // Branch on context type
-  const parts = (payload.contents as { parts: Record<string, unknown>[] }[])[0].parts;
-
-  if (context.textContext) {
-    // Append text context to the user prompt part
-    parts[parts.length - 1].text += `\n\n--- CONTEXT ---\n${context.textContext}`;
-  } else if (context.fileId) {
-    // Base64-encode the file and attach as inline_data
-    const file = DriveApp.getFileById(context.fileId);
-    if (file.getSize() > CONFIG.MAX_FILE_SIZE_BYTES) {
-      throw new Error("File too large (>25MB).");
-    }
-    parts.push({
-      inline_data: {
-        mime_type: file.getMimeType(),
-        data: Utilities.base64Encode(file.getBlob().getBytes()),
-      },
-    });
+  if (req.generationConfig) {
+    payload.generationConfig = req.generationConfig;
   }
+
+  if (req.tools && req.tools.length > 0) {
+    payload.tools = [{ function_declarations: req.tools }];
+  }
+
+  return payload;
+}
+
+/**
+ * Call the Gemini generateContent endpoint and return the response text.
+ */
+export function callGeminiAPI(req: GeminiRequest): string {
+  const modelName = req.modelName ?? CONFIG.MODEL_NAME;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${req.apiKey}`;
 
   const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
     method: "post",
     contentType: "application/json",
-    payload: JSON.stringify(payload),
+    payload: JSON.stringify(buildGeminiPayload(req)),
     muteHttpExceptions: true,
   };
 
   const response = UrlFetchApp.fetch(url, options);
-  const json = JSON.parse(response.getContentText());
+  const json = JSON.parse(response.getContentText()) as Record<string, unknown>;
 
-  if (json.error) throw new Error(json.error.message);
-  return json.candidates?.[0]?.content?.parts?.[0]?.text || "No response.";
+  if (json.error) throw new Error((json.error as { message: string }).message);
+  return (json.candidates as any)?.[0]?.content?.parts?.[0]?.text ?? "No response.";
 }
