@@ -65,7 +65,7 @@ jobs:
         run: |
           python3 -c "
           import json, os
-          json.dump({'token': {'access_token': os.environ['ACCESS_TOKEN'], 'token_type': 'Bearer', 'expiry_date': 9999999999999}}, open(os.path.expanduser('~/.clasprc.json'), 'w'))
+          json.dump({'tokens': {'default': {'access_token': os.environ['ACCESS_TOKEN'], 'token_type': 'Bearer', 'expiry_date': 9999999999999}}}, open(os.path.expanduser('~/.clasprc.json'), 'w'))
           "
 
       # Build, copy dev clasp config, and push. Clasp reads credentials from
@@ -120,7 +120,7 @@ jobs:
         run: |
           python3 -c "
           import json, os
-          json.dump({'token': {'access_token': os.environ['ACCESS_TOKEN'], 'token_type': 'Bearer', 'expiry_date': 9999999999999}}, open(os.path.expanduser('~/.clasprc.json'), 'w'))
+          json.dump({'tokens': {'default': {'access_token': os.environ['ACCESS_TOKEN'], 'token_type': 'Bearer', 'expiry_date': 9999999999999}}}, open(os.path.expanduser('~/.clasprc.json'), 'w'))
           "
 
       # Build, copy prod clasp config, and push. Clasp reads credentials from
