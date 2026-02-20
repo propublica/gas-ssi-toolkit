@@ -41,11 +41,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-      - name: 'Debug OIDC Token'
-        run: |
-          ID_TOKEN=$(curl -sLS "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=google-cloud" -H "User-Agent: actions/oidc-client" -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN")
-          echo "Token Claims:"
-          echo $ID_TOKEN | cut -d'.' -f2 | base64 --decode | jq .
 
       # Exchange GitHub's OIDC token for a short-lived GCP access token
       # via Workload Identity Federation. Sets GOOGLE_APPLICATION_CREDENTIALS.
