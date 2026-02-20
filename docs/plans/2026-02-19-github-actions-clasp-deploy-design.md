@@ -1,7 +1,7 @@
 # GitHub Actions Clasp Deployment Design
 
 **Date:** 2026-02-19
-**Status:** Approved
+**Status:** Paused — WIF approach blocked by intentional Google limitation (see Implementation History)
 
 ## Overview
 
@@ -154,9 +154,54 @@ jobs:
 
 ---
 
+## Implementation History
+
+The WIF + service account approach was fully implemented and the GCP/GitHub infrastructure was set up correctly (WIF pool, OIDC provider, service account, GitHub Environments). The workflow structure, CI gate, and branch conditions all work as designed. The approach fails at one specific point that cannot be worked around without Domain-wide Delegation: **the Apps Script API does not support service account authentication**.
+
+### What we tried
+
+**Attempt 1 — `clasp push --adc`**
+`google-github-actions/auth@v3` sets `GOOGLE_APPLICATION_CREDENTIALS` to a WIF external account credential file. `clasp push --adc` is supposed to read this via Application Default Credentials. Result: `No credentials found.` Clasp's bundled version of `google-auth-library` cannot parse the `external_account` credential file format that WIF produces.
+
+**Attempt 2 — Write access token to `~/.clasprc.json`**
+Switched to `token_format: 'access_token'` on the auth action to get a concrete OAuth 2.0 access token, then wrote it to `~/.clasprc.json` for clasp to read directly. Dropped `--adc`. Worked through several credential format errors:
+
+- `client_email` missing → the WIF external account credential file (still in `GOOGLE_APPLICATION_CREDENTIALS`) was being read instead of `~/.clasprc.json`. Added `GOOGLE_APPLICATION_CREDENTIALS: ''` to the deploy step env to suppress it.
+- `client_id` missing → `UserRefreshClient.fromJSON()` (google-auth-library) requires `type`, `client_id`, `client_secret`, and `refresh_token` to all be present or it throws before the token is ever used. Added clasp's own embedded public OAuth client credentials and a dummy `refresh_token` (never called because `expiry_date` is set far in the future, causing clasp to use the `access_token` directly at the HTTP layer).
+
+After resolving all credential format issues, clasp authenticated successfully. But then:
+
+**Final blocker — Apps Script API rejects service account identity**
+```
+User has not enabled the Apps Script API.
+Enable it by visiting https://script.google.com/home/usersettings then retry.
+```
+
+This is not a configuration error. The Apps Script API requires the authenticated identity to have enabled the API at the user account level (`script.google.com/home/usersettings`). Service accounts are not human Google accounts and cannot enable user-level settings.
+
+### Why this cannot be fixed without DWD
+
+This is **intentional, documented Google behavior**:
+
+- Google's Apps Script API docs explicitly state: *"The Apps Script API does not work with service accounts."* — [source](https://developers.google.com/apps-script/api/concepts)
+- The clasp GitHub issue tracker confirms the same: service accounts are categorically rejected by the Apps Script API — [clasp issue #1051](https://github.com/google/clasp/issues/1051)
+- A Google issue tracker report (442055772) confirms rejecting service accounts is intentional
+
+The only path to service account authentication against the Apps Script API is **Domain-wide Delegation (DWD)**, which allows a service account to impersonate a human Workspace user. DWD requires Google Workspace admin console access and is significantly more complex to configure.
+
+### Current state of `deploy.yml`
+
+The workflow file exists on `develop` with the full credential-writing implementation (Attempt 2 above). The WIF infrastructure (GCP pool, provider, service account, GitHub Environments) is fully configured. Everything works except the final Apps Script API call. The file is left in place as a reference but deploys will fail at the `npx clasp push` step until the auth approach is changed.
+
+### Path forward
+
+The **Fallback Approach** below is now the recommended implementation path. It uses a human Google account's OAuth refresh token — an account that naturally has Apps Script API enabled — which is exactly what the Apps Script API requires.
+
+---
+
 ## Fallback Approach: Custom OAuth Client + `.clasprc.json` Secret
 
-Use this approach if `--adc` proves unreliable (e.g. breaks on a clasp version bump).
+**This is now the recommended implementation path.** The WIF + service account approach is blocked by a documented Google limitation (Apps Script API does not support service account authentication). See Implementation History above.
 
 ### How it works
 
