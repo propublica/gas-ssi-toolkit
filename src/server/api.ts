@@ -1,5 +1,5 @@
 /**
- * api.ts — Gemini API interaction via UrlFetchApp. Test change
+ * api.ts — Gemini API interaction via UrlFetchApp.
  *
  * Requires oauth scope: https://www.googleapis.com/auth/script.external_request
  */
