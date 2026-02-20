@@ -65,12 +65,16 @@ jobs:
         run: |
           python3 -c "
           import json, os
-          json.dump({'tokens': {'default': {'access_token': os.environ['ACCESS_TOKEN'], 'token_type': 'Bearer', 'expiry_date': 9999999999999}}}, open(os.path.expanduser('~/.clasprc.json'), 'w'))
+          json.dump({'tokens': {'default': {'type': 'authorized_user', 'access_token': os.environ['ACCESS_TOKEN'], 'token_type': 'Bearer', 'expiry_date': 9999999999999}}}, open(os.path.expanduser('~/.clasprc.json'), 'w'))
           "
 
       # Build, copy dev clasp config, and push. Clasp reads credentials from
       # ~/.clasprc.json written in the previous step.
+      # GOOGLE_APPLICATION_CREDENTIALS is cleared so clasp ignores the WIF
+      # external account file and reads ~/.clasprc.json instead.
       - name: Deploy to dev
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ''
         run: npm run build && cp .clasp.dev.json .clasp.json && npx clasp push
 
   deploy-prod:
@@ -120,10 +124,14 @@ jobs:
         run: |
           python3 -c "
           import json, os
-          json.dump({'tokens': {'default': {'access_token': os.environ['ACCESS_TOKEN'], 'token_type': 'Bearer', 'expiry_date': 9999999999999}}}, open(os.path.expanduser('~/.clasprc.json'), 'w'))
+          json.dump({'tokens': {'default': {'type': 'authorized_user', 'access_token': os.environ['ACCESS_TOKEN'], 'token_type': 'Bearer', 'expiry_date': 9999999999999}}}, open(os.path.expanduser('~/.clasprc.json'), 'w'))
           "
 
       # Build, copy prod clasp config, and push. Clasp reads credentials from
       # ~/.clasprc.json written in the previous step.
+      # GOOGLE_APPLICATION_CREDENTIALS is cleared so clasp ignores the WIF
+      # external account file and reads ~/.clasprc.json instead.
       - name: Deploy to prod
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ''
         run: npm run build && cp .clasp.prod.json .clasp.json && npx clasp push
