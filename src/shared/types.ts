@@ -29,21 +29,37 @@ export interface ColumnMap {
   output: number;
 }
 
-// ── AI Context ─────────────────────────────────────────────────
-
+// ── AI Mode ────────────────────────────────────────────────────
 export type AIMode = "TEXT" | "FILE";
 
-export interface TextContext {
-  textContext: string;
-  fileId?: never;
+// ── Gemini API ─────────────────────────────────────────────────
+
+export interface GeminiInlineData {
+  mime_type: string;
+  data: string; // base64-encoded bytes
 }
 
-export interface FileContext {
-  fileId: string;
-  textContext?: never;
+export interface GeminiFunctionDeclaration {
+  name: string;
+  description: string;
+  parameters?: Record<string, unknown>; // JSON Schema object
 }
 
-export type AIContext = TextContext | FileContext;
+export interface GeminiGenerationConfig {
+  temperature?: number;
+  maxOutputTokens?: number;
+  responseMimeType?: string;
+}
+
+export interface GeminiRequest {
+  apiKey: string;
+  modelName?: string; // defaults to CONFIG.MODEL_NAME if omitted
+  systemPrompt?: string;
+  userTexts: string[]; // assembled into parts: [{text}, {text}, ...]
+  inlineData?: GeminiInlineData; // appended as a final part if present
+  tools?: GeminiFunctionDeclaration[];
+  generationConfig?: GeminiGenerationConfig;
+}
 
 // ── Drive ──────────────────────────────────────────────────────
 

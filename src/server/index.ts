@@ -10,10 +10,9 @@
 
 import { CONFIG } from "./config";
 import { callGeminiAPI } from "./api";
-import { checkDriveService, extractTextUniversal } from "./drive";
+import { checkDriveService, extractTextUniversal, fetchAndEncodeFile } from "./drive";
 import {
   extractId,
-  getAIContext,
   isValidDriveLink,
   getAllFilesRecursive,
   sampleRows,
@@ -286,12 +285,25 @@ export function runBatchAI(mode: AIMode): void {
       let result = "";
 
       try {
-        const context = getAIContext(row, map, mode);
-        if (context) {
-          result = callGeminiAPI(apiKey, row[map.sys_prompt] as string, usrPrompt, context);
+        const systemPrompt = row[map.sys_prompt] as string;
+
+        if (mode === "TEXT") {
+          const sourceText = map.source_text > -1 ? (row[map.source_text] as string) : "";
+          if (!sourceText || sourceText.length <= 5 || sourceText.includes("Error")) {
+            result = "[Skipped: No valid text]";
+          } else {
+            result = callGeminiAPI({ apiKey, systemPrompt, userTexts: [usrPrompt, sourceText] });
+          }
         } else {
-          result = mode === "TEXT" ? "[Skipped: No valid text]" : "[Skipped: No valid Drive Link]";
+          const link = row[map.source_drive] as string;
+          if (!isValidDriveLink(link)) {
+            result = "[Skipped: No valid Drive Link]";
+          } else {
+            const inlineData = fetchAndEncodeFile(extractId(link));
+            result = callGeminiAPI({ apiKey, systemPrompt, userTexts: [usrPrompt], inlineData });
+          }
         }
+
         sheet.getRange(realRowIndex, map.output + 1).setValue(result);
         processed++;
       } catch (e) {
