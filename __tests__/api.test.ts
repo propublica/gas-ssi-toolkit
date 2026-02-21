@@ -74,8 +74,8 @@ describe("buildGeminiPayload", () => {
     const payload = buildGeminiPayload(req);
     const parts = (payload.contents as any)[0].parts;
     expect(parts).toHaveLength(3); // 1 text + 2 inline_data
-    expect(parts[1].inline_data.mime_type).toBe("application/pdf");
-    expect(parts[2].inline_data.mime_type).toBe("image/jpeg");
+    expect(parts[1].inline_data).toEqual({ mime_type: "application/pdf", data: "file1==" });
+    expect(parts[2].inline_data).toEqual({ mime_type: "image/jpeg", data: "file2==" });
   });
 
   it("uses default system prompt when systemPrompt is omitted", () => {
