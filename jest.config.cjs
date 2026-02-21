@@ -39,5 +39,10 @@ module.exports = {
       branches: 95,
       functions: 100,
     },
+    "./src/server/customFunctions.ts": {
+      statements: 90,
+      branches: 85,
+      functions: 100,
+    },
   },
 };
