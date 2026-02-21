@@ -27,7 +27,7 @@
 
 // ── Import after mocks ─────────────────────────────────────────
 
-import { GEMINI } from "../src/server/customFunctions";
+import { GEMINI, TOOL_REGISTRY } from "../src/server/customFunctions";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -145,6 +145,15 @@ describe("GEMINI", () => {
     it("returns an error string for an unknown tool name", () => {
       const result = GEMINI("prompt", undefined, undefined, "nonExistentTool");
       expect(result).toMatch(/\[GEMINI Error:.*nonExistentTool/);
+    });
+
+    it("includes a known tool declaration in the API payload", () => {
+      mockOkResponse("ok");
+      TOOL_REGISTRY["testTool"] = { name: "testTool", description: "A test tool" };
+      GEMINI("prompt", undefined, undefined, "testTool");
+      delete TOOL_REGISTRY["testTool"];
+      const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
+      expect(payload.tools[0].function_declarations[0].name).toBe("testTool");
     });
   });
 
