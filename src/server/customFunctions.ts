@@ -22,7 +22,7 @@ import type { GeminiFunctionDeclaration } from "../shared/types";
 // Map tool names to GeminiFunctionDeclaration objects.
 // Add entries here as concrete tool use cases are designed.
 
-const TOOL_REGISTRY: Record<string, GeminiFunctionDeclaration> = {};
+export const TOOL_REGISTRY: Record<string, GeminiFunctionDeclaration> = {};
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -79,7 +79,11 @@ export function GEMINI(
     // Normalize inlineData: fetch and encode each Drive URL / file ID
     const resolvedInlineData =
       inlineData != null
-        ? flattenArg(inlineData).map((url) => fetchAndEncodeFile(extractId(url)))
+        ? flattenArg(inlineData).map((url) => {
+            const id = extractId(url);
+            if (!id) throw new Error(`Could not extract a Drive file ID from: "${url}"`);
+            return fetchAndEncodeFile(id);
+          })
         : undefined;
 
     return callGeminiAPI({
@@ -90,6 +94,7 @@ export function GEMINI(
       tools: resolvedTools.length ? resolvedTools : undefined,
     });
   } catch (e) {
-    return `[GEMINI Error: ${(e as Error).message}]`;
+    const msg = e instanceof Error ? e.message : String(e);
+    return `[GEMINI Error: ${msg}]`;
   }
 }
