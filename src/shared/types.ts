@@ -56,7 +56,7 @@ export interface GeminiRequest {
   modelName?: string; // defaults to CONFIG.MODEL_NAME if omitted
   systemPrompt?: string;
   userTexts: string[]; // assembled into parts: [{text}, {text}, ...]
-  inlineData?: GeminiInlineData; // appended as a final part if present
+  inlineData?: GeminiInlineData[]; // each item appended as an inline_data part
   tools?: GeminiFunctionDeclaration[];
   generationConfig?: GeminiGenerationConfig;
 }

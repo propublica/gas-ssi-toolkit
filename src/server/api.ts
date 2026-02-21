@@ -21,9 +21,7 @@ interface GeminiPart {
  */
 export function buildGeminiPayload(req: GeminiRequest): Record<string, unknown> {
   const parts: GeminiPart[] = req.userTexts.map((text) => ({ text }));
-  if (req.inlineData) {
-    parts.push({ inline_data: req.inlineData });
-  }
+  req.inlineData?.forEach((d) => parts.push({ inline_data: d }));
 
   const payload: Record<string, unknown> = {
     system_instruction: {

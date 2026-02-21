@@ -299,7 +299,7 @@ export function runBatchAI(mode: AIMode): void {
           if (!isValidDriveLink(link)) {
             result = "[Skipped: No valid Drive Link]";
           } else {
-            const inlineData = fetchAndEncodeFile(extractId(link));
+            const inlineData = [fetchAndEncodeFile(extractId(link))];
             result = callGeminiAPI({ apiKey, systemPrompt, userTexts: [usrPrompt], inlineData });
           }
         }
