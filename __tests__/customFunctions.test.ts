@@ -71,6 +71,14 @@ describe("SSI", () => {
       const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
       expect(payload.contents[0].parts).toHaveLength(2);
     });
+
+    it("passes empty parts when userTexts is null", () => {
+      mockOkResponse("ok");
+      const result = SSI(null);
+      const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
+      expect(payload.contents[0].parts).toEqual([]);
+      expect(result).toBe("ok");
+    });
   });
 
   // ── systemPrompt ─────────────────────────────────────────────
