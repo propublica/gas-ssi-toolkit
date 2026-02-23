@@ -68,14 +68,64 @@ export function extractTextUniversal(fileId: string): string {
 /**
  * Fetch a Drive file by ID and return it as base64-encoded inline data
  * ready for the Gemini API. Throws if the file exceeds the 25MB limit.
+ *
+ * Uses the Drive REST API via UrlFetchApp rather than DriveApp directly,
+ * because DriveApp is unavailable in custom function execution contexts.
+ *
+ * NOTE: Custom functions in bound scripts run in AuthMode.CUSTOM_FUNCTION,
+ * which gives ScriptApp.getOAuthToken() a token scoped only to
+ * spreadsheets.currentonly — not drive. Drive file fetching therefore only
+ * works from menu-triggered functions (e.g. runBatchAI). Calling this from
+ * the SSI() custom function will throw with a clear error pointing users to
+ * runBatchAI. A service account key in Script Properties could bypass this
+ * (see Google's fact-check sample), but every file would need to be shared
+ * with the service account email — poor UX for a cell formula.
+ *
+ * Requires oauth scope: https://www.googleapis.com/auth/drive.readonly
  */
 export function fetchAndEncodeFile(fileId: string): GeminiInlineData {
-  const file = DriveApp.getFileById(fileId);
-  if (file.getSize() > CONFIG.MAX_FILE_SIZE_BYTES) {
+  const token = ScriptApp.getOAuthToken();
+  if (!token) {
+    throw new Error(
+      "Drive file access requires full OAuth authorization, which is not available " +
+        "in spreadsheet formula context (AuthMode.CUSTOM_FUNCTION). " +
+        "Use the ⚡ SSI Toolkit menu > Run AI to process Drive files.",
+    );
+  }
+  const headers = { Authorization: `Bearer ${token}` };
+
+  const metaResp = UrlFetchApp.fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType%2Csize`,
+    { headers, muteHttpExceptions: true },
+  );
+  if (metaResp.getResponseCode() !== 200) {
+    const body = JSON.parse(metaResp.getContentText()) as { error?: { message: string } };
+    throw new Error(
+      body.error?.message ?? `Drive metadata request failed (${metaResp.getResponseCode()})`,
+    );
+  }
+  const { mimeType, size } = JSON.parse(metaResp.getContentText()) as {
+    mimeType: string;
+    size: string;
+  };
+
+  if (parseInt(size, 10) > CONFIG.MAX_FILE_SIZE_BYTES) {
     throw new Error("File too large (>25MB).");
   }
+
+  const contentResp = UrlFetchApp.fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+    { headers, muteHttpExceptions: true },
+  );
+  if (contentResp.getResponseCode() !== 200) {
+    const body = JSON.parse(contentResp.getContentText()) as { error?: { message: string } };
+    throw new Error(
+      body.error?.message ?? `Drive download failed (${contentResp.getResponseCode()})`,
+    );
+  }
+
   return {
-    mime_type: file.getMimeType(),
-    data: Utilities.base64Encode(file.getBlob().getBytes()),
+    mime_type: mimeType,
+    data: Utilities.base64Encode(contentResp.getContent()),
   };
 }
