@@ -7,12 +7,17 @@
  * - Errors must be returned as strings — thrown exceptions show as generic
  *   script errors in the cell with no useful message
  * - PropertiesService.getScriptProperties() is available after the add-on
- *   has been authorized by the user (opening the menu triggers authorization)
+ *   has been authorized (triggered by opening the ⚡ SSI Toolkit menu).
+ * - The inlineData parameter is NOT supported from custom function context:
+ *   ScriptApp.getOAuthToken() returns null in bound-script custom functions,
+ *   so Drive file fetching is unavailable. Use the Run AI menu tool instead.
  * - Range arguments arrive as unknown[][], single cells as raw scalars
  */
 
 import { CONFIG } from "./config";
 import { callGeminiAPI } from "./api";
+import { fetchAndEncodeFile } from "./drive";
+import { extractId } from "./utils";
 import type { GeminiFunctionDeclaration } from "../shared/types";
 
 // ── Tool Registry ────────────────────────────────────────────────────────────
@@ -44,14 +49,22 @@ function flattenArg(val: unknown): string[] {
  * @param {string|Array} userTexts One or more text parts for the user message.
  *   Pass a single string, a cell reference, or a range / array literal.
  *   Example: "Summarize this" or A1 or A1:A3 or {A1,B4,B10}
- * @param {string} [systemPrompt] (Optional) System-level instruction for the model.
+ * @param {string|Array} inlineData Drive URL(s) or file ID(s) to attach as
+ *   inline data. Pass a single URL, a cell reference, or a range / array literal.
+ *   Example: A2 or {A2,A3}
+ * @param {string} systemPrompt System-level instruction for the model.
  *   Example: "You are a concise summarizer."
  * @param {string|Array} [toolNames] (Optional) Names of pre-registered tools to enable.
  *   Example: "myTool" or {A5,A6}
  * @return {string} The model's text response, or "[SSI Error: ...]" on failure.
  * @customfunction
  */
-export function SSI(userTexts: unknown, systemPrompt?: string, toolNames?: unknown): string {
+export function SSI(
+  userTexts: unknown,
+  inlineData?: unknown,
+  systemPrompt?: string,
+  toolNames?: unknown,
+): string {
   try {
     // Resolve API key from Script Properties (set via Project Settings)
     const apiKey = PropertiesService.getScriptProperties().getProperty(CONFIG.API_KEY_PROPERTY);
@@ -66,10 +79,21 @@ export function SSI(userTexts: unknown, systemPrompt?: string, toolNames?: unkno
       return decl;
     });
 
+    // Normalize inlineData: fetch and encode each Drive URL / file ID
+    const resolvedInlineData =
+      inlineData != null
+        ? flattenArg(inlineData).map((url) => {
+            const id = extractId(url);
+            if (!id) throw new Error(`Could not extract a Drive file ID from: "${url}"`);
+            return fetchAndEncodeFile(id);
+          })
+        : undefined;
+
     return callGeminiAPI({
       apiKey,
       systemPrompt: systemPrompt || undefined,
       userTexts: flattenArg(userTexts),
+      inlineData: resolvedInlineData?.length ? resolvedInlineData : undefined,
       tools: resolvedTools.length ? resolvedTools : undefined,
     });
   } catch (e) {

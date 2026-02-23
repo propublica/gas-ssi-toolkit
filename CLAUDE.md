@@ -109,7 +109,8 @@ The Gemini API key must be set as a Script Property (`GEMINI_API_KEY`) in Apps S
 - **No Node.js built-ins** — everything runs on Google's servers
 - `appsscript.json` must be in `dist/` for clasp push (the build script copies it)
 - Drive Advanced Service must be enabled in the Apps Script editor AND declared in `appsscript.json`
-- `PropertiesService.getScriptProperties()` is available in custom functions once the add-on has been authorized by the user (opening the menu triggers authorization)
+- Custom functions run in `AuthMode.CUSTOM_FUNCTION`, which provides only the `spreadsheets.currentonly` scope. `PropertiesService` works (no scope needed). `UrlFetchApp` works for API-key-based calls (e.g. Gemini). `ScriptApp.getOAuthToken()` returns a token, but it is scoped to `spreadsheets.currentonly` only — not to `drive` or any other declared scope. `DriveApp` and other OAuth-requiring services fail with a permissions error.
+- **Drive file access from `SSI()` is not supported.** `fetchAndEncodeFile` uses `UrlFetchApp` + `ScriptApp.getOAuthToken()`, but the custom function token lacks the `drive` scope, so Drive API calls return 401. Drive file processing belongs to the `runBatchAI` batch tool (menu-triggered, full auth context). A service account workaround exists but requires sharing every file with the service account email — impractical for a cell formula.
 - `.clasp.json` is generated at deploy time by copying `.clasp.dev.json` or `.clasp.prod.json`
 
 ## Code Style
