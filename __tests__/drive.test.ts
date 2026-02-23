@@ -10,14 +10,6 @@ const mockUi = {
   ButtonSet: { OK: "OK" },
 };
 
-(globalThis as any).UrlFetchApp = {
-  fetch: jest.fn(),
-};
-
-(globalThis as any).ScriptApp = {
-  getOAuthToken: jest.fn().mockReturnValue("mock-oauth-token"),
-};
-
 (globalThis as any).Drive = {
   Files: {},
 };
@@ -147,81 +139,27 @@ describe("extractTextUniversal", () => {
 describe("fetchAndEncodeFile", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  function mockDriveApi(mimeType: string, sizeBytes: number): void {
-    (UrlFetchApp.fetch as jest.Mock)
-      .mockReturnValueOnce({
-        getResponseCode: () => 200,
-        getContentText: () => JSON.stringify({ mimeType, size: String(sizeBytes) }),
-      })
-      .mockReturnValueOnce({
-        getResponseCode: () => 200,
-        getContent: () => [1, 2, 3],
-      });
-  }
-
   it("returns mime_type and base64-encoded data for a valid file", () => {
-    mockDriveApi("application/pdf", 1024);
+    const mockFile = {
+      getMimeType: () => "application/pdf",
+      getSize: () => 1024,
+      getBlob: () => ({ getBytes: () => [1, 2, 3] }),
+    };
+    (DriveApp.getFileById as jest.Mock).mockReturnValue(mockFile);
+
     const result = fetchAndEncodeFile("file123");
     expect(result.mime_type).toBe("application/pdf");
-    expect(result.data).toBe("base64data==");
+    expect(result.data).toBe("base64data=="); // matches Utilities mock in this file
   });
 
   it("throws when file exceeds 25MB", () => {
-    // Only need the metadata call — the function throws before fetching content.
-    (UrlFetchApp.fetch as jest.Mock).mockReturnValueOnce({
-      getResponseCode: () => 200,
-      getContentText: () =>
-        JSON.stringify({ mimeType: "application/pdf", size: String(30 * 1024 * 1024) }),
-    });
+    const mockFile = {
+      getMimeType: () => "application/pdf",
+      getSize: () => 30 * 1024 * 1024,
+      getBlob: () => ({ getBytes: () => [] }),
+    };
+    (DriveApp.getFileById as jest.Mock).mockReturnValue(mockFile);
+
     expect(() => fetchAndEncodeFile("bigfile")).toThrow("File too large");
-  });
-
-  it("throws a clear error when the OAuth token is null", () => {
-    (ScriptApp.getOAuthToken as jest.Mock).mockReturnValueOnce(null);
-    expect(() => fetchAndEncodeFile("anyId")).toThrow(
-      "Drive file access requires full OAuth authorization",
-    );
-  });
-
-  it("throws on Drive metadata API error with message", () => {
-    (UrlFetchApp.fetch as jest.Mock).mockReturnValueOnce({
-      getResponseCode: () => 403,
-      getContentText: () => JSON.stringify({ error: { message: "Insufficient permission" } }),
-    });
-    expect(() => fetchAndEncodeFile("badId")).toThrow("Insufficient permission");
-  });
-
-  it("throws a fallback message on Drive metadata error with no body message", () => {
-    (UrlFetchApp.fetch as jest.Mock).mockReturnValueOnce({
-      getResponseCode: () => 500,
-      getContentText: () => JSON.stringify({}),
-    });
-    expect(() => fetchAndEncodeFile("badId")).toThrow("Drive metadata request failed (500)");
-  });
-
-  it("throws on Drive content API error with message", () => {
-    (UrlFetchApp.fetch as jest.Mock)
-      .mockReturnValueOnce({
-        getResponseCode: () => 200,
-        getContentText: () => JSON.stringify({ mimeType: "application/pdf", size: "1024" }),
-      })
-      .mockReturnValueOnce({
-        getResponseCode: () => 404,
-        getContentText: () => JSON.stringify({ error: { message: "File not found" } }),
-      });
-    expect(() => fetchAndEncodeFile("missingId")).toThrow("File not found");
-  });
-
-  it("throws a fallback message on Drive content error with no body message", () => {
-    (UrlFetchApp.fetch as jest.Mock)
-      .mockReturnValueOnce({
-        getResponseCode: () => 200,
-        getContentText: () => JSON.stringify({ mimeType: "application/pdf", size: "1024" }),
-      })
-      .mockReturnValueOnce({
-        getResponseCode: () => 403,
-        getContentText: () => JSON.stringify({}),
-      });
-    expect(() => fetchAndEncodeFile("missingId")).toThrow("Drive download failed (403)");
   });
 });

@@ -58,14 +58,12 @@ function sampleRowsToEvaluation() { _GASEntry.sampleRowsToEvaluation(); }
  * Call the Gemini API from a spreadsheet cell.
  * @param {string|Array} userTexts One or more text parts for the user message.
  *   Pass a single string, a cell reference, or a range / array literal.
- * @param {string|Array} inlineData Drive URL(s) or file ID(s) to attach as inline data.
- *   Pass a single URL, a cell reference, or a range / array literal.
  * @param {string} systemPrompt System-level instruction for the model.
  * @param {string|Array} toolNames Names of pre-registered tools to enable.
  * @return {string} The model's text response, or "[SSI Error: ...]" on failure.
  * @customfunction
  */
-function SSI(userTexts, inlineData, systemPrompt, toolNames) { return _GASEntry.SSI(userTexts, inlineData, systemPrompt, toolNames); }
+function SSI(userTexts, systemPrompt, toolNames) { return _GASEntry.SSI(userTexts, systemPrompt, toolNames); }
 `,
   },
   plugins: [
