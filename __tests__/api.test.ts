@@ -1,8 +1,8 @@
 /**
  * Tests for src/server/api.ts
  *
- * Only UrlFetchApp needs mocking — DriveApp and Utilities are no longer
- * used in this module.
+ * GAS globals mocked: UrlFetchApp (callGeminiAPI) and PropertiesService
+ * (invokeGemini). DriveApp and Utilities are not used in this module.
  */
 
 // ── Mock globals BEFORE imports ────────────────────────────────
