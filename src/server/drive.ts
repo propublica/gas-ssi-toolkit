@@ -68,14 +68,49 @@ export function extractTextUniversal(fileId: string): string {
 /**
  * Fetch a Drive file by ID and return it as base64-encoded inline data
  * ready for the Gemini API. Throws if the file exceeds the 25MB limit.
+ *
+ * Uses the Drive REST API via UrlFetchApp rather than DriveApp directly,
+ * because DriveApp is unavailable in custom function execution contexts.
+ * UrlFetchApp and ScriptApp.getOAuthToken() work in all contexts.
+ *
+ * Requires oauth scope: https://www.googleapis.com/auth/drive.readonly
  */
 export function fetchAndEncodeFile(fileId: string): GeminiInlineData {
-  const file = DriveApp.getFileById(fileId);
-  if (file.getSize() > CONFIG.MAX_FILE_SIZE_BYTES) {
+  const token = ScriptApp.getOAuthToken();
+  const headers = { Authorization: `Bearer ${token}` };
+
+  const metaResp = UrlFetchApp.fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType%2Csize`,
+    { headers, muteHttpExceptions: true },
+  );
+  if (metaResp.getResponseCode() !== 200) {
+    const body = JSON.parse(metaResp.getContentText()) as { error?: { message: string } };
+    throw new Error(
+      body.error?.message ?? `Drive metadata request failed (${metaResp.getResponseCode()})`,
+    );
+  }
+  const { mimeType, size } = JSON.parse(metaResp.getContentText()) as {
+    mimeType: string;
+    size: string;
+  };
+
+  if (parseInt(size, 10) > CONFIG.MAX_FILE_SIZE_BYTES) {
     throw new Error("File too large (>25MB).");
   }
+
+  const contentResp = UrlFetchApp.fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+    { headers, muteHttpExceptions: true },
+  );
+  if (contentResp.getResponseCode() !== 200) {
+    const body = JSON.parse(contentResp.getContentText()) as { error?: { message: string } };
+    throw new Error(
+      body.error?.message ?? `Drive download failed (${contentResp.getResponseCode()})`,
+    );
+  }
+
   return {
-    mime_type: file.getMimeType(),
-    data: Utilities.base64Encode(file.getBlob().getBytes()),
+    mime_type: mimeType,
+    data: Utilities.base64Encode(contentResp.getContent()),
   };
 }

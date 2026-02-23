@@ -25,6 +25,10 @@
   }),
 };
 
+(globalThis as any).ScriptApp = {
+  getOAuthToken: jest.fn().mockReturnValue("mock-oauth-token"),
+};
+
 // ── Import after mocks ─────────────────────────────────────────
 
 import { SSI, TOOL_REGISTRY } from "../src/server/customFunctions";
@@ -41,12 +45,27 @@ function mockOkResponse(text: string): void {
   mockFetchResponse({ candidates: [{ content: { parts: [{ text }] } }] });
 }
 
-function mockDriveFile(): void {
-  (DriveApp.getFileById as jest.Mock).mockReturnValue({
-    getMimeType: () => "application/pdf",
-    getSize: () => 1024,
-    getBlob: () => ({ getBytes: () => [1, 2, 3] }),
-  });
+/** Mock one Drive REST API file fetch (metadata + content calls via UrlFetchApp). */
+function mockDriveApiFile(): void {
+  (UrlFetchApp.fetch as jest.Mock)
+    .mockReturnValueOnce({
+      getResponseCode: () => 200,
+      getContentText: () => JSON.stringify({ mimeType: "application/pdf", size: "1024" }),
+    })
+    .mockReturnValueOnce({
+      getResponseCode: () => 200,
+      getContent: () => [1, 2, 3],
+    });
+}
+
+/** Return the payload sent to the Gemini API, regardless of how many Drive calls preceded it. */
+function getGeminiPayload(): Record<string, unknown> {
+  const calls = (UrlFetchApp.fetch as jest.Mock).mock.calls as unknown[][];
+  const geminiCall = calls.find((c) => String(c[0]).includes("generativelanguage.googleapis.com"));
+  return JSON.parse((geminiCall as [string, { payload: string }])[1].payload) as Record<
+    string,
+    unknown
+  >;
 }
 
 // ── Tests ──────────────────────────────────────────────────────
@@ -96,28 +115,29 @@ describe("SSI", () => {
     const driveUrl2 = "https://drive.google.com/file/d/xyz789defgh456ijklm012abc/view";
 
     it("attaches a single Drive URL as one inline_data part", () => {
+      mockDriveApiFile();
       mockOkResponse("ok");
-      mockDriveFile();
       SSI("prompt", driveUrl);
-      const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
-      expect(payload.contents[0].parts).toHaveLength(2); // text + inline_data
-      expect(payload.contents[0].parts[1].inline_data.mime_type).toBe("application/pdf");
+      const payload = getGeminiPayload();
+      expect((payload.contents as any)[0].parts).toHaveLength(2); // text + inline_data
+      expect((payload.contents as any)[0].parts[1].inline_data.mime_type).toBe("application/pdf");
     });
 
     it("attaches multiple Drive URLs as multiple inline_data parts", () => {
+      mockDriveApiFile();
+      mockDriveApiFile();
       mockOkResponse("ok");
-      mockDriveFile();
       SSI("prompt", [[driveUrl, driveUrl2]]);
-      const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
-      expect(payload.contents[0].parts).toHaveLength(3); // text + 2 inline_data
+      const payload = getGeminiPayload();
+      expect((payload.contents as any)[0].parts).toHaveLength(3); // text + 2 inline_data
     });
 
     it("omits inline_data parts when inlineData is not provided", () => {
       mockOkResponse("ok");
       SSI("prompt");
-      const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
-      expect(payload.contents[0].parts).toHaveLength(1);
-      expect(payload.contents[0].parts[0].inline_data).toBeUndefined();
+      const payload = getGeminiPayload();
+      expect((payload.contents as any)[0].parts).toHaveLength(1);
+      expect((payload.contents as any)[0].parts[0].inline_data).toBeUndefined();
     });
   });
 
