@@ -64,3 +64,14 @@ export function callGeminiAPI(req: GeminiRequest): string {
     | undefined;
   return candidates?.[0]?.content?.parts?.[0]?.text ?? "No response.";
 }
+
+/**
+ * Resolve the Gemini API key from Script Properties and call callGeminiAPI.
+ * This is the preferred entry point for all production Gemini calls.
+ * Throws if the API key property is not set.
+ */
+export function invokeGemini(params: Omit<GeminiRequest, "apiKey">): string {
+  const apiKey = PropertiesService.getScriptProperties().getProperty(CONFIG.API_KEY_PROPERTY);
+  if (!apiKey) throw new Error(`${CONFIG.API_KEY_PROPERTY} script property not set`);
+  return callGeminiAPI({ apiKey, ...params });
+}

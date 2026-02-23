@@ -11,9 +11,15 @@
   fetch: jest.fn(),
 };
 
+(globalThis as any).PropertiesService = {
+  getScriptProperties: jest.fn().mockReturnValue({
+    getProperty: jest.fn().mockReturnValue("test-api-key"),
+  }),
+};
+
 // ── Import after mocks ─────────────────────────────────────────
 
-import { buildGeminiPayload, callGeminiAPI } from "../src/server/api";
+import { buildGeminiPayload, callGeminiAPI, invokeGemini } from "../src/server/api";
 import { CONFIG } from "../src/server/config";
 import type { GeminiRequest } from "../src/shared/types";
 
@@ -142,5 +148,41 @@ describe("callGeminiAPI", () => {
     callGeminiAPI(baseReq);
     const url = (UrlFetchApp.fetch as jest.Mock).mock.calls[0][0];
     expect(url).toContain(CONFIG.MODEL_NAME);
+  });
+});
+
+// ── invokeGemini tests ─────────────────────────────────────────
+
+describe("invokeGemini", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("calls callGeminiAPI with the resolved API key", () => {
+    mockFetchResponse({ candidates: [{ content: { parts: [{ text: "result" }] } }] });
+    const result = invokeGemini({ userTexts: ["hello"] });
+    expect(result).toBe("result");
+    const url = (UrlFetchApp.fetch as jest.Mock).mock.calls[0][0] as string;
+    expect(url).toContain("test-api-key");
+  });
+
+  it("throws when the API key property is not set", () => {
+    (PropertiesService.getScriptProperties().getProperty as jest.Mock).mockReturnValueOnce(null);
+    expect(() => invokeGemini({ userTexts: ["hello"] })).toThrow(/GEMINI_API_KEY/);
+  });
+
+  it("passes systemPrompt through to the payload", () => {
+    mockFetchResponse({ candidates: [{ content: { parts: [{ text: "ok" }] } }] });
+    invokeGemini({ systemPrompt: "Be concise", userTexts: ["hello"] });
+    const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
+    expect(payload.system_instruction.parts[0].text).toBe("Be concise");
+  });
+
+  it("passes inlineData through to the payload", () => {
+    mockFetchResponse({ candidates: [{ content: { parts: [{ text: "ok" }] } }] });
+    invokeGemini({
+      userTexts: ["describe this"],
+      inlineData: [{ mime_type: "application/pdf", data: "base64==" }],
+    });
+    const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
+    expect(payload.contents[0].parts[1].inline_data.mime_type).toBe("application/pdf");
   });
 });
