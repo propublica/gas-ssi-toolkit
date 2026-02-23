@@ -8,7 +8,7 @@
  * assign to `global.*` — that's the contract with Rollup's IIFE output.
  */
 
-export { GEMINI } from "./customFunctions";
+export { SSI } from "./customFunctions";
 import { CONFIG } from "./config";
 import { callGeminiAPI } from "./api";
 import { checkDriveService, extractTextUniversal, fetchAndEncodeFile } from "./drive";

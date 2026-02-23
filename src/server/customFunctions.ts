@@ -53,10 +53,10 @@ function flattenArg(val: unknown): string[] {
  *   Example: "You are a concise summarizer."
  * @param {string|Array} toolNames Names of pre-registered tools to enable.
  *   Example: "myTool" or {A5,A6}
- * @return {string} The model's text response, or "[GEMINI Error: ...]" on failure.
+ * @return {string} The model's text response, or "[SSI Error: ...]" on failure.
  * @customfunction
  */
-export function GEMINI(
+export function SSI(
   userTexts: unknown,
   inlineData?: unknown,
   systemPrompt?: string,
@@ -66,7 +66,7 @@ export function GEMINI(
     // Resolve API key from Script Properties (set via Project Settings)
     const apiKey = PropertiesService.getScriptProperties().getProperty(CONFIG.API_KEY_PROPERTY);
     if (!apiKey) {
-      return `[GEMINI Error: ${CONFIG.API_KEY_PROPERTY} script property not set. Go to Project Settings > Script Properties to add it.]`;
+      return `[SSI Error: ${CONFIG.API_KEY_PROPERTY} script property not set. Go to Project Settings > Script Properties to add it.]`;
     }
 
     // Normalize and validate tool names
@@ -95,6 +95,6 @@ export function GEMINI(
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return `[GEMINI Error: ${msg}]`;
+    return `[SSI Error: ${msg}]`;
   }
 }
