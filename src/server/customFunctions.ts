@@ -7,7 +7,10 @@
  * - Errors must be returned as strings — thrown exceptions show as generic
  *   script errors in the cell with no useful message
  * - PropertiesService.getScriptProperties() is available after the add-on
- *   has been authorized by the user
+ *   has been authorized (triggered by opening the ⚡ SSI Toolkit menu).
+ * - The inlineData parameter is NOT supported from custom function context:
+ *   ScriptApp.getOAuthToken() returns null in bound-script custom functions,
+ *   so Drive file fetching is unavailable. Use the Run AI menu tool instead.
  * - Range arguments arrive as unknown[][], single cells as raw scalars
  */
 

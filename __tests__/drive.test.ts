@@ -176,6 +176,13 @@ describe("fetchAndEncodeFile", () => {
     expect(() => fetchAndEncodeFile("bigfile")).toThrow("File too large");
   });
 
+  it("throws a clear error when the OAuth token is null", () => {
+    (ScriptApp.getOAuthToken as jest.Mock).mockReturnValueOnce(null);
+    expect(() => fetchAndEncodeFile("anyId")).toThrow(
+      "Drive file access requires full OAuth authorization",
+    );
+  });
+
   it("throws on Drive metadata API error with message", () => {
     (UrlFetchApp.fetch as jest.Mock).mockReturnValueOnce({
       getResponseCode: () => 403,
