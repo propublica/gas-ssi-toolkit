@@ -13,6 +13,7 @@ import {
   getAllFilesRecursive,
   sampleRows,
   truncateText,
+  flattenArg,
 } from "../src/server/utils";
 import type { DriveFileInfo } from "../src/shared/types";
 
@@ -188,5 +189,35 @@ describe("getAllFilesRecursive", () => {
     const result: DriveFileInfo[] = [];
     getAllFilesRecursive(folder as any, result);
     expect(result).toHaveLength(0);
+  });
+});
+
+describe("flattenArg", () => {
+  it("wraps a scalar string in an array", () => {
+    expect(flattenArg("hello")).toEqual(["hello"]);
+  });
+
+  it("flattens a vertical range (multiple rows, one column)", () => {
+    expect(flattenArg([["row1"], ["row2"], ["row3"]])).toEqual(["row1", "row2", "row3"]);
+  });
+
+  it("flattens a horizontal range (one row, multiple columns)", () => {
+    expect(flattenArg([["col1", "col2", "col3"]])).toEqual(["col1", "col2", "col3"]);
+  });
+
+  it("filters empty strings from ranges", () => {
+    expect(flattenArg([["text", "", "more"]])).toEqual(["text", "more"]);
+  });
+
+  it("filters null values from ranges", () => {
+    expect(flattenArg([["a", null, "b"]])).toEqual(["a", "b"]);
+  });
+
+  it("returns an empty array for null input", () => {
+    expect(flattenArg(null)).toEqual([]);
+  });
+
+  it("converts non-string scalars to strings", () => {
+    expect(flattenArg(42)).toEqual(["42"]);
   });
 });
