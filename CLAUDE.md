@@ -109,7 +109,8 @@ The Gemini API key must be set as a Script Property (`GEMINI_API_KEY`) in Apps S
 - **No Node.js built-ins** — everything runs on Google's servers
 - `appsscript.json` must be in `dist/` for clasp push (the build script copies it)
 - Drive Advanced Service must be enabled in the Apps Script editor AND declared in `appsscript.json`
-- `PropertiesService.getScriptProperties()` is available in custom functions once the add-on has been authorized by the user (opening the menu triggers authorization)
+- `PropertiesService.getScriptProperties()` and `ScriptApp.getOAuthToken()` are available in custom functions once the add-on has been authorized by the user (opening the menu triggers authorization)
+- `DriveApp`, `DocumentApp`, and other OAuth-requiring services are **not** available in custom function execution contexts, even with proper scopes declared. Use `UrlFetchApp` + `ScriptApp.getOAuthToken()` to call the equivalent REST APIs instead (see `fetchAndEncodeFile` in `drive.ts` for the pattern)
 - `.clasp.json` is generated at deploy time by copying `.clasp.dev.json` or `.clasp.prod.json`
 
 ## Code Style
