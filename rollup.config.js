@@ -34,6 +34,17 @@ export default {
     footer: `
 /**
  * Global Handshake — Explicit function stubs for Google Apps Script discovery.
+ *
+ * Every export from index.ts that Apps Script needs to call must have a
+ * matching one-line stub here. Rollup's IIFE wrapper scopes everything inside
+ * _GASEntry; these stubs re-expose the relevant functions in the global scope.
+ *
+ * CUSTOM FUNCTIONS: If the stub is for a Sheets custom function (callable from
+ * a cell formula), you MUST add a JSDoc comment with @customfunction directly
+ * on the stub below. The TypeScript-level JSDoc is compiled away by Rollup and
+ * does NOT appear on the global stub. Google Sheets only recognises a function
+ * as a custom function when @customfunction is present on the global declaration
+ * — without it the function will not appear in autocomplete or parameter hints.
  */
 function onOpen(e) { _GASEntry.onOpen(e); }
 function showSidebar() { _GASEntry.showSidebar(); }
@@ -43,6 +54,16 @@ function handleDialogSelection(mode) { _GASEntry.handleDialogSelection(mode); }
 function importDriveLinks() { _GASEntry.importDriveLinks(); }
 function extractTextFromSelection() { _GASEntry.extractTextFromSelection(); }
 function sampleRowsToEvaluation() { _GASEntry.sampleRowsToEvaluation(); }
+/**
+ * Call the Gemini API from a spreadsheet cell.
+ * @param {string|Array} userTexts One or more text parts for the user message.
+ *   Pass a single string, a cell reference, or a range / array literal.
+ * @param {string} systemPrompt System-level instruction for the model.
+ * @param {string|Array} toolNames Names of pre-registered tools to enable.
+ * @return {string} The model's text response, or "[SSI Error: ...]" on failure.
+ * @customfunction
+ */
+function SSI(userTexts, systemPrompt, toolNames) { return _GASEntry.SSI(userTexts, systemPrompt, toolNames); }
 `,
   },
   plugins: [
