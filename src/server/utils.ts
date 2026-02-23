@@ -78,3 +78,15 @@ export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + "... [TRUNCATED]";
 }
+
+/**
+ * Normalize a custom function argument to a flat array of non-empty strings.
+ * GAS passes single-cell references as raw scalars and ranges as 2D arrays.
+ */
+export function flattenArg(val: unknown): string[] {
+  if (!Array.isArray(val)) return val != null ? [String(val)] : [];
+  return (val as unknown[][])
+    .flat()
+    .filter((v) => v !== "" && v != null)
+    .map(String);
+}
