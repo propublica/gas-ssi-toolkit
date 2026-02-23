@@ -54,12 +54,28 @@ describe("buildGeminiPayload", () => {
     const req: GeminiRequest = {
       ...baseReq,
       userTexts: ["What is this?"],
-      inlineData: { mime_type: "application/pdf", data: "base64==" },
+      inlineData: [{ mime_type: "application/pdf", data: "base64==" }],
     };
     const payload = buildGeminiPayload(req);
     const parts = (payload.contents as any)[0].parts;
     expect(parts).toHaveLength(2);
     expect(parts[1].inline_data).toEqual({ mime_type: "application/pdf", data: "base64==" });
+  });
+
+  it("appends multiple inline_data parts when inlineData has multiple items", () => {
+    const req: GeminiRequest = {
+      ...baseReq,
+      userTexts: ["Describe both files"],
+      inlineData: [
+        { mime_type: "application/pdf", data: "file1==" },
+        { mime_type: "image/jpeg", data: "file2==" },
+      ],
+    };
+    const payload = buildGeminiPayload(req);
+    const parts = (payload.contents as any)[0].parts;
+    expect(parts).toHaveLength(3); // 1 text + 2 inline_data
+    expect(parts[1].inline_data).toEqual({ mime_type: "application/pdf", data: "file1==" });
+    expect(parts[2].inline_data).toEqual({ mime_type: "image/jpeg", data: "file2==" });
   });
 
   it("uses default system prompt when systemPrompt is omitted", () => {
