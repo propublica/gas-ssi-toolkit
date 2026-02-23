@@ -57,16 +57,22 @@ function showSourceDialog() { _GASEntry.showSourceDialog(); }
 
 If you skip step 2, the function will exist in the bundle but Apps Script won't be able to discover or call it.
 
+**Custom functions (callable from spreadsheet cells) require one extra step:**
+3. Add a JSDoc comment with `@customfunction` directly on the stub in `rollup.config.js`
+
+The TypeScript-level JSDoc is compiled away by Rollup and does not appear on the global stub. Google Sheets only registers a function as a custom function when `@customfunction` is present in a JSDoc comment on the **global** declaration — the one in the footer. Without it the function executes correctly when called explicitly but does not appear in autocomplete and is not recognized as a custom function by Sheets.
+
 ### Module Dependency Graph
 
 ```
-src/server/index.ts   (entry point — menu, 4 tool orchestrators, UI handlers)
-├── src/server/config.ts   (CONFIG object: API key property name, model, column names, limits)
-├── src/server/api.ts      (callGeminiAPI — text or multimodal via UrlFetchApp + base64)
-├── src/server/drive.ts    (extractTextUniversal, checkDriveService — OCR via Drive Advanced Service)
-├── src/server/dialog.ts   (HTML_TEMPLATE string for AI mode selection modal)
-├── src/server/utils.ts    (extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive, sampleRows, truncateText, getAIContext)
-└── src/shared/types.ts    (shared interfaces: AppConfig, AIMode, ColumnMap, AIContext variants)
+src/server/index.ts          (entry point — menu, 4 tool orchestrators, UI handlers, re-exports custom functions)
+├── src/server/config.ts         (CONFIG object: API key property name, model, column names, limits)
+├── src/server/api.ts            (callGeminiAPI, buildGeminiPayload — pure HTTP adapter via UrlFetchApp)
+├── src/server/drive.ts          (extractTextUniversal, fetchAndEncodeFile, checkDriveService)
+├── src/server/dialog.ts         (HTML_TEMPLATE string for AI mode selection modal)
+├── src/server/utils.ts          (extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive, sampleRows, truncateText)
+├── src/server/customFunctions.ts  (SSI — Sheets custom function; TOOL_REGISTRY for named tool declarations)
+└── src/shared/types.ts          (shared interfaces: AppConfig, AIMode, ColumnMap, GeminiRequest, etc.)
 ```
 
 Source files use relative imports (e.g. `../shared/types`). The `@server/*` and `@shared/*` aliases are **Jest-only** (mapped in `jest.config.cjs`) and are not available in TypeScript source.
@@ -103,7 +109,7 @@ The Gemini API key must be set as a Script Property (`GEMINI_API_KEY`) in Apps S
 - **No Node.js built-ins** — everything runs on Google's servers
 - `appsscript.json` must be in `dist/` for clasp push (the build script copies it)
 - Drive Advanced Service must be enabled in the Apps Script editor AND declared in `appsscript.json`
-- `PropertiesService` is not available in custom functions (only in menu-triggered functions)
+- `PropertiesService.getScriptProperties()` is available in custom functions once the add-on has been authorized by the user (opening the menu triggers authorization)
 - `.clasp.json` is generated at deploy time by copying `.clasp.dev.json` or `.clasp.prod.json`
 
 ## Code Style

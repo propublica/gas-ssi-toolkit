@@ -34,6 +34,17 @@ export default {
     footer: `
 /**
  * Global Handshake — Explicit function stubs for Google Apps Script discovery.
+ *
+ * Every export from index.ts that Apps Script needs to call must have a
+ * matching one-line stub here. Rollup's IIFE wrapper scopes everything inside
+ * _GASEntry; these stubs re-expose the relevant functions in the global scope.
+ *
+ * CUSTOM FUNCTIONS: If the stub is for a Sheets custom function (callable from
+ * a cell formula), you MUST add a JSDoc comment with @customfunction directly
+ * on the stub below. The TypeScript-level JSDoc is compiled away by Rollup and
+ * does NOT appear on the global stub. Google Sheets only recognises a function
+ * as a custom function when @customfunction is present on the global declaration
+ * — without it the function will not appear in autocomplete or parameter hints.
  */
 function onOpen(e) { _GASEntry.onOpen(e); }
 function showSidebar() { _GASEntry.showSidebar(); }
