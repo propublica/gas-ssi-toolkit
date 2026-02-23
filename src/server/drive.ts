@@ -71,12 +71,27 @@ export function extractTextUniversal(fileId: string): string {
  *
  * Uses the Drive REST API via UrlFetchApp rather than DriveApp directly,
  * because DriveApp is unavailable in custom function execution contexts.
- * UrlFetchApp and ScriptApp.getOAuthToken() work in all contexts.
+ *
+ * NOTE: Custom functions in bound scripts run in AuthMode.CUSTOM_FUNCTION,
+ * which gives ScriptApp.getOAuthToken() a token scoped only to
+ * spreadsheets.currentonly — not drive. Drive file fetching therefore only
+ * works from menu-triggered functions (e.g. runBatchAI). Calling this from
+ * the SSI() custom function will throw with a clear error pointing users to
+ * runBatchAI. A service account key in Script Properties could bypass this
+ * (see Google's fact-check sample), but every file would need to be shared
+ * with the service account email — poor UX for a cell formula.
  *
  * Requires oauth scope: https://www.googleapis.com/auth/drive.readonly
  */
 export function fetchAndEncodeFile(fileId: string): GeminiInlineData {
   const token = ScriptApp.getOAuthToken();
+  if (!token) {
+    throw new Error(
+      "Drive file access requires full OAuth authorization, which is not available " +
+        "in spreadsheet formula context (AuthMode.CUSTOM_FUNCTION). " +
+        "Use the ⚡ SSI Toolkit menu > Run AI to process Drive files.",
+    );
+  }
   const headers = { Authorization: `Bearer ${token}` };
 
   const metaResp = UrlFetchApp.fetch(
