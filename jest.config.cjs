@@ -44,5 +44,10 @@ module.exports = {
       branches: 85,
       functions: 100,
     },
+    "./src/server/inference.ts": {
+      statements: 90,
+      branches: 80,
+      functions: 100,
+    },
   },
 };
