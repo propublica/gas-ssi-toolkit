@@ -64,35 +64,34 @@ export function runInference(
   userPrompts: unknown,
   driveLinks: unknown,
   systemPrompt: unknown,
-  outputCell: GoogleAppsScript.Spreadsheet.Range,
-): void {
-  try {
-    const userTexts = flattenArg(userPrompts);
+): string | null {
+  const userTexts = flattenArg(userPrompts);
+  if (userTexts.length === 0) return null;
 
+  try {
     const inlineData: GeminiInlineData[] = flattenArg(driveLinks)
       .filter(isValidDriveLink)
       .map((link) => fetchAndEncodeFile(extractId(link)));
 
-    const result = invokeGemini({
+    return invokeGemini({
       systemPrompt: flattenArg(systemPrompt)[0] ?? undefined,
       userTexts,
       inlineData: inlineData.length ? inlineData : undefined,
     });
-
-    outputCell.setValue(result);
   } catch (e) {
-    outputCell.setValue("Error: " + (e as Error).message);
+    return "Error: " + (e as Error).message;
   }
 }
 ```
 
 **Input contract:**
 - `userPrompts` — any cell-origin value: scalar string, 2D array from a range, or null. `flattenArg` normalizes to `string[]`.
-- `driveLinks` — same. Invalid or non-Drive strings are silently filtered; valid links are encoded via `fetchAndEncodeFile`. Pass null/undefined for text-only calls.
-- `systemPrompt` — scalar or range; first non-empty string is used. Pass null/undefined to omit.
-- `outputCell` — a `Range` object pointing at the cell to receive the result or error.
+- `driveLinks` — same. Invalid or non-Drive strings are silently filtered; valid links are encoded via `fetchAndEncodeFile`. Pass null for text-only calls.
+- `systemPrompt` — scalar or range; first non-empty string is used. Pass null to use the model default.
 
-**Error handling:** all errors (missing API key, network failure, file too large, etc.) are written to `outputCell` as `"Error: <message>"`. This matches the existing per-row behavior in `runBatchAI`.
+**Return contract:** Returns the model response string, an `"Error: ..."` string on failure, or `null` if `userPrompts` flattens to empty (signals the caller to skip this row).
+
+**SpreadsheetApp dependency:** none. `runInference` is free of `GoogleAppsScript.Spreadsheet` types — all cell reads and writes remain the caller's responsibility.
 
 **Behavior change vs. current `runBatchAI` TEXT mode:** the existing check `sourceText.length <= 5 || sourceText.includes("Error")` is dropped. `runInference` passes whatever text it receives to the model. This validation was a heuristic guard that belongs at the call site if still needed.
 
@@ -128,36 +127,30 @@ No behavior change. `SSI` does not use `runInference` — it calls `invokeGemini
 
 ### 6. `index.ts` — `runBatchAI` simplified loop
 
-The API key block is removed. The loop body delegates to `runInference`, passing the appropriate cell values based on mode. Column mapping and mode branching remain in `runBatchAI`:
+The API key block is removed. The loop delegates to `runInference` and handles cell writes. Column mapping and mode branching remain in `runBatchAI`:
 
 ```typescript
 for (let i = 0; i < dataValues.length; i++) {
   const row = dataValues[i];
-  const usrPrompt = row[map.user_prompt] as string;
   const realRowIndex = range.getRow() + i;
-
-  if (!usrPrompt) continue;
 
   SpreadsheetApp.getActive().toast(`Processing Row ${realRowIndex}...`, "AI Agent", -1);
 
   const userPrompts = mode === "TEXT"
-    ? [usrPrompt, row[map.source_text]]
-    : [usrPrompt];
+    ? [row[map.user_prompt], row[map.source_text]]
+    : [row[map.user_prompt]];
   const driveLinks = mode === "FILE" ? row[map.source_drive] : null;
 
-  runInference(
-    userPrompts,
-    driveLinks,
-    row[map.sys_prompt],
-    sheet.getRange(realRowIndex, map.output + 1),
-  );
+  const result = runInference(userPrompts, driveLinks, row[map.sys_prompt]);
+  if (result === null) continue;
 
+  sheet.getRange(realRowIndex, map.output + 1).setValue(result);
   processed++;
   SpreadsheetApp.flush();
 }
 ```
 
-The per-row `try/catch` is removed — `runInference` handles its own errors and writes them to the output cell.
+`null` from `runInference` means no user prompt — skip without writing. Error strings are written to the output cell like any other result. The per-row `try/catch` is removed from `runBatchAI`.
 
 ### 7. Module dependency graph (after)
 

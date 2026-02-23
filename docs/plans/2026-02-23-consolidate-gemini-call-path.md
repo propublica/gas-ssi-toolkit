@@ -256,6 +256,8 @@ git commit -m "feat: add invokeGemini as single Gemini entry point"
 - Create: `src/server/inference.ts`
 - Create: `__tests__/inference.test.ts`
 
+`runInference` has no SpreadsheetApp dependency — it returns `string | null` and the caller handles cell writes. `null` signals "no user prompts after flattening — skip this row". Error strings are returned (not thrown) so the caller can write them to the cell without its own try/catch.
+
 **Step 1: Write the failing tests**
 
 Create `__tests__/inference.test.ts`:
@@ -305,26 +307,24 @@ function mockOkResponse(text: string): void {
   mockFetchResponse({ candidates: [{ content: { parts: [{ text }] } }] });
 }
 
-function makeOutputCell() {
-  return { setValue: jest.fn() };
-}
-
 // ── Tests ──────────────────────────────────────────────────────
 
 describe("runInference", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("calls invokeGemini with normalized userPrompts and writes result to output cell", () => {
+  it("returns the model response string for a scalar user prompt", () => {
     mockOkResponse("AI response");
-    const outputCell = makeOutputCell();
-    runInference("Hello AI", null, null, outputCell as any);
-    expect(outputCell.setValue).toHaveBeenCalledWith("AI response");
+    expect(runInference("Hello AI", null, null)).toBe("AI response");
+  });
+
+  it("returns null when userPrompts flattens to empty", () => {
+    expect(runInference(null, null, null)).toBeNull();
+    expect(runInference("", null, null)).toBeNull();
   });
 
   it("flattens a vertical range of user prompts", () => {
     mockOkResponse("ok");
-    const outputCell = makeOutputCell();
-    runInference([["p1"], ["p2"]], null, null, outputCell as any);
+    runInference([["p1"], ["p2"]], null, null);
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.contents[0].parts).toHaveLength(2);
     expect(payload.contents[0].parts[0].text).toBe("p1");
@@ -333,8 +333,7 @@ describe("runInference", () => {
 
   it("encodes a valid drive link as inlineData", () => {
     mockOkResponse("ok");
-    const outputCell = makeOutputCell();
-    runInference("prompt", "https://drive.google.com/file/d/abc123/view", null, outputCell as any);
+    runInference("prompt", "https://drive.google.com/file/d/abc123/view", null);
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.contents[0].parts[1].inline_data).toEqual({
       mime_type: "application/pdf",
@@ -344,16 +343,14 @@ describe("runInference", () => {
 
   it("filters out invalid drive links silently", () => {
     mockOkResponse("ok");
-    const outputCell = makeOutputCell();
-    runInference("prompt", "not-a-drive-link", null, outputCell as any);
+    runInference("prompt", "not-a-drive-link", null);
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.contents[0].parts).toHaveLength(1); // text only, no inline_data
   });
 
   it("omits inlineData from payload when driveLinks is null", () => {
     mockOkResponse("ok");
-    const outputCell = makeOutputCell();
-    runInference("prompt", null, null, outputCell as any);
+    runInference("prompt", null, null);
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.tools).toBeUndefined();
     expect(payload.contents[0].parts).toHaveLength(1);
@@ -361,34 +358,30 @@ describe("runInference", () => {
 
   it("passes systemPrompt to the payload", () => {
     mockOkResponse("ok");
-    const outputCell = makeOutputCell();
-    runInference("prompt", null, "Be concise", outputCell as any);
+    runInference("prompt", null, "Be concise");
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.system_instruction.parts[0].text).toBe("Be concise");
   });
 
   it("uses default system prompt when systemPrompt is null", () => {
     mockOkResponse("ok");
-    const outputCell = makeOutputCell();
-    runInference("prompt", null, null, outputCell as any);
+    runInference("prompt", null, null);
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.system_instruction.parts[0].text).toBe("You are a helpful assistant.");
   });
 
-  it("writes error message to output cell when invokeGemini throws", () => {
+  it("returns an error string when invokeGemini throws", () => {
     mockFetchResponse({ error: { message: "quota exceeded" } });
-    const outputCell = makeOutputCell();
-    runInference("prompt", null, null, outputCell as any);
-    expect(outputCell.setValue).toHaveBeenCalledWith("Error: quota exceeded");
+    expect(runInference("prompt", null, null)).toBe("Error: quota exceeded");
   });
 
-  it("writes error message to output cell when Drive fetch throws", () => {
+  it("returns an error string when Drive fetch throws", () => {
     (DriveApp.getFileById as jest.Mock).mockImplementationOnce(() => {
       throw new Error("File not found");
     });
-    const outputCell = makeOutputCell();
-    runInference("prompt", "https://drive.google.com/file/d/abc123/view", null, outputCell as any);
-    expect(outputCell.setValue).toHaveBeenCalledWith("Error: File not found");
+    expect(
+      runInference("prompt", "https://drive.google.com/file/d/abc123/view", null),
+    ).toBe("Error: File not found");
   });
 });
 ```
@@ -407,9 +400,9 @@ Expected: FAIL — `runInference` module does not exist
 /**
  * inference.ts — Unified inference handler for menu-triggered AI calls.
  *
- * runInference normalizes raw cell values into a Gemini request, executes it
- * via invokeGemini, and writes the result (or any error) to the provided
- * output cell. This is the entry point for all batch/menu AI operations.
+ * runInference normalizes raw cell values into a Gemini request and executes
+ * it via invokeGemini. It has no SpreadsheetApp dependency — callers are
+ * responsible for writing the returned value to the sheet.
  */
 
 import { invokeGemini } from "./api";
@@ -418,8 +411,7 @@ import { flattenArg, isValidDriveLink, extractId } from "./utils";
 import type { GeminiInlineData } from "../shared/types";
 
 /**
- * Execute a single Gemini inference from raw cell values and write the result
- * to the provided output cell.
+ * Execute a single Gemini inference from raw cell values.
  *
  * @param userPrompts  Cell value(s) for the user message — scalar or 2D range.
  * @param driveLinks   Cell value(s) containing Drive URLs to attach as inline
@@ -427,30 +419,29 @@ import type { GeminiInlineData } from "../shared/types";
  *                     Pass null to omit.
  * @param systemPrompt Cell value for the system instruction. First non-empty
  *                     string is used. Pass null to use the model default.
- * @param outputCell   Range to receive the model response or error string.
+ * @returns The model response string, an "Error: ..." string on failure,
+ *          or null if userPrompts is empty (signals caller to skip this row).
  */
 export function runInference(
   userPrompts: unknown,
   driveLinks: unknown,
   systemPrompt: unknown,
-  outputCell: GoogleAppsScript.Spreadsheet.Range,
-): void {
-  try {
-    const userTexts = flattenArg(userPrompts);
+): string | null {
+  const userTexts = flattenArg(userPrompts);
+  if (userTexts.length === 0) return null;
 
+  try {
     const inlineData: GeminiInlineData[] = flattenArg(driveLinks)
       .filter(isValidDriveLink)
       .map((link) => fetchAndEncodeFile(extractId(link)));
 
-    const result = invokeGemini({
+    return invokeGemini({
       systemPrompt: flattenArg(systemPrompt)[0] ?? undefined,
       userTexts,
       inlineData: inlineData.length ? inlineData : undefined,
     });
-
-    outputCell.setValue(result);
   } catch (e) {
-    outputCell.setValue("Error: " + (e as Error).message);
+    return "Error: " + (e as Error).message;
   }
 }
 ```
@@ -461,7 +452,7 @@ export function runInference(
 npx jest __tests__/inference.test.ts --no-coverage
 ```
 
-Expected: PASS — all 9 tests
+Expected: PASS — all 10 tests
 
 **Step 5: Add coverage threshold**
 
@@ -625,25 +616,19 @@ let processed = 0;
 
 for (let i = 0; i < dataValues.length; i++) {
   const row = dataValues[i];
-  const usrPrompt = row[map.user_prompt] as string;
   const realRowIndex = range.getRow() + i;
-
-  if (!usrPrompt) continue;
 
   SpreadsheetApp.getActive().toast(`Processing Row ${realRowIndex}...`, "AI Agent", -1);
 
   const userPrompts = mode === "TEXT"
-    ? [usrPrompt, row[map.source_text]]
-    : [usrPrompt];
+    ? [row[map.user_prompt], row[map.source_text]]
+    : [row[map.user_prompt]];
   const driveLinks = mode === "FILE" ? row[map.source_drive] : null;
 
-  runInference(
-    userPrompts,
-    driveLinks,
-    row[map.sys_prompt],
-    sheet.getRange(realRowIndex, map.output + 1),
-  );
+  const result = runInference(userPrompts, driveLinks, row[map.sys_prompt]);
+  if (result === null) continue;
 
+  sheet.getRange(realRowIndex, map.output + 1).setValue(result);
   processed++;
   SpreadsheetApp.flush();
 }
