@@ -5,10 +5,11 @@
 
 ## Context
 
-`SSI` (custom function) and `runBatchAI` (menu tool) each independently look up `GEMINI_API_KEY` from `ScriptProperties` then call `callGeminiAPI`. Any future Gemini-calling feature repeats this pattern. Two related problems are addressed together:
+`SSI` (custom function) and `runBatchAI` (menu tool) each independently look up `GEMINI_API_KEY` from `ScriptProperties` then call `callGeminiAPI`. Any future Gemini-calling feature repeats this pattern. Three related problems are addressed together:
 
 1. **No single Gemini entry point** — callers independently own auth resolution and the API call
 2. **`flattenArg` and `TOOL_REGISTRY` are misplaced** — both live in `customFunctions.ts` but belong in dedicated locations
+3. **No unified inference handler** — input normalization (text casting, Drive file encoding) is inlined in `runBatchAI`'s loop body with no reusable abstraction
 
 ## Design
 
@@ -24,9 +25,9 @@ export function invokeGemini(params: Omit<GeminiRequest, "apiKey">): string {
 }
 ```
 
-The signature takes `Omit<GeminiRequest, "apiKey">` — callers pass `userTexts`, `systemPrompt`, `inlineData`, `tools`, etc. freely. No column mapping or mode logic is encoded here; those remain the caller's responsibility.
+The signature takes `Omit<GeminiRequest, "apiKey">` — callers pass `userTexts`, `systemPrompt`, `inlineData`, `tools`, etc. freely. No column mapping or mode logic is encoded here.
 
-`callGeminiAPI` is unchanged — `apiKey: string` stays required in `GeminiRequest`. All existing `api.test.ts` tests pass an explicit key and require no changes. New `invokeGemini` tests are added to `api.test.ts`, mocking `PropertiesService` as a `globalThis` property before imports (the same pattern already used in `customFunctions.test.ts`).
+`callGeminiAPI` is unchanged — `apiKey: string` stays required in `GeminiRequest`. All existing `api.test.ts` tests continue to pass an explicit key and require no changes.
 
 ### 2. `utils.ts` — add `flattenArg`
 
@@ -42,7 +43,7 @@ export function flattenArg(val: unknown): string[] {
 }
 ```
 
-`customFunctions.ts` imports it from `./utils`. `utils.test.ts` gains a `flattenArg` describe block covering: scalar string, vertical range (`[[v1],[v2]]`), horizontal range (`[[v1,v2]]`), null input, and empty-cell filtering.
+`customFunctions.ts` imports it from `./utils`.
 
 ### 3. `src/server/tools.ts` — new module for `TOOL_REGISTRY`
 
@@ -52,14 +53,57 @@ import type { GeminiFunctionDeclaration } from "../shared/types";
 export const TOOL_REGISTRY: Record<string, GeminiFunctionDeclaration> = {};
 ```
 
-`customFunctions.ts` imports `TOOL_REGISTRY` from `./tools`. This gives tool declarations a dedicated home as concrete use cases are added. No behavior change.
+`customFunctions.ts` imports `TOOL_REGISTRY` from `./tools`.
 
-### 4. `customFunctions.ts` — thin wrapper
+### 4. `src/server/inference.ts` — new unified inference handler
+
+Single function that accepts raw cell values, normalizes them, executes an `invokeGemini` call, and writes the result to the output cell. Menu-only — does not return a value.
+
+```typescript
+export function runInference(
+  userPrompts: unknown,
+  driveLinks: unknown,
+  systemPrompt: unknown,
+  outputCell: GoogleAppsScript.Spreadsheet.Range,
+): void {
+  try {
+    const userTexts = flattenArg(userPrompts);
+
+    const inlineData: GeminiInlineData[] = flattenArg(driveLinks)
+      .filter(isValidDriveLink)
+      .map((link) => fetchAndEncodeFile(extractId(link)));
+
+    const result = invokeGemini({
+      systemPrompt: flattenArg(systemPrompt)[0] ?? undefined,
+      userTexts,
+      inlineData: inlineData.length ? inlineData : undefined,
+    });
+
+    outputCell.setValue(result);
+  } catch (e) {
+    outputCell.setValue("Error: " + (e as Error).message);
+  }
+}
+```
+
+**Input contract:**
+- `userPrompts` — any cell-origin value: scalar string, 2D array from a range, or null. `flattenArg` normalizes to `string[]`.
+- `driveLinks` — same. Invalid or non-Drive strings are silently filtered; valid links are encoded via `fetchAndEncodeFile`. Pass null/undefined for text-only calls.
+- `systemPrompt` — scalar or range; first non-empty string is used. Pass null/undefined to omit.
+- `outputCell` — a `Range` object pointing at the cell to receive the result or error.
+
+**Error handling:** all errors (missing API key, network failure, file too large, etc.) are written to `outputCell` as `"Error: <message>"`. This matches the existing per-row behavior in `runBatchAI`.
+
+**Behavior change vs. current `runBatchAI` TEXT mode:** the existing check `sourceText.length <= 5 || sourceText.includes("Error")` is dropped. `runInference` passes whatever text it receives to the model. This validation was a heuristic guard that belongs at the call site if still needed.
+
+### 5. `customFunctions.ts` — thin wrapper
 
 ```typescript
 import { invokeGemini } from "./api";
 import { flattenArg } from "./utils";
 import { TOOL_REGISTRY } from "./tools";
+
+export { TOOL_REGISTRY };
 
 export function SSI(userTexts: unknown, systemPrompt?: string, toolNames?: unknown): string {
   try {
@@ -80,33 +124,48 @@ export function SSI(userTexts: unknown, systemPrompt?: string, toolNames?: unkno
 }
 ```
 
-No behavior change. The `try/catch` → error string contract is preserved.
+No behavior change. `SSI` does not use `runInference` — it calls `invokeGemini` directly because it returns a value to the calling cell rather than writing to a Range.
 
-### 5. `index.ts` — `runBatchAI` calls `invokeGemini`
+### 6. `index.ts` — `runBatchAI` simplified loop
 
-Replace the API key lookup and `callGeminiAPI` calls. The column mapping, mode branching, and all other logic in `runBatchAI` are untouched:
+The API key block is removed. The loop body delegates to `runInference`, passing the appropriate cell values based on mode. Column mapping and mode branching remain in `runBatchAI`:
 
 ```typescript
-// Before
-const apiKey = PropertiesService.getScriptProperties().getProperty(CONFIG.API_KEY_PROPERTY);
-if (!apiKey) { ui.alert(...); return; }
-// ...
-result = callGeminiAPI({ apiKey, systemPrompt, userTexts: [usrPrompt, sourceText] });
-result = callGeminiAPI({ apiKey, systemPrompt, userTexts: [usrPrompt], inlineData });
+for (let i = 0; i < dataValues.length; i++) {
+  const row = dataValues[i];
+  const usrPrompt = row[map.user_prompt] as string;
+  const realRowIndex = range.getRow() + i;
 
-// After
-result = invokeGemini({ systemPrompt, userTexts: [usrPrompt, sourceText] });
-result = invokeGemini({ systemPrompt, userTexts: [usrPrompt], inlineData });
+  if (!usrPrompt) continue;
+
+  SpreadsheetApp.getActive().toast(`Processing Row ${realRowIndex}...`, "AI Agent", -1);
+
+  const userPrompts = mode === "TEXT"
+    ? [usrPrompt, row[map.source_text]]
+    : [usrPrompt];
+  const driveLinks = mode === "FILE" ? row[map.source_drive] : null;
+
+  runInference(
+    userPrompts,
+    driveLinks,
+    row[map.sys_prompt],
+    sheet.getRange(realRowIndex, map.output + 1),
+  );
+
+  processed++;
+  SpreadsheetApp.flush();
+}
 ```
 
-The upfront `ui.alert` for a missing key is removed. A missing key now throws inside `invokeGemini` and is caught by the existing per-row `try/catch`, writing `"Error: GEMINI_API_KEY script property not set"` to the first affected output cell. This is a minor UX change — the key-missing case is a configuration error that should be caught during setup.
+The per-row `try/catch` is removed — `runInference` handles its own errors and writes them to the output cell.
 
-`callGeminiAPI` is no longer imported in `index.ts`.
-
-### 6. Module dependency graph (after)
+### 7. Module dependency graph (after)
 
 ```
-index.ts          →  api.ts (invokeGemini)
+index.ts          →  inference.ts (runInference)
+inference.ts      →  api.ts (invokeGemini)
+                  →  drive.ts (fetchAndEncodeFile)
+                  →  utils.ts (flattenArg, isValidDriveLink, extractId)
 customFunctions   →  api.ts (invokeGemini)
                   →  utils.ts (flattenArg)
                   →  tools.ts (TOOL_REGISTRY)
@@ -114,22 +173,21 @@ api.ts            →  config.ts (unchanged)
 tools.ts          →  types.ts (GeminiFunctionDeclaration)
 ```
 
-`callGeminiAPI` remains exported from `api.ts` for tests and any caller that needs to supply its own key.
+`callGeminiAPI` remains exported from `api.ts` for tests.
 
-### 7. Tests
+### 8. Tests
 
 | File | Changes |
 |---|---|
-| `api.test.ts` | Add `invokeGemini` block: resolves key from mocked `PropertiesService`, throws on missing key, passes params through to `callGeminiAPI`. Existing tests unchanged. |
+| `api.test.ts` | Add `invokeGemini` block: resolves key from mocked `PropertiesService`, throws on missing key, passes params through. Existing tests unchanged. |
 | `utils.test.ts` | Add `flattenArg` block: scalar, vertical range, horizontal range, null, empty-cell filtering. |
+| `__tests__/inference.test.ts` (new) | Mock `UrlFetchApp`, `PropertiesService`, `DriveApp`, `Utilities` before import. Cases: scalar userPrompts; range userPrompts; valid drive link → encoded inlineData; invalid drive link → filtered; systemPrompt used; systemPrompt omitted; error written to output cell. |
 | `customFunctions.test.ts` | No changes — `PropertiesService` mock already in place; all existing tests pass as-is. |
-
-Coverage thresholds: add entry for `src/server/tools.ts` in `jest.config.cjs`.
 
 ## What This Does Not Change
 
 - `GeminiRequest` interface — `apiKey: string` stays required
 - `buildGeminiPayload` — unchanged pure function
 - `SSI` public interface and `[SSI Error: ...]` format
-- `runBatchAI` column mapping, mode branching, header validation, progress toasts, per-row error handling
+- `runBatchAI` column mapping, mode branching, header validation, progress toasts
 - Rollup footer stubs and `appsscript.json` — no new GAS entry points
