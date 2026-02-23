@@ -43,7 +43,7 @@ function handleDialogSelection(mode) { _GASEntry.handleDialogSelection(mode); }
 function importDriveLinks() { _GASEntry.importDriveLinks(); }
 function extractTextFromSelection() { _GASEntry.extractTextFromSelection(); }
 function sampleRowsToEvaluation() { _GASEntry.sampleRowsToEvaluation(); }
-function GEMINI(userTexts, inlineData, systemPrompt, toolNames) { return _GASEntry.GEMINI(userTexts, inlineData, systemPrompt, toolNames); }
+function SSI(userTexts, inlineData, systemPrompt, toolNames) { return _GASEntry.SSI(userTexts, inlineData, systemPrompt, toolNames); }
 `,
   },
   plugins: [
