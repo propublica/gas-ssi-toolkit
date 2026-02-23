@@ -44,9 +44,9 @@ function flattenArg(val: unknown): string[] {
  * @param {string|Array} userTexts One or more text parts for the user message.
  *   Pass a single string, a cell reference, or a range / array literal.
  *   Example: "Summarize this" or A1 or A1:A3 or {A1,B4,B10}
- * @param {string} systemPrompt System-level instruction for the model.
+ * @param {string} [systemPrompt] (Optional) System-level instruction for the model.
  *   Example: "You are a concise summarizer."
- * @param {string|Array} toolNames Names of pre-registered tools to enable.
+ * @param {string|Array} [toolNames] (Optional) Names of pre-registered tools to enable.
  *   Example: "myTool" or {A5,A6}
  * @return {string} The model's text response, or "[SSI Error: ...]" on failure.
  * @customfunction
