@@ -29,10 +29,46 @@ export function buildSingleTagList(
   includeNew: boolean,
   selected?: string,
 ): void {
-  void container;
-  void headers;
-  void includeNew;
-  void selected;
+  container.innerHTML = "";
+
+  function selectOnly(clicked: HTMLButtonElement): void {
+    container.querySelectorAll<HTMLButtonElement>(".tag").forEach((t) => {
+      t.classList.remove("selected");
+    });
+    clicked.classList.add("selected");
+  }
+
+  headers.forEach((h) => {
+    const btn = document.createElement("button");
+    btn.className = "tag";
+    btn.type = "button";
+    btn.textContent = h;
+    btn.setAttribute("data-value", h);
+    if (selected === h) btn.classList.add("selected");
+    btn.addEventListener("click", function () {
+      selectOnly(this);
+      const input = document.getElementById("new-col-input") as HTMLInputElement | null;
+      if (input) input.style.display = "none";
+    });
+    container.appendChild(btn);
+  });
+
+  if (includeNew) {
+    const newBtn = document.createElement("button");
+    newBtn.className = "tag";
+    newBtn.type = "button";
+    newBtn.textContent = "+ New column";
+    newBtn.setAttribute("data-value", "__new__");
+    newBtn.addEventListener("click", function () {
+      selectOnly(this);
+      const input = document.getElementById("new-col-input") as HTMLInputElement | null;
+      if (input) {
+        input.style.display = "block";
+        input.focus();
+      }
+    });
+    container.appendChild(newBtn);
+  }
 }
 
 /**
