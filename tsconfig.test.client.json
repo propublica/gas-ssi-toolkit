@@ -8,5 +8,6 @@
     "src/client/**/*.ts",
     "src/shared/**/*.ts",
     "__tests__/sidebar.test.ts"
-  ]
+  ],
+  "exclude": []
 }
