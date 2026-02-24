@@ -1,3 +1,4 @@
+/// <reference types="node" />
 /**
  * Shared DOM fixtures and setup utilities for sidebar tests.
  * Used by sidebar.test.ts and sidebar-entry.test.ts.

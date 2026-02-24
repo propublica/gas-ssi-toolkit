@@ -2,12 +2,14 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "lib": ["ES2019", "DOM"],
-    "types": ["google-apps-script", "jest", "node"]
+    "types": ["google-apps-script", "jest"]
   },
   "include": [
     "src/client/**/*.ts",
     "src/shared/**/*.ts",
-    "__tests__/**/*.ts"
+    "__tests__/sidebar.test.ts",
+    "__tests__/sidebar-entry.test.ts",
+    "__tests__/helpers/*.ts"
   ],
   "exclude": []
 }
