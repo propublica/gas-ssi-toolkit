@@ -18,8 +18,8 @@ const mockRun = {
 (globalThis as unknown as { google: unknown }).google = { script: { run: mockRun } };
 globalThis.alert = jest.fn();
 
-import { showAIPanel, hideAIPanel, dispatchTool } from "../src/client/sidebar-entry";
-import { setupConfigPanel } from "./helpers/sidebar-fixtures";
+import { showAIPanel, hideAIPanel, dispatchTool, runAI } from "../src/client/sidebar-entry";
+import { setupConfigPanel, setupWithSelections } from "./helpers/sidebar-fixtures";
 
 // Captured callbacks — assigned fresh in each beforeEach via mockImplementation.
 let capturedSuccess: (v: unknown) => void;
@@ -140,5 +140,52 @@ describe("dispatchTool", () => {
     expect(globalThis.alert).toHaveBeenCalledWith("Error: Drive error");
     expect(btn.classList.contains("loading")).toBe(false);
     expect(btn.innerHTML).toBe("Import");
+  });
+});
+
+// ── runAI ─────────────────────────────────────────────────────────────────────
+
+describe("runAI", () => {
+  it("does not call runBatchAI when assembleRunConfig returns null (no selections)", () => {
+    // beforeEach calls setupConfigPanel() with no pre-selections,
+    // so assembleRunConfig() returns null (no userPromptCols selected).
+    runAI();
+    expect(mockRun.runBatchAI).not.toHaveBeenCalled();
+  });
+
+  it("disables run-btn and sets text to 'Running...' while the request is in flight", () => {
+    setupWithSelections({ userPrompt: ["col_a"], output: "ai_inference" });
+    runAI();
+    const btn = document.getElementById("run-btn") as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    expect(btn.textContent).toBe("Running...");
+  });
+
+  it("calls runBatchAI with the assembled RunConfig", () => {
+    setupWithSelections({ userPrompt: ["col_a"], output: "ai_inference" });
+    runAI();
+    expect(mockRun.runBatchAI).toHaveBeenCalledWith(
+      expect.objectContaining({ userPromptCols: ["col_a"], outputCol: "ai_inference" }),
+    );
+  });
+
+  it("on success: re-enables run-btn, resets text, and hides ai-panel", () => {
+    setupWithSelections({ userPrompt: ["col_a"], output: "ai_inference" });
+    runAI();
+    capturedSuccess(undefined);
+    const btn = document.getElementById("run-btn") as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    expect(btn.textContent).toBe("Run AI");
+    expect(document.getElementById("tool-list")!.style.display).toBe("block");
+  });
+
+  it("on failure: alerts, re-enables run-btn, and resets text", () => {
+    setupWithSelections({ userPrompt: ["col_a"], output: "ai_inference" });
+    runAI();
+    capturedFailure(new Error("API error"));
+    const btn = document.getElementById("run-btn") as HTMLButtonElement;
+    expect(globalThis.alert).toHaveBeenCalledWith("Error: API error");
+    expect(btn.disabled).toBe(false);
+    expect(btn.textContent).toBe("Run AI");
   });
 });
