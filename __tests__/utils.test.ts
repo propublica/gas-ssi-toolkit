@@ -217,6 +217,10 @@ describe("flattenArg", () => {
     expect(flattenArg(null)).toEqual([]);
   });
 
+  it("returns an empty array for an empty string scalar", () => {
+    expect(flattenArg("")).toEqual([]);
+  });
+
   it("converts non-string scalars to strings", () => {
     expect(flattenArg(42)).toEqual(["42"]);
   });
