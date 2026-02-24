@@ -20,7 +20,7 @@ import {
 
 // ── Panel navigation ──────────────────────────────────────────────────────────
 
-function showAIPanel(preset?: Partial<RunConfig>): void {
+export function showAIPanel(preset?: Partial<RunConfig>): void {
   document.getElementById("tool-list")!.style.display = "none";
   document.getElementById("ai-panel")!.style.display = "block";
   document.getElementById("config-form")!.style.display = "none";
@@ -47,14 +47,14 @@ function showAIPanel(preset?: Partial<RunConfig>): void {
     .getSheetHeaders();
 }
 
-function hideAIPanel(): void {
+export function hideAIPanel(): void {
   document.getElementById("ai-panel")!.style.display = "none";
   document.getElementById("tool-list")!.style.display = "block";
 }
 
 // ── Tool dispatch ─────────────────────────────────────────────────────────────
 
-function dispatchTool(e: MouseEvent, fn: string): void {
+export function dispatchTool(e: MouseEvent, fn: string): void {
   const btn = e.currentTarget as HTMLButtonElement;
   const orig = btn.innerHTML;
   btn.classList.add("loading");
@@ -74,7 +74,7 @@ function dispatchTool(e: MouseEvent, fn: string): void {
 
 // ── Run AI ────────────────────────────────────────────────────────────────────
 
-function runAI(): void {
+export function runAI(): void {
   const config = assembleRunConfig();
   if (!config) return;
 
