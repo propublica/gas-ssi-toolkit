@@ -8,29 +8,15 @@ export interface AppConfig {
   API_KEY_PROPERTY: string;
   MODEL_NAME: string;
   MAX_FILE_SIZE_BYTES: number;
-  COLUMNS: ColumnConfig;
 }
 
-export interface ColumnConfig {
-  SOURCE_DRIVE: string;
-  SOURCE_TEXT: string;
-  SYS_PROMPT: string;
-  USER_PROMPT: string;
-  OUTPUT: string;
+export interface RunConfig {
+  userPromptCols: string[];
+  driveFileCols?: string[];
+  systemPromptCol?: string;
+  outputCol: string;
+  rowRange?: { start: number; end: number };
 }
-
-// ── Column Mapping ─────────────────────────────────────────────
-
-export interface ColumnMap {
-  source_drive: number;
-  source_text: number;
-  sys_prompt: number;
-  user_prompt: number;
-  output: number;
-}
-
-// ── AI Mode ────────────────────────────────────────────────────
-export type AIMode = "TEXT" | "FILE";
 
 // ── Gemini API ─────────────────────────────────────────────────
 

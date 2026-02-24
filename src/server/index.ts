@@ -9,7 +9,6 @@
  */
 
 export { SSI } from "./customFunctions";
-import { CONFIG } from "./config";
 import { runInference } from "./inference";
 import { checkDriveService, extractTextUniversal } from "./drive";
 import {
@@ -18,9 +17,9 @@ import {
   getAllFilesRecursive,
   sampleRows,
   truncateText,
+  resolveColumns,
 } from "./utils";
-import { HTML_TEMPLATE } from "./dialog";
-import type { AIMode, ColumnMap } from "../shared/types";
+import type { RunConfig } from "../shared/types";
 
 // ==========================================
 // 🚀 MENU & INITIALIZATION
@@ -37,13 +36,11 @@ export function onOpen(): void {
 // 🖥️ UI HANDLERS
 // ==========================================
 
-export function showSourceDialog(): void {
-  const htmlOutput = HtmlService.createHtmlOutput(HTML_TEMPLATE).setWidth(400).setHeight(300);
-  SpreadsheetApp.getUi().showModalDialog(htmlOutput, "Choose AI Data Source");
-}
-
-export function handleDialogSelection(mode: string): void {
-  runBatchAI(mode as AIMode);
+export function getSheetHeaders(): string[] {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const lastCol = sheet.getLastColumn();
+  if (lastCol === 0) return [];
+  return sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
 }
 
 export function showSidebar(): void {
@@ -226,63 +223,99 @@ export function sampleRowsToEvaluation(): void {
 // 🧠 TOOL 4: AI BATCH PROCESSOR
 // ==========================================
 
-export function runBatchAI(mode: AIMode): void {
+export function runBatchAI(config: RunConfig): void {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getActiveSheet();
   const ui = SpreadsheetApp.getUi();
 
-  // Map column headers to indices
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] as string[];
-  const map: ColumnMap = {
-    source_drive: headers.indexOf(CONFIG.COLUMNS.SOURCE_DRIVE),
-    source_text: headers.findIndex((h) => h.includes(CONFIG.COLUMNS.SOURCE_TEXT)),
-    sys_prompt: headers.indexOf(CONFIG.COLUMNS.SYS_PROMPT),
-    user_prompt: headers.indexOf(CONFIG.COLUMNS.USER_PROMPT),
-    output: headers.indexOf(CONFIG.COLUMNS.OUTPUT),
-  };
 
-  if (
-    map.source_drive === -1 ||
-    map.sys_prompt === -1 ||
-    map.user_prompt === -1 ||
-    map.output === -1
-  ) {
+  // Validate user prompt columns (required)
+  const userPromptIdxs = resolveColumns(headers, config.userPromptCols);
+  const missingUserPrompt = config.userPromptCols.filter((_, i) => userPromptIdxs[i] === -1);
+  if (missingUserPrompt.length > 0) {
     ui.alert(
       "Error: Missing Columns",
-      `Ensure headers exist: ${Object.values(CONFIG.COLUMNS).join(", ")}`,
+      `Could not find columns: ${missingUserPrompt.join(", ")}`,
       ui.ButtonSet.OK,
     );
     return;
   }
 
-  // Process selected rows
-  const range = sheet.getActiveRange();
-  if (!range) return;
+  // Validate drive file columns (if selected)
+  let driveFileIdxs: number[] = [];
+  if (config.driveFileCols && config.driveFileCols.length > 0) {
+    driveFileIdxs = resolveColumns(headers, config.driveFileCols);
+    const missingDrive = config.driveFileCols.filter((_, i) => driveFileIdxs[i] === -1);
+    if (missingDrive.length > 0) {
+      ui.alert(
+        "Error: Missing Columns",
+        `Could not find columns: ${missingDrive.join(", ")}`,
+        ui.ButtonSet.OK,
+      );
+      return;
+    }
+  }
 
-  const dataValues = sheet
-    .getRange(range.getRow(), 1, range.getNumRows(), sheet.getLastColumn())
-    .getValues();
+  // Validate system prompt column (if selected)
+  let systemPromptIdx = -1;
+  if (config.systemPromptCol) {
+    const idxs = resolveColumns(headers, [config.systemPromptCol]);
+    if (idxs[0] === -1) {
+      ui.alert(
+        "Error: Missing Columns",
+        `Could not find column: ${config.systemPromptCol}`,
+        ui.ButtonSet.OK,
+      );
+      return;
+    }
+    systemPromptIdx = idxs[0];
+  }
 
-  SpreadsheetApp.getActive().toast(`Starting AI Batch (${mode} Mode)...`, "AI Agent", -1);
+  // Resolve output column — create if not found
+  let outputIdx = headers.indexOf(config.outputCol);
+  if (outputIdx === -1) {
+    const newColIdx = sheet.getLastColumn() + 1;
+    sheet.getRange(1, newColIdx).setValue(config.outputCol);
+    outputIdx = newColIdx - 1;
+  }
+
+  // Determine row range
+  let startRow: number;
+  let numRows: number;
+  if (config.rowRange) {
+    startRow = config.rowRange.start;
+    numRows = config.rowRange.end - config.rowRange.start + 1;
+  } else {
+    const range = sheet.getActiveRange();
+    if (!range) return;
+    startRow = range.getRow();
+    numRows = range.getNumRows();
+  }
+
+  const dataValues = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues();
+
+  SpreadsheetApp.getActive().toast(`Starting AI Batch...`, "AI Agent", -1);
   let processed = 0;
 
   for (let i = 0; i < dataValues.length; i++) {
     const row = dataValues[i];
-    const realRowIndex = range.getRow() + i;
+    const realRowIndex = startRow + i;
 
     SpreadsheetApp.getActive().toast(`Processing Row ${realRowIndex}...`, "AI Agent", -1);
 
-    const userPrompts =
-      mode === "TEXT" ? [row[map.user_prompt], row[map.source_text]] : [row[map.user_prompt]];
-    const driveLinks = mode === "FILE" ? row[map.source_drive] : null;
+    const userPrompts = userPromptIdxs.map((idx) => row[idx]);
+    const driveLinks = driveFileIdxs.length > 0 ? driveFileIdxs.map((idx) => row[idx]) : undefined;
+    const systemPrompt = systemPromptIdx >= 0 ? row[systemPromptIdx] : undefined;
 
-    const result = runInference(userPrompts, driveLinks, row[map.sys_prompt]);
+    const result = runInference(userPrompts, driveLinks, systemPrompt);
     if (result === null) continue;
 
-    sheet.getRange(realRowIndex, map.output + 1).setValue(result);
+    sheet.getRange(realRowIndex, outputIdx + 1).setValue(result);
     processed++;
     SpreadsheetApp.flush();
   }
+
   SpreadsheetApp.getActive().toast(`Complete! Processed ${processed} rows.`, "Success", 5);
 }
 
@@ -292,7 +325,6 @@ export function runBatchAI(mode: AIMode): void {
 
 const TOOLS: Record<string, () => void> = {
   importDriveLinks,
-  showSourceDialog,
   sampleRowsToEvaluation,
   extractTextFromSelection,
 };
