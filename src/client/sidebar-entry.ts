@@ -1,10 +1,10 @@
 /**
  * GAS-coupled entry point for the sidebar.
  *
- * This file wires DOM events to google.script.run and is the Rollup entry
- * point for the client bundle. It is excluded from coverage collection for
- * the same reason src/server/index.ts is excluded — it is deeply coupled to
- * the GAS sandbox runtime and cannot be unit-tested.
+ * The four exported functions (showAIPanel, hideAIPanel, dispatchTool, runAI)
+ * are unit-tested in __tests__/sidebar-entry.test.ts via mock callback capture.
+ * init() and its inner addEventListener callbacks are not tested — init()
+ * contains only event wiring with no branching logic.
  *
  * Pure helpers live in sidebar.ts and are fully unit-tested.
  */
