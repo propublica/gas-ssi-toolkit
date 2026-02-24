@@ -113,7 +113,7 @@ function SSI(userTexts, systemPrompt, toolNames) { return _GASEntry.SSI(userText
     },
     plugins: [
       nodeResolve({ preferBuiltins: false }),
-      typescript({ tsconfig: "./tsconfig.client.json" }),
+      typescript({ tsconfig: "./tsconfig.client.json", compilerOptions: { sourceMap: false } }),
       inlineSidebarHtml({
         template: "src/Sidebar.html",
         css: "src/client/sidebar.css",
