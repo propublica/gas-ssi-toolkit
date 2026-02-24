@@ -17,9 +17,9 @@ import type { GeminiInlineData } from "../shared/types";
  * @param userPrompts  Cell value(s) for the user message — scalar or 2D range.
  * @param driveLinks   Cell value(s) containing Drive URLs to attach as inline
  *                     data. Invalid or non-Drive strings are silently filtered.
- *                     Pass null to omit.
+ *                     Omit or pass `undefined` to skip Drive attachment.
  * @param systemPrompt Cell value for the system instruction. First non-empty
- *                     string is used. Pass null to use the model default.
+ *                     string is used. Omit or pass `undefined` to use the model default.
  * @returns The model response string, an "Error: ..." string on failure,
  *          or null if userPrompts is empty (signals caller to skip this row).
  */

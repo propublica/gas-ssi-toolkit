@@ -83,7 +83,7 @@ describe("runInference", () => {
     expect(payload.contents[0].parts).toHaveLength(1); // text only, no inline_data
   });
 
-  it("omits inlineData from payload when driveLinks is null", () => {
+  it("omits inlineData from payload when driveLinks is omitted", () => {
     mockOkResponse("ok");
     runInference("prompt");
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
@@ -98,7 +98,7 @@ describe("runInference", () => {
     expect(payload.system_instruction.parts[0].text).toBe("Be concise");
   });
 
-  it("uses default system prompt when systemPrompt is null", () => {
+  it("uses default system prompt when systemPrompt is omitted", () => {
     mockOkResponse("ok");
     runInference("prompt");
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
