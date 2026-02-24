@@ -228,7 +228,11 @@ export function runBatchAI(config: RunConfig): void {
   const sheet = ss.getActiveSheet();
   const ui = SpreadsheetApp.getUi();
 
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] as string[];
+  const headers = getSheetHeaders();
+  if (headers.length === 0) {
+    ui.alert("Error", "The active sheet has no column headers.", ui.ButtonSet.OK);
+    return;
+  }
 
   // Validate user prompt columns (required)
   const userPromptIdxs = resolveColumns(headers, config.userPromptCols);
