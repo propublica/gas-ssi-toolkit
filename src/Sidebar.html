@@ -21,9 +21,7 @@
             color: var(--text-main);
         }
 
-        .container {
-            padding: 16px;
-        }
+        .container { padding: 16px; }
 
         .guide-card {
             background-color: #f8f9fa;
@@ -35,9 +33,7 @@
             transition: background-color 0.2s;
         }
 
-        .guide-card:hover {
-            background-color: #f1f3f4;
-        }
+        .guide-card:hover { background-color: #f1f3f4; }
 
         .guide-link {
             color: var(--primary-blue);
@@ -50,9 +46,7 @@
             font-size: 14px;
         }
 
-        .section {
-            margin-bottom: 28px;
-        }
+        .section { margin-bottom: 28px; }
 
         h3 {
             font-size: 11px;
@@ -87,17 +81,9 @@
             color: var(--primary-blue);
         }
 
-        .tool-btn:active {
-            background-color: #e8eaed;
-            transform: scale(0.98);
-        }
+        .tool-btn:active { background-color: #e8eaed; transform: scale(0.98); }
 
-        .icon {
-            margin-right: 12px;
-            font-size: 18px;
-            width: 24px;
-            text-align: center;
-        }
+        .icon { margin-right: 12px; font-size: 18px; width: 24px; text-align: center; }
 
         .status-footer {
             margin-top: 40px;
@@ -109,68 +95,412 @@
             line-height: 1.5;
         }
 
-        .loading {
-            opacity: 0.5;
-            pointer-events: none;
+        .loading { opacity: 0.5; pointer-events: none; }
+
+        /* ── AI Config Panel ── */
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--primary-blue);
+            cursor: pointer;
+            font-size: 14px;
+            font-family: 'Google Sans', sans-serif;
+            padding: 0;
+        }
+
+        .panel-title { font-weight: 500; font-size: 15px; }
+
+        .field-group { margin-bottom: 16px; }
+
+        .field-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            margin-bottom: 6px;
+        }
+
+        .required { color: #d93025; }
+        .optional { color: var(--text-secondary); font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 11px; }
+
+        .tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .tag {
+            padding: 5px 10px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            background: white;
+            color: var(--text-main);
+            font-family: 'Google Sans', sans-serif;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .tag:hover {
+            border-color: var(--primary-blue);
+            background: var(--hover-blue);
+        }
+
+        .tag.selected {
+            background: #e8f0fe;
+            border-color: var(--primary-blue);
+            color: var(--primary-blue);
+            font-weight: 500;
+        }
+
+        .select-input {
+            width: 100%;
+            padding: 7px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: 'Google Sans', sans-serif;
+            font-size: 13px;
+            color: var(--text-main);
+            box-sizing: border-box;
+        }
+
+        .text-input {
+            width: 100%;
+            padding: 7px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: 'Google Sans', sans-serif;
+            font-size: 13px;
+            margin-top: 6px;
+            box-sizing: border-box;
+        }
+
+        .row-range-options {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 13px;
+        }
+
+        .row-range-options label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .range-inputs { display: flex; gap: 8px; margin-top: 6px; }
+
+        .range-inputs input {
+            width: 50%;
+            padding: 6px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: 'Google Sans', sans-serif;
+            box-sizing: border-box;
+        }
+
+        .panel-buttons { display: flex; gap: 8px; margin-top: 24px; }
+
+        .btn-run {
+            flex: 1;
+            padding: 10px;
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-family: 'Google Sans', sans-serif;
+            font-weight: 500;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .btn-run:hover { background: #1557b0; }
+        .btn-run:disabled { background: #9aa0a6; cursor: default; }
+
+        .btn-cancel {
+            padding: 10px 16px;
+            background: white;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: 'Google Sans', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .no-headers-msg {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 24px 0;
+            font-style: italic;
         }
     </style>
 </head>
 
 <body>
-    <div class="container">
+    <!-- Default tool list -->
+    <div id="tool-list" class="container">
         <div class="guide-card">
             <a href="https://docs.google.com/document/d/1BQJzBHiE6L0hvU6NMD0jaQE71VWRpWH-vNQu3UtGjBA/edit?tab=t.66jobsqlduah#heading=h.h5k0s81xpiiq"
                 target="_blank" class="guide-link">
                 <span>📖</span> View User Guide ↗
             </a>
         </div>
-
         <div class="section">
             <h3>Main Tools</h3>
-            <button class="tool-btn" onclick="run(event, 'importDriveLinks')">
+            <button class="tool-btn" onclick="dispatchTool(event, 'importDriveLinks')">
                 <span class="icon">📂</span> Import Drive Links
             </button>
-            <button class="tool-btn" onclick="run(event, 'showSourceDialog')">
+            <button class="tool-btn" onclick="showAIPanel()">
                 <span class="icon">▶️</span> Run AI Inference
             </button>
         </div>
-
         <div class="section">
             <h3>Extras</h3>
-            <button class="tool-btn" onclick="run(event, 'sampleRowsToEvaluation')">
+            <button class="tool-btn" onclick="dispatchTool(event, 'sampleRowsToEvaluation')">
                 <span class="icon">🎲</span> Sample Rows
             </button>
-            <button class="tool-btn" onclick="run(event, 'extractTextFromSelection')">
+            <button class="tool-btn" onclick="dispatchTool(event, 'extractTextFromSelection')">
                 <span class="icon">📜</span> Extract Text
             </button>
         </div>
+        <div class="status-footer">
+            <strong>SSI Tools v2.0</strong><br>
+            Powered by Gemini 2.0 Flash<br>
+            Evaluation Unrestricted Mode
+        </div>
     </div>
 
-    <div class="status-footer">
-        <strong>SSI Tools v2.0</strong><br>
-        Powered by Gemini 2.0 Flash<br>
-        Evaluation Unrestricted Mode
+    <!-- AI config panel -->
+    <div id="ai-panel" class="container" style="display:none">
+        <div class="panel-header">
+            <button class="back-btn" onclick="hideAIPanel()">← Back</button>
+            <span class="panel-title">Configure AI Run</span>
+        </div>
+
+        <div id="no-headers-msg" class="no-headers-msg" style="display:none">
+            No columns found — add headers to your sheet first.
+        </div>
+
+        <div id="config-form" style="display:none">
+            <div class="field-group">
+                <span class="field-label">User prompt columns <span class="required">*</span></span>
+                <div id="user-prompt-cols" class="tag-list"></div>
+            </div>
+
+            <div class="field-group">
+                <span class="field-label">Drive file columns <span class="optional">(optional)</span></span>
+                <div id="drive-file-cols" class="tag-list"></div>
+            </div>
+
+            <div class="field-group">
+                <span class="field-label">System prompt column <span class="optional">(optional)</span></span>
+                <div id="system-prompt-col" class="tag-list"></div>
+            </div>
+
+            <div class="field-group">
+                <span class="field-label">Output column <span class="required">*</span></span>
+                <div id="output-col" class="tag-list"></div>
+                <input id="new-col-input" type="text" class="text-input" placeholder="ai_column_name" value="ai_" style="display:none">
+            </div>
+
+            <div class="field-group">
+                <span class="field-label">Rows to process</span>
+                <div class="row-range-options">
+                    <label><input type="radio" name="row-range" value="selection" checked onchange="handleRowRangeChange()"> Use sheet selection</label>
+                    <label><input type="radio" name="row-range" value="range" onchange="handleRowRangeChange()"> Specify range</label>
+                    <div id="range-inputs" class="range-inputs" style="display:none">
+                        <input type="number" id="row-start" placeholder="Start row" min="2">
+                        <input type="number" id="row-end" placeholder="End row" min="2">
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-buttons">
+                <button class="btn-cancel" onclick="hideAIPanel()">Cancel</button>
+                <button id="run-btn" class="btn-run" onclick="runAI()">Run AI</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        function run(e, fn) {
-            const btn = e.currentTarget;
-            const originalContent = btn.innerHTML;
-
+        // ── Existing tool dispatch ──────────────────────────────────
+        function dispatchTool(e, fn) {
+            var btn = e.currentTarget;
+            var orig = btn.innerHTML;
             btn.classList.add('loading');
             btn.innerHTML = '<span class="icon">⏳</span> Working...';
+            google.script.run
+                .withSuccessHandler(function() { btn.classList.remove('loading'); btn.innerHTML = orig; })
+                .withFailureHandler(function(msg) { alert('Error: ' + msg); btn.classList.remove('loading'); btn.innerHTML = orig; })
+                .runTool(fn);
+        }
+
+        // ── AI panel ───────────────────────────────────────────────
+        function showAIPanel() {
+            document.getElementById('tool-list').style.display = 'none';
+            document.getElementById('ai-panel').style.display = 'block';
+            document.getElementById('config-form').style.display = 'none';
+            document.getElementById('no-headers-msg').style.display = 'none';
+            google.script.run
+                .withSuccessHandler(loadHeaders)
+                .withFailureHandler(function(msg) { alert('Error loading headers: ' + msg); hideAIPanel(); })
+                .getSheetHeaders();
+        }
+
+        function hideAIPanel() {
+            document.getElementById('ai-panel').style.display = 'none';
+            document.getElementById('tool-list').style.display = 'block';
+        }
+
+        function loadHeaders(headers) {
+            if (!headers || headers.length === 0) {
+                document.getElementById('no-headers-msg').style.display = 'block';
+                return;
+            }
+            buildTagList('user-prompt-cols', headers);
+            buildTagList('drive-file-cols', headers);
+            buildSingleTagList('system-prompt-col', headers, false);
+            buildSingleTagList('output-col', headers, true);
+            document.getElementById('config-form').style.display = 'block';
+        }
+
+        function buildTagList(containerId, headers) {
+            var container = document.getElementById(containerId);
+            container.innerHTML = '';
+            headers.forEach(function(h) {
+                var btn = document.createElement('button');
+                btn.className = 'tag';
+                btn.type = 'button';
+                btn.textContent = h;
+                btn.setAttribute('data-value', h);
+                btn.onclick = function() { this.classList.toggle('selected'); };
+                container.appendChild(btn);
+            });
+        }
+
+        function buildSingleTagList(containerId, headers, includeNew) {
+            var container = document.getElementById(containerId);
+            container.innerHTML = '';
+            function selectOnly(clicked) {
+                Array.prototype.slice.call(container.querySelectorAll('.tag'))
+                    .forEach(function(t) { t.classList.remove('selected'); });
+                clicked.classList.add('selected');
+            }
+            headers.forEach(function(h) {
+                var btn = document.createElement('button');
+                btn.className = 'tag';
+                btn.type = 'button';
+                btn.textContent = h;
+                btn.setAttribute('data-value', h);
+                btn.onclick = function() {
+                    selectOnly(this);
+                    document.getElementById('new-col-input').style.display = 'none';
+                };
+                container.appendChild(btn);
+            });
+            if (includeNew) {
+                var newBtn = document.createElement('button');
+                newBtn.className = 'tag';
+                newBtn.type = 'button';
+                newBtn.textContent = '+ New column';
+                newBtn.setAttribute('data-value', '__new__');
+                newBtn.onclick = function() {
+                    selectOnly(this);
+                    var input = document.getElementById('new-col-input');
+                    input.style.display = 'block';
+                    input.focus();
+                };
+                container.appendChild(newBtn);
+            }
+        }
+
+        function handleRowRangeChange() {
+            var isRange = document.querySelector('input[name="row-range"]:checked').value === 'range';
+            document.getElementById('range-inputs').style.display = isRange ? 'flex' : 'none';
+        }
+
+        function runAI() {
+            var userPromptCols = Array.prototype.slice
+                .call(document.querySelectorAll('#user-prompt-cols .tag.selected'))
+                .map(function(t) { return t.getAttribute('data-value'); });
+
+            if (userPromptCols.length === 0) {
+                alert('Please select at least one User prompt column.');
+                return;
+            }
+
+            var driveFileCols = Array.prototype.slice
+                .call(document.querySelectorAll('#drive-file-cols .tag.selected'))
+                .map(function(t) { return t.getAttribute('data-value'); });
+
+            var sysTag = document.querySelector('#system-prompt-col .tag.selected');
+            var systemPromptCol = sysTag ? sysTag.getAttribute('data-value') : undefined;
+
+            var outputTag = document.querySelector('#output-col .tag.selected');
+            var outputCol;
+            if (!outputTag) {
+                alert('Please select an output column.');
+                return;
+            } else if (outputTag.getAttribute('data-value') === '__new__') {
+                outputCol = document.getElementById('new-col-input').value.trim();
+                if (!outputCol) { alert('Please enter a name for the new output column.'); return; }
+            } else {
+                outputCol = outputTag.getAttribute('data-value');
+            }
+
+            var rowRangeMode = document.querySelector('input[name="row-range"]:checked').value;
+            var rowRange;
+            if (rowRangeMode === 'range') {
+                var start = parseInt(document.getElementById('row-start').value, 10);
+                var end = parseInt(document.getElementById('row-end').value, 10);
+                if (isNaN(start) || isNaN(end) || start < 2 || end < start) {
+                    alert('Please enter a valid row range (start ≥ 2, end ≥ start).');
+                    return;
+                }
+                rowRange = { start: start, end: end };
+            }
+
+            var config = {
+                userPromptCols: userPromptCols,
+                driveFileCols: driveFileCols.length > 0 ? driveFileCols : undefined,
+                systemPromptCol: systemPromptCol,
+                outputCol: outputCol,
+                rowRange: rowRange,
+            };
+
+            var btn = document.getElementById('run-btn');
+            btn.disabled = true;
+            btn.textContent = 'Running...';
 
             google.script.run
-                .withSuccessHandler(() => {
-                    btn.classList.remove('loading');
-                    btn.innerHTML = originalContent;
+                .withSuccessHandler(function() {
+                    btn.disabled = false;
+                    btn.textContent = 'Run AI';
+                    hideAIPanel();
                 })
-                .withFailureHandler(msg => {
+                .withFailureHandler(function(msg) {
                     alert('Error: ' + msg);
-                    btn.classList.remove('loading');
-                    btn.innerHTML = originalContent;
+                    btn.disabled = false;
+                    btn.textContent = 'Run AI';
                 })
-                .runTool(fn);
+                .runBatchAI(config);
         }
     </script>
 </body>

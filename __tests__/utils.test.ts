@@ -14,6 +14,7 @@ import {
   sampleRows,
   truncateText,
   flattenArg,
+  resolveColumns,
 } from "../src/server/utils";
 import type { DriveFileInfo } from "../src/shared/types";
 
@@ -223,5 +224,27 @@ describe("flattenArg", () => {
 
   it("converts non-string scalars to strings", () => {
     expect(flattenArg(42)).toEqual(["42"]);
+  });
+});
+
+describe("resolveColumns", () => {
+  it("returns indices for all found names", () => {
+    expect(resolveColumns(["a", "b", "c"], ["a", "c"])).toEqual([0, 2]);
+  });
+
+  it("returns -1 for names not in headers", () => {
+    expect(resolveColumns(["a", "b"], ["c"])).toEqual([-1]);
+  });
+
+  it("returns empty array for empty names list", () => {
+    expect(resolveColumns(["a", "b"], [])).toEqual([]);
+  });
+
+  it("returns -1 for all names when headers is empty", () => {
+    expect(resolveColumns([], ["a"])).toEqual([-1]);
+  });
+
+  it("preserves the order of the names argument", () => {
+    expect(resolveColumns(["x", "y", "z"], ["z", "x"])).toEqual([2, 0]);
   });
 });

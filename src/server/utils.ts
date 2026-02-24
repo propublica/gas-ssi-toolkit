@@ -90,3 +90,11 @@ export function flattenArg(val: unknown): string[] {
     .filter((v) => v !== "" && v != null)
     .map(String);
 }
+
+/**
+ * Map an array of column header names to their zero-based indices.
+ * Returns -1 for any name not found in `headers`.
+ */
+export function resolveColumns(headers: string[], names: string[]): number[] {
+  return names.map((name) => headers.indexOf(name));
+}
