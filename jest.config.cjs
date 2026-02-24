@@ -2,6 +2,10 @@
 module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",
+  transform: {
+    "^.+/src/client/.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
+    "^.+\\.ts$": "ts-jest",
+  },
   roots: ["<rootDir>/__tests__"],
   moduleNameMapper: {
     "^@server/(.*)$": "<rootDir>/src/server/$1",
