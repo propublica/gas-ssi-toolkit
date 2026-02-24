@@ -311,16 +311,12 @@
 
             <div class="field-group">
                 <span class="field-label">System prompt column <span class="optional">(optional)</span></span>
-                <select id="system-prompt-col" class="select-input">
-                    <option value="">None</option>
-                </select>
+                <div id="system-prompt-col" class="tag-list"></div>
             </div>
 
             <div class="field-group">
                 <span class="field-label">Output column <span class="required">*</span></span>
-                <select id="output-col" class="select-input" onchange="handleOutputColChange(this)">
-                    <option value="">Select...</option>
-                </select>
+                <div id="output-col" class="tag-list"></div>
                 <input id="new-col-input" type="text" class="text-input" placeholder="ai_column_name" value="ai_" style="display:none">
             </div>
 
@@ -380,14 +376,8 @@
             }
             buildTagList('user-prompt-cols', headers);
             buildTagList('drive-file-cols', headers);
-            buildSelectOptions('system-prompt-col', headers, true);
-            buildSelectOptions('output-col', headers, false);
-            // Append "New column..." to output select after real headers
-            var outputSel = document.getElementById('output-col');
-            var newOpt = document.createElement('option');
-            newOpt.value = '__new__';
-            newOpt.textContent = 'New column...';
-            outputSel.appendChild(newOpt);
+            buildSingleTagList('system-prompt-col', headers, false);
+            buildSingleTagList('output-col', headers, true);
             document.getElementById('config-form').style.display = 'block';
         }
 
@@ -405,31 +395,40 @@
             });
         }
 
-        function buildSelectOptions(selectId, headers, includeNone) {
-            var sel = document.getElementById(selectId);
-            sel.innerHTML = '';
-            if (includeNone) {
-                var none = document.createElement('option');
-                none.value = '';
-                none.textContent = 'None';
-                sel.appendChild(none);
-            } else {
-                var ph = document.createElement('option');
-                ph.value = '';
-                ph.textContent = 'Select...';
-                sel.appendChild(ph);
+        function buildSingleTagList(containerId, headers, includeNew) {
+            var container = document.getElementById(containerId);
+            container.innerHTML = '';
+            function selectOnly(clicked) {
+                Array.prototype.slice.call(container.querySelectorAll('.tag'))
+                    .forEach(function(t) { t.classList.remove('selected'); });
+                clicked.classList.add('selected');
             }
             headers.forEach(function(h) {
-                var opt = document.createElement('option');
-                opt.value = h;
-                opt.textContent = h;
-                sel.appendChild(opt);
+                var btn = document.createElement('button');
+                btn.className = 'tag';
+                btn.type = 'button';
+                btn.textContent = h;
+                btn.setAttribute('data-value', h);
+                btn.onclick = function() {
+                    selectOnly(this);
+                    document.getElementById('new-col-input').style.display = 'none';
+                };
+                container.appendChild(btn);
             });
-        }
-
-        function handleOutputColChange(sel) {
-            document.getElementById('new-col-input').style.display =
-                sel.value === '__new__' ? 'block' : 'none';
+            if (includeNew) {
+                var newBtn = document.createElement('button');
+                newBtn.className = 'tag';
+                newBtn.type = 'button';
+                newBtn.textContent = '+ New column';
+                newBtn.setAttribute('data-value', '__new__');
+                newBtn.onclick = function() {
+                    selectOnly(this);
+                    var input = document.getElementById('new-col-input');
+                    input.style.display = 'block';
+                    input.focus();
+                };
+                container.appendChild(newBtn);
+            }
         }
 
         function handleRowRangeChange() {
@@ -451,19 +450,19 @@
                 .call(document.querySelectorAll('#drive-file-cols .tag.selected'))
                 .map(function(t) { return t.getAttribute('data-value'); });
 
-            var sysVal = document.getElementById('system-prompt-col').value;
-            var systemPromptCol = sysVal || undefined;
+            var sysTag = document.querySelector('#system-prompt-col .tag.selected');
+            var systemPromptCol = sysTag ? sysTag.getAttribute('data-value') : undefined;
 
-            var outputSel = document.getElementById('output-col');
+            var outputTag = document.querySelector('#output-col .tag.selected');
             var outputCol;
-            if (outputSel.value === '__new__') {
-                outputCol = document.getElementById('new-col-input').value.trim();
-                if (!outputCol) { alert('Please enter a name for the new output column.'); return; }
-            } else if (outputSel.value) {
-                outputCol = outputSel.value;
-            } else {
+            if (!outputTag) {
                 alert('Please select an output column.');
                 return;
+            } else if (outputTag.getAttribute('data-value') === '__new__') {
+                outputCol = document.getElementById('new-col-input').value.trim();
+                if (!outputCol) { alert('Please enter a name for the new output column.'); return; }
+            } else {
+                outputCol = outputTag.getAttribute('data-value');
             }
 
             var rowRangeMode = document.querySelector('input[name="row-range"]:checked').value;
