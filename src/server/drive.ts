@@ -41,15 +41,18 @@ export function extractTextUniversal(fileId: string): string {
     const mimeType = file.getMimeType();
 
     // Native Google Doc — read directly
-    if (mimeType === MimeType.GOOGLE_DOCS) {
+    if (mimeType === (MimeType as unknown as GoogleAppsScript.Base.MimeType).GOOGLE_DOCS) {
       return DocumentApp.openById(fileId).getBody().getText();
     }
 
     // PDF or image — OCR via temporary Doc conversion (Drive API v3)
-    if (mimeType === MimeType.PDF || mimeType.includes("image/")) {
+    if (
+      mimeType === (MimeType as unknown as GoogleAppsScript.Base.MimeType).PDF ||
+      mimeType.includes("image/")
+    ) {
       const resource = {
         name: "Temp_" + file.getName(),
-        mimeType: MimeType.GOOGLE_DOCS,
+        mimeType: (MimeType as unknown as GoogleAppsScript.Base.MimeType).GOOGLE_DOCS,
       };
       // Drive.Files.create with content triggers server-side OCR
       const tempFile = Drive.Files.create(resource, file.getBlob());
