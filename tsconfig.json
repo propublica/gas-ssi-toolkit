@@ -25,6 +25,10 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
 
+    /* Only auto-include these @types packages — prevents @types/jsdom from
+       bleeding in via jest-environment-jsdom and colliding with the GAS MimeType global. */
+    "types": ["google-apps-script", "jest"],
+
     /* Emit declarations alongside JS for IDE support. */
     "declaration": true,
     "declarationDir": "./dist/types",
