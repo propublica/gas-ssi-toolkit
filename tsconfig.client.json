@@ -3,6 +3,7 @@
   "compilerOptions": {
     "lib": ["ES2019", "DOM"],
     "types": ["google-apps-script", "jest"],
+    "rootDir": ".",
     "noUnusedLocals": false
   },
   "include": [

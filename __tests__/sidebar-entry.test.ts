@@ -99,7 +99,11 @@ describe("showAIPanel", () => {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Creates a button with the given innerHTML and a MouseEvent whose currentTarget is that button. */
+/**
+ * Creates a button with the given innerHTML and a MouseEvent whose currentTarget is that button.
+ * The button is appended to document.body; cleanup happens via the next beforeEach which
+ * calls setupConfigPanel() and resets document.body.innerHTML.
+ */
 function makeButtonEvent(html = "Click"): { e: MouseEvent; btn: HTMLButtonElement } {
   const btn = document.createElement("button");
   btn.innerHTML = html;
