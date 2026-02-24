@@ -133,26 +133,38 @@
         .required { color: #d93025; }
         .optional { color: var(--text-secondary); font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 11px; }
 
-        .checkbox-list {
+        .tag-list {
             display: flex;
-            flex-direction: column;
-            gap: 4px;
-            max-height: 110px;
-            overflow-y: auto;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            padding: 8px;
-            font-size: 13px;
+            flex-wrap: wrap;
+            gap: 6px;
         }
 
-        .checkbox-list label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .tag {
+            padding: 5px 10px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            background: white;
+            color: var(--text-main);
+            font-family: 'Google Sans', sans-serif;
+            font-size: 12px;
             cursor: pointer;
-            white-space: nowrap;
+            transition: all 0.15s;
+            max-width: 100%;
             overflow: hidden;
             text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .tag:hover {
+            border-color: var(--primary-blue);
+            background: var(--hover-blue);
+        }
+
+        .tag.selected {
+            background: #e8f0fe;
+            border-color: var(--primary-blue);
+            color: var(--primary-blue);
+            font-weight: 500;
         }
 
         .select-input {
@@ -289,12 +301,12 @@
         <div id="config-form" style="display:none">
             <div class="field-group">
                 <span class="field-label">User prompt columns <span class="required">*</span></span>
-                <div id="user-prompt-cols" class="checkbox-list"></div>
+                <div id="user-prompt-cols" class="tag-list"></div>
             </div>
 
             <div class="field-group">
                 <span class="field-label">Drive file columns <span class="optional">(optional)</span></span>
-                <div id="drive-file-cols" class="checkbox-list"></div>
+                <div id="drive-file-cols" class="tag-list"></div>
             </div>
 
             <div class="field-group">
@@ -366,8 +378,8 @@
                 document.getElementById('no-headers-msg').style.display = 'block';
                 return;
             }
-            buildCheckboxList('user-prompt-cols', headers);
-            buildCheckboxList('drive-file-cols', headers);
+            buildTagList('user-prompt-cols', headers);
+            buildTagList('drive-file-cols', headers);
             buildSelectOptions('system-prompt-col', headers, true);
             buildSelectOptions('output-col', headers, false);
             // Append "New column..." to output select after real headers
@@ -379,17 +391,17 @@
             document.getElementById('config-form').style.display = 'block';
         }
 
-        function buildCheckboxList(containerId, headers) {
+        function buildTagList(containerId, headers) {
             var container = document.getElementById(containerId);
             container.innerHTML = '';
             headers.forEach(function(h) {
-                var label = document.createElement('label');
-                var cb = document.createElement('input');
-                cb.type = 'checkbox';
-                cb.value = h;
-                label.appendChild(cb);
-                label.appendChild(document.createTextNode(' ' + h));
-                container.appendChild(label);
+                var btn = document.createElement('button');
+                btn.className = 'tag';
+                btn.type = 'button';
+                btn.textContent = h;
+                btn.setAttribute('data-value', h);
+                btn.onclick = function() { this.classList.toggle('selected'); };
+                container.appendChild(btn);
             });
         }
 
@@ -427,8 +439,8 @@
 
         function runAI() {
             var userPromptCols = Array.prototype.slice
-                .call(document.querySelectorAll('#user-prompt-cols input:checked'))
-                .map(function(cb) { return cb.value; });
+                .call(document.querySelectorAll('#user-prompt-cols .tag.selected'))
+                .map(function(t) { return t.getAttribute('data-value'); });
 
             if (userPromptCols.length === 0) {
                 alert('Please select at least one User prompt column.');
@@ -436,8 +448,8 @@
             }
 
             var driveFileCols = Array.prototype.slice
-                .call(document.querySelectorAll('#drive-file-cols input:checked'))
-                .map(function(cb) { return cb.value; });
+                .call(document.querySelectorAll('#drive-file-cols .tag.selected'))
+                .map(function(t) { return t.getAttribute('data-value'); });
 
             var sysVal = document.getElementById('system-prompt-col').value;
             var systemPromptCol = sysVal || undefined;
@@ -479,7 +491,11 @@
             btn.textContent = 'Running...';
 
             google.script.run
-                .withSuccessHandler(function() { hideAIPanel(); })
+                .withSuccessHandler(function() {
+                    btn.disabled = false;
+                    btn.textContent = 'Run AI';
+                    hideAIPanel();
+                })
                 .withFailureHandler(function(msg) {
                     alert('Error: ' + msg);
                     btn.disabled = false;
