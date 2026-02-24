@@ -49,17 +49,17 @@ describe("runInference", () => {
 
   it("returns the model response string for a scalar user prompt", () => {
     mockOkResponse("AI response");
-    expect(runInference("Hello AI", null, null)).toBe("AI response");
+    expect(runInference("Hello AI")).toBe("AI response");
   });
 
   it("returns null when userPrompts flattens to empty", () => {
-    expect(runInference(null, null, null)).toBeNull();
-    expect(runInference("", null, null)).toBeNull();
+    expect(runInference(null)).toBeNull();
+    expect(runInference("")).toBeNull();
   });
 
   it("flattens a vertical range of user prompts", () => {
     mockOkResponse("ok");
-    runInference([["p1"], ["p2"]], null, null);
+    runInference([["p1"], ["p2"]]);
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.contents[0].parts).toHaveLength(2);
     expect(payload.contents[0].parts[0].text).toBe("p1");
@@ -68,7 +68,7 @@ describe("runInference", () => {
 
   it("encodes a valid drive link as inlineData", () => {
     mockOkResponse("ok");
-    runInference("prompt", "https://drive.google.com/file/d/abc123/view", null);
+    runInference("prompt", "https://drive.google.com/file/d/abc123/view");
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.contents[0].parts[1].inline_data).toEqual({
       mime_type: "application/pdf",
@@ -78,14 +78,14 @@ describe("runInference", () => {
 
   it("filters out invalid drive links silently", () => {
     mockOkResponse("ok");
-    runInference("prompt", "not-a-drive-link", null);
+    runInference("prompt", "not-a-drive-link");
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.contents[0].parts).toHaveLength(1); // text only, no inline_data
   });
 
   it("omits inlineData from payload when driveLinks is null", () => {
     mockOkResponse("ok");
-    runInference("prompt", null, null);
+    runInference("prompt");
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.tools).toBeUndefined();
     expect(payload.contents[0].parts).toHaveLength(1);
@@ -93,28 +93,28 @@ describe("runInference", () => {
 
   it("passes systemPrompt to the payload", () => {
     mockOkResponse("ok");
-    runInference("prompt", null, "Be concise");
+    runInference("prompt", undefined, "Be concise");
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.system_instruction.parts[0].text).toBe("Be concise");
   });
 
   it("uses default system prompt when systemPrompt is null", () => {
     mockOkResponse("ok");
-    runInference("prompt", null, null);
+    runInference("prompt");
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.system_instruction.parts[0].text).toBe("You are a helpful assistant.");
   });
 
   it("returns an error string when invokeGemini throws", () => {
     mockFetchResponse({ error: { message: "quota exceeded" } });
-    expect(runInference("prompt", null, null)).toBe("Error: quota exceeded");
+    expect(runInference("prompt")).toBe("Error: quota exceeded");
   });
 
   it("returns an error string when Drive fetch throws", () => {
     (DriveApp.getFileById as jest.Mock).mockImplementationOnce(() => {
       throw new Error("File not found");
     });
-    expect(runInference("prompt", "https://drive.google.com/file/d/abc123/view", null)).toBe(
+    expect(runInference("prompt", "https://drive.google.com/file/d/abc123/view")).toBe(
       "Error: File not found",
     );
   });

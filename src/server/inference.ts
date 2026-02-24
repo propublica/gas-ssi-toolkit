@@ -25,19 +25,22 @@ import type { GeminiInlineData } from "../shared/types";
  */
 export function runInference(
   userPrompts: unknown,
-  driveLinks: unknown,
-  systemPrompt: unknown,
+  driveLinks?: unknown,
+  systemPrompt?: unknown,
 ): string | null {
   const userTexts = flattenArg(userPrompts);
   if (userTexts.length === 0) return null;
 
   try {
-    const inlineData: GeminiInlineData[] = flattenArg(driveLinks)
-      .filter(isValidDriveLink)
-      .map((link) => fetchAndEncodeFile(extractId(link)));
+    const inlineData: GeminiInlineData[] =
+      driveLinks !== undefined
+        ? flattenArg(driveLinks)
+            .filter(isValidDriveLink)
+            .map((link) => fetchAndEncodeFile(extractId(link)))
+        : [];
 
     return invokeGemini({
-      systemPrompt: flattenArg(systemPrompt)[0] ?? undefined,
+      systemPrompt: systemPrompt !== undefined ? flattenArg(systemPrompt)[0] : undefined,
       userTexts,
       inlineData: inlineData.length ? inlineData : undefined,
     });
