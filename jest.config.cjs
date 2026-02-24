@@ -20,13 +20,12 @@ module.exports = {
   // Scope coverage to source files only.
   // src/server/index.ts is excluded: the four tool orchestrators are deeply
   // coupled to SpreadsheetApp UI globals and are not unit-tested.
-  // src/client/sidebar-entry.ts is excluded for the same reason: it couples
-  // google.script.run calls to the GAS sandbox runtime.
+  // sidebar-entry.ts is now partially covered — init() and its inner arrow
+  // functions remain untested (addEventListener wiring only); see threshold below.
   // See docs/plans/2026-02-18-testing-coverage-design.md for full rationale.
   collectCoverageFrom: [
     "src/**/*.ts",
     "!src/server/index.ts",
-    "!src/client/sidebar-entry.ts",
   ],
   coverageThreshold: {
     // Thresholds are set ~5 points below observed full-suite coverage to allow
@@ -63,6 +62,15 @@ module.exports = {
       statements: 95,
       branches: 81,
       functions: 95,
+    },
+    // init() and its 8 inner arrow functions (addEventListener wiring) are not
+    // unit-tested — init() runs at module load time before beforeEach sets up
+    // the DOM, so all ?.addEventListener calls are no-ops and the callbacks
+    // are never invoked. The four exported functions are fully tested.
+    "./src/client/sidebar-entry.ts": {
+      statements: 82,
+      branches: 52,
+      functions: 52,
     },
   },
 };
