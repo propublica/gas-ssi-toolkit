@@ -1,4 +1,4 @@
-import type { RunConfig } from "../../shared/types";
+import type { RunConfig } from "../shared/types";
 
 interface GoogleScriptRun {
   withSuccessHandler(fn: (result: unknown) => void): this;
