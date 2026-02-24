@@ -92,7 +92,13 @@ export function assembleRunConfig(): RunConfig | null {
  * Shows/hides the row range inputs based on the selected radio.
  * Exported for testing.
  */
-export function handleRowRangeChange(): void {}
+export function handleRowRangeChange(): void {
+  const checked = document.querySelector<HTMLInputElement>('input[name="row-range"]:checked');
+  const rangeInputs = document.getElementById("range-inputs");
+  if (rangeInputs) {
+    rangeInputs.style.display = checked?.value === "range" ? "flex" : "none";
+  }
+}
 
 /**
  * Wires all event listeners. Called once at the end of the script.

@@ -12,7 +12,7 @@ const mockRun = {
 };
 (globalThis as unknown as { google: unknown }).google = { script: { run: mockRun } };
 
-import { buildTagList, buildSingleTagList } from "../src/client/sidebar";
+import { buildTagList, buildSingleTagList, handleRowRangeChange } from "../src/client/sidebar";
 
 // ── buildTagList ──────────────────────────────────────────────────────────────
 
@@ -114,5 +114,29 @@ describe("buildSingleTagList", () => {
     c.querySelector<HTMLButtonElement>('[data-value="__new__"]')!.click();
     c.querySelector<HTMLButtonElement>('[data-value="a"]')!.click();
     expect(document.getElementById("new-col-input")!.style.display).toBe("none");
+  });
+});
+
+// ── handleRowRangeChange ──────────────────────────────────────────────────────
+
+describe("handleRowRangeChange", () => {
+  function makeRowRangeDom(checkedValue: "selection" | "range"): void {
+    document.body.innerHTML = `
+      <input type="radio" name="row-range" value="selection" ${checkedValue === "selection" ? "checked" : ""}>
+      <input type="radio" name="row-range" value="range" ${checkedValue === "range" ? "checked" : ""}>
+      <div id="range-inputs" style="display:none"></div>
+    `;
+  }
+
+  it("shows range-inputs when 'range' radio is checked", () => {
+    makeRowRangeDom("range");
+    handleRowRangeChange();
+    expect(document.getElementById("range-inputs")!.style.display).toBe("flex");
+  });
+
+  it("hides range-inputs when 'selection' radio is checked", () => {
+    makeRowRangeDom("selection");
+    handleRowRangeChange();
+    expect(document.getElementById("range-inputs")!.style.display).toBe("none");
   });
 });
