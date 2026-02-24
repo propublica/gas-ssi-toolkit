@@ -6,6 +6,7 @@ module.exports = {
     // Client source files, sidebar tests, and shared test helpers use the client tsconfig (DOM lib).
     "^.+/src/client/.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
     "^.+/__tests__/sidebar\\.test\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
+    "^.+/__tests__/sidebar-entry\\.test\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
     "^.+/__tests__/helpers/.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
     // All other TypeScript files use the main tsconfig.
     "^.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.json" }],
