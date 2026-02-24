@@ -36,20 +36,22 @@ export function checkDriveService(ui: GoogleAppsScript.Base.Ui): boolean {
  * - Everything else returns a skip message.
  */
 export function extractTextUniversal(fileId: string): string {
+  // Cast to the GAS enum type to avoid collision with DOM's MimeType interface.
+  const GASMimeType = MimeType as unknown as GoogleAppsScript.Base.MimeType;
   try {
     const file = DriveApp.getFileById(fileId);
     const mimeType = file.getMimeType();
 
     // Native Google Doc — read directly
-    if (mimeType === MimeType.GOOGLE_DOCS) {
+    if (mimeType === GASMimeType.GOOGLE_DOCS) {
       return DocumentApp.openById(fileId).getBody().getText();
     }
 
     // PDF or image — OCR via temporary Doc conversion (Drive API v3)
-    if (mimeType === MimeType.PDF || mimeType.includes("image/")) {
+    if (mimeType === GASMimeType.PDF || mimeType.includes("image/")) {
       const resource = {
         name: "Temp_" + file.getName(),
-        mimeType: MimeType.GOOGLE_DOCS,
+        mimeType: GASMimeType.GOOGLE_DOCS,
       };
       // Drive.Files.create with content triggers server-side OCR
       const tempFile = Drive.Files.create(resource, file.getBlob());

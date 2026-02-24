@@ -2,7 +2,7 @@
   "compilerOptions": {
     /* Apps Script runs on V8, which supports ES2019 features. */
     "target": "ES2019",
-    "lib": ["ES2019"],
+    "lib": ["ES2019", "DOM"],
 
     /* Use ESNext modules so Rollup can tree-shake and bundle them. */
     "module": "ESNext",
