@@ -17,19 +17,19 @@
         </div>
         <div class="section">
             <h3>Main Tools</h3>
-            <button class="tool-btn" onclick="dispatchTool(event, 'importDriveLinks')">
+            <button id="btn-import-drive-links" class="tool-btn">
                 <span class="icon">📂</span> Import Drive Links
             </button>
-            <button class="tool-btn" onclick="showAIPanel()">
+            <button id="btn-run-ai" class="tool-btn">
                 <span class="icon">▶️</span> Run AI Inference
             </button>
         </div>
         <div class="section">
             <h3>Extras</h3>
-            <button class="tool-btn" onclick="dispatchTool(event, 'sampleRowsToEvaluation')">
+            <button id="btn-sample-rows" class="tool-btn">
                 <span class="icon">🎲</span> Sample Rows
             </button>
-            <button class="tool-btn" onclick="dispatchTool(event, 'extractTextFromSelection')">
+            <button id="btn-extract-text" class="tool-btn">
                 <span class="icon">📜</span> Extract Text
             </button>
         </div>
@@ -43,7 +43,7 @@
     <!-- AI config panel -->
     <div id="ai-panel" class="container" style="display:none">
         <div class="panel-header">
-            <button class="back-btn" onclick="hideAIPanel()">← Back</button>
+            <button id="back-btn" class="back-btn">← Back</button>
             <span class="panel-title">Configure AI Run</span>
         </div>
 
@@ -76,8 +76,8 @@
             <div class="field-group">
                 <span class="field-label">Rows to process</span>
                 <div class="row-range-options">
-                    <label><input type="radio" name="row-range" value="selection" checked onchange="handleRowRangeChange()"> Use sheet selection</label>
-                    <label><input type="radio" name="row-range" value="range" onchange="handleRowRangeChange()"> Specify range</label>
+                    <label><input type="radio" name="row-range" value="selection" checked> Use sheet selection</label>
+                    <label><input type="radio" name="row-range" value="range"> Specify range</label>
                     <div id="range-inputs" class="range-inputs" style="display:none">
                         <input type="number" id="row-start" placeholder="Start row" min="2">
                         <input type="number" id="row-end" placeholder="End row" min="2">
@@ -86,176 +86,13 @@
             </div>
 
             <div class="panel-buttons">
-                <button class="btn-cancel" onclick="hideAIPanel()">Cancel</button>
-                <button id="run-btn" class="btn-run" onclick="runAI()">Run AI</button>
+                <button id="cancel-btn" class="btn-cancel">Cancel</button>
+                <button id="run-btn" class="btn-run">Run AI</button>
             </div>
         </div>
     </div>
 
-    <script>
-        // ── Existing tool dispatch ──────────────────────────────────
-        function dispatchTool(e, fn) {
-            var btn = e.currentTarget;
-            var orig = btn.innerHTML;
-            btn.classList.add('loading');
-            btn.innerHTML = '<span class="icon">⏳</span> Working...';
-            google.script.run
-                .withSuccessHandler(function() { btn.classList.remove('loading'); btn.innerHTML = orig; })
-                .withFailureHandler(function(msg) { alert('Error: ' + msg); btn.classList.remove('loading'); btn.innerHTML = orig; })
-                .runTool(fn);
-        }
-
-        // ── AI panel ───────────────────────────────────────────────
-        function showAIPanel() {
-            document.getElementById('tool-list').style.display = 'none';
-            document.getElementById('ai-panel').style.display = 'block';
-            document.getElementById('config-form').style.display = 'none';
-            document.getElementById('no-headers-msg').style.display = 'none';
-            google.script.run
-                .withSuccessHandler(loadHeaders)
-                .withFailureHandler(function(msg) { alert('Error loading headers: ' + msg); hideAIPanel(); })
-                .getSheetHeaders();
-        }
-
-        function hideAIPanel() {
-            document.getElementById('ai-panel').style.display = 'none';
-            document.getElementById('tool-list').style.display = 'block';
-        }
-
-        function loadHeaders(headers) {
-            if (!headers || headers.length === 0) {
-                document.getElementById('no-headers-msg').style.display = 'block';
-                return;
-            }
-            buildTagList('user-prompt-cols', headers);
-            buildTagList('drive-file-cols', headers);
-            buildSingleTagList('system-prompt-col', headers, false);
-            buildSingleTagList('output-col', headers, true);
-            document.getElementById('config-form').style.display = 'block';
-        }
-
-        function buildTagList(containerId, headers) {
-            var container = document.getElementById(containerId);
-            container.innerHTML = '';
-            headers.forEach(function(h) {
-                var btn = document.createElement('button');
-                btn.className = 'tag';
-                btn.type = 'button';
-                btn.textContent = h;
-                btn.setAttribute('data-value', h);
-                btn.onclick = function() { this.classList.toggle('selected'); };
-                container.appendChild(btn);
-            });
-        }
-
-        function buildSingleTagList(containerId, headers, includeNew) {
-            var container = document.getElementById(containerId);
-            container.innerHTML = '';
-            function selectOnly(clicked) {
-                Array.prototype.slice.call(container.querySelectorAll('.tag'))
-                    .forEach(function(t) { t.classList.remove('selected'); });
-                clicked.classList.add('selected');
-            }
-            headers.forEach(function(h) {
-                var btn = document.createElement('button');
-                btn.className = 'tag';
-                btn.type = 'button';
-                btn.textContent = h;
-                btn.setAttribute('data-value', h);
-                btn.onclick = function() {
-                    selectOnly(this);
-                    document.getElementById('new-col-input').style.display = 'none';
-                };
-                container.appendChild(btn);
-            });
-            if (includeNew) {
-                var newBtn = document.createElement('button');
-                newBtn.className = 'tag';
-                newBtn.type = 'button';
-                newBtn.textContent = '+ New column';
-                newBtn.setAttribute('data-value', '__new__');
-                newBtn.onclick = function() {
-                    selectOnly(this);
-                    var input = document.getElementById('new-col-input');
-                    input.style.display = 'block';
-                    input.focus();
-                };
-                container.appendChild(newBtn);
-            }
-        }
-
-        function handleRowRangeChange() {
-            var isRange = document.querySelector('input[name="row-range"]:checked').value === 'range';
-            document.getElementById('range-inputs').style.display = isRange ? 'flex' : 'none';
-        }
-
-        function runAI() {
-            var userPromptCols = Array.prototype.slice
-                .call(document.querySelectorAll('#user-prompt-cols .tag.selected'))
-                .map(function(t) { return t.getAttribute('data-value'); });
-
-            if (userPromptCols.length === 0) {
-                alert('Please select at least one User prompt column.');
-                return;
-            }
-
-            var driveFileCols = Array.prototype.slice
-                .call(document.querySelectorAll('#drive-file-cols .tag.selected'))
-                .map(function(t) { return t.getAttribute('data-value'); });
-
-            var sysTag = document.querySelector('#system-prompt-col .tag.selected');
-            var systemPromptCol = sysTag ? sysTag.getAttribute('data-value') : undefined;
-
-            var outputTag = document.querySelector('#output-col .tag.selected');
-            var outputCol;
-            if (!outputTag) {
-                alert('Please select an output column.');
-                return;
-            } else if (outputTag.getAttribute('data-value') === '__new__') {
-                outputCol = document.getElementById('new-col-input').value.trim();
-                if (!outputCol) { alert('Please enter a name for the new output column.'); return; }
-            } else {
-                outputCol = outputTag.getAttribute('data-value');
-            }
-
-            var rowRangeMode = document.querySelector('input[name="row-range"]:checked').value;
-            var rowRange;
-            if (rowRangeMode === 'range') {
-                var start = parseInt(document.getElementById('row-start').value, 10);
-                var end = parseInt(document.getElementById('row-end').value, 10);
-                if (isNaN(start) || isNaN(end) || start < 2 || end < start) {
-                    alert('Please enter a valid row range (start ≥ 2, end ≥ start).');
-                    return;
-                }
-                rowRange = { start: start, end: end };
-            }
-
-            var config = {
-                userPromptCols: userPromptCols,
-                driveFileCols: driveFileCols.length > 0 ? driveFileCols : undefined,
-                systemPromptCol: systemPromptCol,
-                outputCol: outputCol,
-                rowRange: rowRange,
-            };
-
-            var btn = document.getElementById('run-btn');
-            btn.disabled = true;
-            btn.textContent = 'Running...';
-
-            google.script.run
-                .withSuccessHandler(function() {
-                    btn.disabled = false;
-                    btn.textContent = 'Run AI';
-                    hideAIPanel();
-                })
-                .withFailureHandler(function(msg) {
-                    alert('Error: ' + msg);
-                    btn.disabled = false;
-                    btn.textContent = 'Run AI';
-                })
-                .runBatchAI(config);
-        }
-    </script>
+    {{SCRIPTS}}
 </body>
 
 </html>
