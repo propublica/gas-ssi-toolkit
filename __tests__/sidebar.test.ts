@@ -12,7 +12,12 @@ const mockRun = {
 };
 (globalThis as unknown as { google: unknown }).google = { script: { run: mockRun } };
 
-import { buildTagList, buildSingleTagList, handleRowRangeChange } from "../src/client/sidebar";
+import {
+  buildTagList,
+  buildSingleTagList,
+  applyPreset,
+  handleRowRangeChange,
+} from "../src/client/sidebar";
 
 // ── buildTagList ──────────────────────────────────────────────────────────────
 
@@ -138,5 +143,80 @@ describe("handleRowRangeChange", () => {
     makeRowRangeDom("selection");
     handleRowRangeChange();
     expect(document.getElementById("range-inputs")!.style.display).toBe("none");
+  });
+});
+
+// ── applyPreset ───────────────────────────────────────────────────────────────
+
+describe("applyPreset", () => {
+  function setupPanel(headers: string[]): void {
+    document.body.innerHTML = `
+      <div id="user-prompt-cols"></div>
+      <div id="drive-file-cols"></div>
+      <div id="system-prompt-col"></div>
+      <div id="output-col"></div>
+      <input id="new-col-input" type="text" style="display:none">
+      <input type="radio" name="row-range" value="selection" checked>
+      <input type="radio" name="row-range" value="range">
+      <div id="range-inputs" style="display:none">
+        <input type="number" id="row-start">
+        <input type="number" id="row-end">
+      </div>
+    `;
+    buildTagList(document.getElementById("user-prompt-cols")!, headers);
+    buildTagList(document.getElementById("drive-file-cols")!, headers);
+    buildSingleTagList(document.getElementById("system-prompt-col")!, headers, false);
+    buildSingleTagList(document.getElementById("output-col")!, headers, true);
+  }
+
+  it("pre-selects userPromptCols", () => {
+    setupPanel(["col_a", "col_b", "col_c"]);
+    applyPreset({ userPromptCols: ["col_a", "col_c"] });
+    const selected = document.querySelectorAll("#user-prompt-cols .tag.selected");
+    expect(selected).toHaveLength(2);
+    expect(selected[0].getAttribute("data-value")).toBe("col_a");
+    expect(selected[1].getAttribute("data-value")).toBe("col_c");
+  });
+
+  it("pre-selects driveFileCols", () => {
+    setupPanel(["source_drive", "source_text"]);
+    applyPreset({ driveFileCols: ["source_drive"] });
+    const selected = document.querySelectorAll("#drive-file-cols .tag.selected");
+    expect(selected).toHaveLength(1);
+    expect(selected[0].getAttribute("data-value")).toBe("source_drive");
+  });
+
+  it("pre-selects systemPromptCol (single-select)", () => {
+    setupPanel(["system_prompt", "user_prompt"]);
+    applyPreset({ systemPromptCol: "system_prompt" });
+    const selected = document.querySelectorAll("#system-prompt-col .tag.selected");
+    expect(selected).toHaveLength(1);
+    expect(selected[0].getAttribute("data-value")).toBe("system_prompt");
+  });
+
+  it("pre-selects outputCol (single-select)", () => {
+    setupPanel(["ai_inference", "col_b"]);
+    applyPreset({ outputCol: "ai_inference" });
+    const selected = document.querySelectorAll("#output-col .tag.selected");
+    expect(selected).toHaveLength(1);
+    expect(selected[0].getAttribute("data-value")).toBe("ai_inference");
+  });
+
+  it("sets rowRange radio and populates inputs", () => {
+    setupPanel(["col_a"]);
+    applyPreset({ rowRange: { start: 2, end: 10 } });
+    const rangeRadio = document.querySelector<HTMLInputElement>(
+      'input[name="row-range"][value="range"]',
+    )!;
+    expect(rangeRadio.checked).toBe(true);
+    expect((document.getElementById("row-start") as HTMLInputElement).value).toBe("2");
+    expect((document.getElementById("row-end") as HTMLInputElement).value).toBe("10");
+    expect(document.getElementById("range-inputs")!.style.display).toBe("flex");
+  });
+
+  it("ignores fields absent from the preset", () => {
+    setupPanel(["col_a", "col_b"]);
+    applyPreset({ userPromptCols: ["col_a"] });
+    expect(document.querySelectorAll("#drive-file-cols .tag.selected")).toHaveLength(0);
   });
 });

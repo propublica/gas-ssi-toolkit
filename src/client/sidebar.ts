@@ -72,23 +72,6 @@ export function buildSingleTagList(
 }
 
 /**
- * Applies a RunConfig preset by marking matching tags as selected.
- * Exported for testing.
- */
-export function applyPreset(preset: Partial<RunConfig>): void {
-  void preset;
-}
-
-/**
- * Reads current panel DOM state and returns a validated RunConfig.
- * Returns null and shows an alert if required fields are missing.
- * Exported for testing.
- */
-export function assembleRunConfig(): RunConfig | null {
-  return null;
-}
-
-/**
  * Shows/hides the row range inputs based on the selected radio.
  * Exported for testing.
  */
@@ -98,6 +81,57 @@ export function handleRowRangeChange(): void {
   if (rangeInputs) {
     rangeInputs.style.display = checked?.value === "range" ? "flex" : "none";
   }
+}
+
+function setMultiSelected(containerId: string, values: string[]): void {
+  document
+    .getElementById(containerId)
+    ?.querySelectorAll<HTMLButtonElement>(".tag")
+    .forEach((tag) => {
+      tag.classList.toggle("selected", values.includes(tag.getAttribute("data-value") ?? ""));
+    });
+}
+
+function setSingleSelected(containerId: string, value: string): void {
+  document
+    .getElementById(containerId)
+    ?.querySelectorAll<HTMLButtonElement>(".tag")
+    .forEach((tag) => {
+      tag.classList.toggle("selected", tag.getAttribute("data-value") === value);
+    });
+}
+
+/**
+ * Applies a RunConfig preset by marking matching tags as selected.
+ * Exported for testing.
+ */
+export function applyPreset(preset: Partial<RunConfig>): void {
+  if (preset.userPromptCols) setMultiSelected("user-prompt-cols", preset.userPromptCols);
+  if (preset.driveFileCols) setMultiSelected("drive-file-cols", preset.driveFileCols);
+  if (preset.systemPromptCol) setSingleSelected("system-prompt-col", preset.systemPromptCol);
+  if (preset.outputCol) setSingleSelected("output-col", preset.outputCol);
+  if (preset.rowRange) {
+    const rangeRadio = document.querySelector<HTMLInputElement>(
+      'input[name="row-range"][value="range"]',
+    );
+    if (rangeRadio) {
+      rangeRadio.checked = true;
+      handleRowRangeChange();
+      const startInput = document.getElementById("row-start") as HTMLInputElement | null;
+      const endInput = document.getElementById("row-end") as HTMLInputElement | null;
+      if (startInput) startInput.value = String(preset.rowRange.start);
+      if (endInput) endInput.value = String(preset.rowRange.end);
+    }
+  }
+}
+
+/**
+ * Reads current panel DOM state and returns a validated RunConfig.
+ * Returns null and shows an alert if required fields are missing.
+ * Exported for testing.
+ */
+export function assembleRunConfig(): RunConfig | null {
+  return null;
 }
 
 /**
