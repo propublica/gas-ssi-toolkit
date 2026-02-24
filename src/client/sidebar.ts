@@ -5,9 +5,17 @@ import type { RunConfig } from "../shared/types";
  * Exported for testing.
  */
 export function buildTagList(container: HTMLElement, headers: string[], selected?: string[]): void {
-  void container;
-  void headers;
-  void selected;
+  container.innerHTML = "";
+  headers.forEach((h) => {
+    const btn = document.createElement("button");
+    btn.className = "tag";
+    btn.type = "button";
+    btn.textContent = h;
+    btn.setAttribute("data-value", h);
+    if (selected?.includes(h)) btn.classList.add("selected");
+    btn.addEventListener("click", () => btn.classList.toggle("selected"));
+    container.appendChild(btn);
+  });
 }
 
 /**
