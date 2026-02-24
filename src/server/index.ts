@@ -10,8 +10,8 @@
 
 export { SSI } from "./customFunctions";
 import { CONFIG } from "./config";
-import { callGeminiAPI } from "./api";
-import { checkDriveService, extractTextUniversal, fetchAndEncodeFile } from "./drive";
+import { runInference } from "./inference";
+import { checkDriveService, extractTextUniversal } from "./drive";
 import {
   extractId,
   isValidDriveLink,
@@ -231,16 +231,6 @@ export function runBatchAI(mode: AIMode): void {
   const sheet = ss.getActiveSheet();
   const ui = SpreadsheetApp.getUi();
 
-  const apiKey = PropertiesService.getScriptProperties().getProperty(CONFIG.API_KEY_PROPERTY);
-  if (!apiKey) {
-    ui.alert(
-      "🛑 Configuration Error",
-      "API Key not found. Go to Project Settings > Script Properties and add GEMINI_API_KEY.",
-      ui.ButtonSet.OK,
-    );
-    return;
-  }
-
   // Map column headers to indices
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] as string[];
   const map: ColumnMap = {
@@ -278,40 +268,20 @@ export function runBatchAI(mode: AIMode): void {
 
   for (let i = 0; i < dataValues.length; i++) {
     const row = dataValues[i];
-    const usrPrompt = row[map.user_prompt] as string;
     const realRowIndex = range.getRow() + i;
 
-    if (usrPrompt) {
-      SpreadsheetApp.getActive().toast(`Processing Row ${realRowIndex}...`, "AI Agent", -1);
-      let result = "";
+    SpreadsheetApp.getActive().toast(`Processing Row ${realRowIndex}...`, "AI Agent", -1);
 
-      try {
-        const systemPrompt = row[map.sys_prompt] as string;
+    const userPrompts =
+      mode === "TEXT" ? [row[map.user_prompt], row[map.source_text]] : [row[map.user_prompt]];
+    const driveLinks = mode === "FILE" ? row[map.source_drive] : null;
 
-        if (mode === "TEXT") {
-          const sourceText = map.source_text > -1 ? (row[map.source_text] as string) : "";
-          if (!sourceText || sourceText.length <= 5 || sourceText.includes("Error")) {
-            result = "[Skipped: No valid text]";
-          } else {
-            result = callGeminiAPI({ apiKey, systemPrompt, userTexts: [usrPrompt, sourceText] });
-          }
-        } else {
-          const link = row[map.source_drive] as string;
-          if (!isValidDriveLink(link)) {
-            result = "[Skipped: No valid Drive Link]";
-          } else {
-            const inlineData = [fetchAndEncodeFile(extractId(link))];
-            result = callGeminiAPI({ apiKey, systemPrompt, userTexts: [usrPrompt], inlineData });
-          }
-        }
+    const result = runInference(userPrompts, driveLinks, row[map.sys_prompt]);
+    if (result === null) continue;
 
-        sheet.getRange(realRowIndex, map.output + 1).setValue(result);
-        processed++;
-      } catch (e) {
-        sheet.getRange(realRowIndex, map.output + 1).setValue("Error: " + (e as Error).message);
-      }
-      SpreadsheetApp.flush();
-    }
+    sheet.getRange(realRowIndex, map.output + 1).setValue(result);
+    processed++;
+    SpreadsheetApp.flush();
   }
   SpreadsheetApp.getActive().toast(`Complete! Processed ${processed} rows.`, "Success", 5);
 }
