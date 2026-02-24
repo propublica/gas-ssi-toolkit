@@ -15,15 +15,15 @@ module.exports = {
     "^@shared/(.*)$": "<rootDir>/src/shared/$1",
   },
   // Scope coverage to source files only.
-  // src/server/index.ts is excluded from coverage collection: onOpen and
-  // openQuickstartDoc are tested in menu.test.ts, but the four tool
-  // orchestrators (importDriveLinks, extractTextFromSelection,
-  // sampleRowsToEvaluation, runBatchAI) are deeply coupled to SpreadsheetApp
-  // UI globals (prompts, dialogs, active ranges) and are not unit-tested.
+  // src/server/index.ts is excluded: the four tool orchestrators are deeply
+  // coupled to SpreadsheetApp UI globals and are not unit-tested.
+  // src/client/sidebar-entry.ts is excluded for the same reason: it couples
+  // google.script.run calls to the GAS sandbox runtime.
   // See docs/plans/2026-02-18-testing-coverage-design.md for full rationale.
   collectCoverageFrom: [
     "src/**/*.ts",
     "!src/server/index.ts",
+    "!src/client/sidebar-entry.ts",
   ],
   coverageThreshold: {
     // Thresholds are set ~5 points below observed full-suite coverage to allow

@@ -104,7 +104,7 @@ function SSI(userTexts, systemPrompt, toolNames) { return _GASEntry.SSI(userText
 
   // ── Config 2: Client bundle → dist/Sidebar.html ──────────────────────────────
   {
-    input: "src/client/sidebar.ts",
+    input: "src/client/sidebar-entry.ts",
     output: {
       dir: "dist",
       format: "iife",
