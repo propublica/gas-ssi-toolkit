@@ -84,7 +84,7 @@ export function truncateText(text: string, maxLength: number): string {
  * GAS passes single-cell references as raw scalars and ranges as 2D arrays.
  */
 export function flattenArg(val: unknown): string[] {
-  if (!Array.isArray(val)) return val != null ? [String(val)] : [];
+  if (!Array.isArray(val)) return val != null && String(val) !== "" ? [String(val)] : [];
   return (val as unknown[][])
     .flat()
     .filter((v) => v !== "" && v != null)

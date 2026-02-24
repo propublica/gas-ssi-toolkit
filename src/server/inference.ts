@@ -28,7 +28,7 @@ export function runInference(
   driveLinks: unknown,
   systemPrompt: unknown,
 ): string | null {
-  const userTexts = flattenArg(userPrompts).filter((s) => s !== "");
+  const userTexts = flattenArg(userPrompts);
   if (userTexts.length === 0) return null;
 
   try {
