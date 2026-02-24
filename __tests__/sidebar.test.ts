@@ -220,6 +220,15 @@ describe("applyPreset", () => {
     applyPreset({ userPromptCols: ["col_a"] });
     expect(document.querySelectorAll("#drive-file-cols .tag.selected")).toHaveLength(0);
   });
+
+  it("pre-selects __new__ and reveals new-col-input", () => {
+    setupPanel(["ai_inference"]);
+    applyPreset({ outputCol: "__new__" });
+    const selected = document.querySelectorAll("#output-col .tag.selected");
+    expect(selected).toHaveLength(1);
+    expect(selected[0].getAttribute("data-value")).toBe("__new__");
+    expect(document.getElementById("new-col-input")!.style.display).toBe("block");
+  });
 });
 
 // ── assembleRunConfig ─────────────────────────────────────────────────────────

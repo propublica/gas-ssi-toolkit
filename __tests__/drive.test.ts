@@ -68,7 +68,7 @@ describe("extractTextUniversal", () => {
 
   it("reads text directly from a Google Doc", () => {
     (DriveApp.getFileById as jest.Mock).mockReturnValue({
-      getMimeType: () => MimeType.GOOGLE_DOCS,
+      getMimeType: () => "application/vnd.google-apps.document",
     });
     (DocumentApp.openById as jest.Mock).mockReturnValue({
       getBody: () => ({ getText: () => "doc body text" }),
@@ -80,7 +80,7 @@ describe("extractTextUniversal", () => {
   it("performs OCR and returns text for a PDF", () => {
     const mockBlob = {};
     (DriveApp.getFileById as jest.Mock).mockReturnValue({
-      getMimeType: () => MimeType.PDF,
+      getMimeType: () => "application/pdf",
       getName: () => "report.pdf",
       getBlob: () => mockBlob,
     });

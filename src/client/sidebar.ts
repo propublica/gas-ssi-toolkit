@@ -109,7 +109,16 @@ export function applyPreset(preset: Partial<RunConfig>): void {
   if (preset.userPromptCols) setMultiSelected("user-prompt-cols", preset.userPromptCols);
   if (preset.driveFileCols) setMultiSelected("drive-file-cols", preset.driveFileCols);
   if (preset.systemPromptCol) setSingleSelected("system-prompt-col", preset.systemPromptCol);
-  if (preset.outputCol) setSingleSelected("output-col", preset.outputCol);
+  if (preset.outputCol) {
+    setSingleSelected("output-col", preset.outputCol);
+    if (preset.outputCol === "__new__") {
+      const input = document.getElementById("new-col-input") as HTMLInputElement | null;
+      if (input) {
+        input.style.display = "block";
+        input.focus();
+      }
+    }
+  }
   if (preset.rowRange) {
     const rangeRadio = document.querySelector<HTMLInputElement>(
       'input[name="row-range"][value="range"]',

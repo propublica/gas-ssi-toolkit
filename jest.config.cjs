@@ -53,5 +53,10 @@ module.exports = {
       branches: 80,
       functions: 100,
     },
+    "./src/client/sidebar.ts": {
+      statements: 95,
+      branches: 81,
+      functions: 95,
+    },
   },
 };
