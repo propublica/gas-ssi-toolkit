@@ -3,8 +3,12 @@ module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",
   transform: {
+    // Client source files use the client tsconfig (DOM lib).
     "^.+/src/client/.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
-    "^.+\\.ts$": "ts-jest",
+    // sidebar.test.ts imports client code and uses DOM globals — use the client test tsconfig.
+    "^.+/__tests__/sidebar\\.test\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.test.client.json" }],
+    // All other TypeScript files use the main tsconfig.
+    "^.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.json" }],
   },
   roots: ["<rootDir>/__tests__"],
   moduleNameMapper: {
