@@ -125,13 +125,75 @@ export function applyPreset(preset: Partial<RunConfig>): void {
   }
 }
 
+function getSelectedValues(containerId: string): string[] {
+  return Array.from(document.querySelectorAll<HTMLButtonElement>(`#${containerId} .tag.selected`))
+    .map((t) => t.getAttribute("data-value") ?? "")
+    .filter(Boolean);
+}
+
 /**
  * Reads current panel DOM state and returns a validated RunConfig.
  * Returns null and shows an alert if required fields are missing.
  * Exported for testing.
  */
 export function assembleRunConfig(): RunConfig | null {
-  return null;
+  const userPromptCols = getSelectedValues("user-prompt-cols");
+  if (userPromptCols.length === 0) {
+    alert("Please select at least one User prompt column.");
+    return null;
+  }
+
+  const driveFileCols = getSelectedValues("drive-file-cols");
+
+  const sysTag = document.querySelector<HTMLButtonElement>("#system-prompt-col .tag.selected");
+  const systemPromptCol = sysTag?.getAttribute("data-value") ?? undefined;
+
+  const outputTag = document.querySelector<HTMLButtonElement>("#output-col .tag.selected");
+  if (!outputTag) {
+    alert("Please select an output column.");
+    return null;
+  }
+
+  let outputCol: string;
+  if (outputTag.getAttribute("data-value") === "__new__") {
+    const input = document.getElementById("new-col-input") as HTMLInputElement | null;
+    outputCol = input?.value.trim() ?? "";
+    if (!outputCol) {
+      alert("Please enter a name for the new output column.");
+      return null;
+    }
+  } else {
+    outputCol = outputTag.getAttribute("data-value") ?? "";
+  }
+
+  const rowRangeMode = document.querySelector<HTMLInputElement>(
+    'input[name="row-range"]:checked',
+  )?.value;
+
+  let rowRange: { start: number; end: number } | undefined;
+  if (rowRangeMode === "range") {
+    const start = parseInt(
+      (document.getElementById("row-start") as HTMLInputElement | null)?.value ?? "",
+      10,
+    );
+    const end = parseInt(
+      (document.getElementById("row-end") as HTMLInputElement | null)?.value ?? "",
+      10,
+    );
+    if (isNaN(start) || isNaN(end) || start < 2 || end < start) {
+      alert("Please enter a valid row range (start \u2265 2, end \u2265 start).");
+      return null;
+    }
+    rowRange = { start, end };
+  }
+
+  return {
+    userPromptCols,
+    driveFileCols: driveFileCols.length > 0 ? driveFileCols : undefined,
+    systemPromptCol,
+    outputCol,
+    rowRange,
+  };
 }
 
 /**
