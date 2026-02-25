@@ -95,8 +95,11 @@ src/server/index.ts          (entry point — menu, 4 tool orchestrators, UI han
 
 **Client:**
 ```
-src/client/sidebar-entry.ts  (GAS-coupled entry point — showAIPanel, hideAIPanel, dispatchTool, runAI, init)
-└── src/client/sidebar.ts        (pure helpers — buildTagList, buildSingleTagList, applyPreset, assembleRunConfig, handleRowRangeChange)
+src/client/sidebar-entry.ts  (thin init — creates Router, registers panels, calls router.start())
+└── src/client/router.ts         (Router class — push/pop navigation stack)
+└── src/client/services.ts       (GAS boundary — wraps google.script.run as Promises, header cache)
+└── src/client/panels/           (panel classes — mount/unmount lifecycle)
+└── src/client/components/       (reusable UI components — TagList, SingleTagList, RowRange, LockableField)
     └── src/shared/types.ts
 
 src/client/google.d.ts       (compile-time type stub for google.script.run — uses declare global{} pattern)
@@ -106,7 +109,7 @@ src/Sidebar.html             (sidebar template — {{STYLES}} and {{SCRIPTS}} pl
 
 Source files use relative imports (e.g. `../shared/types`). The `@server/*` and `@shared/*` aliases are **Jest-only** (mapped in `jest.config.cjs`) and are not available in TypeScript source.
 
-Only `index.ts` should reference Google Apps Script UI services (SpreadsheetApp, HtmlService, PropertiesService). On the client side, only `sidebar-entry.ts` calls `google.script.run`.
+Only `index.ts` should reference Google Apps Script UI services (SpreadsheetApp, HtmlService, PropertiesService). On the client side, only `services.ts` calls `google.script.run` (wrapping each call as a Promise); `sidebar-entry.ts` is a thin init file that creates the Router and calls `router.start()`.
 
 ### TypeScript Configuration
 
