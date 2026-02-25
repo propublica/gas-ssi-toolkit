@@ -48,6 +48,20 @@ describe("ToolListPanel", () => {
     expect(services.runTool).toHaveBeenCalledWith("importDriveLinks");
   });
 
+  it("clicking Sample Rows calls runTool with 'sampleRowsToEvaluation'", async () => {
+    (services.runTool as jest.Mock).mockResolvedValue(undefined);
+    const c = mountPanel();
+    c.querySelector<HTMLButtonElement>("#btn-sample-rows")!.click();
+    expect(services.runTool).toHaveBeenCalledWith("sampleRowsToEvaluation");
+  });
+
+  it("clicking Extract Text calls runTool with 'extractTextFromSelection'", async () => {
+    (services.runTool as jest.Mock).mockResolvedValue(undefined);
+    const c = mountPanel();
+    c.querySelector<HTMLButtonElement>("#btn-extract-text")!.click();
+    expect(services.runTool).toHaveBeenCalledWith("extractTextFromSelection");
+  });
+
   it("tool button shows loading state while runTool is in flight", () => {
     let resolveRunTool!: () => void;
     (services.runTool as jest.Mock).mockReturnValue(
@@ -70,6 +84,7 @@ describe("ToolListPanel", () => {
     const orig = btn.innerHTML;
     btn.click();
     await Promise.resolve();
+    await Promise.resolve();
     expect(btn.classList.contains("loading")).toBe(false);
     expect(btn.innerHTML).toBe(orig);
   });
@@ -81,6 +96,7 @@ describe("ToolListPanel", () => {
     const btn = c.querySelector<HTMLButtonElement>("#btn-import-drive-links")!;
     const orig = btn.innerHTML;
     btn.click();
+    await Promise.resolve();
     await Promise.resolve();
     expect(globalThis.alert).toHaveBeenCalledWith("Error: Drive error");
     expect(btn.classList.contains("loading")).toBe(false);

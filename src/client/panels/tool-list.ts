@@ -40,7 +40,7 @@ export class ToolListPanel implements Panel {
         btn.innerHTML = orig;
       },
       (err: Error) => {
-        window.alert("Error: " + err.message);
+        globalThis.alert("Error: " + err.message);
         btn.classList.remove("loading");
         btn.innerHTML = orig;
       },
