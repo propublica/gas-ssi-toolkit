@@ -48,4 +48,23 @@ describe("RowRange", () => {
     const r = new RowRange(c, { start: 2, end: 10 });
     expect(r.getValue()).toEqual({ start: 2, end: 10 });
   });
+
+  it("selecting 'selection' radio hides range inputs", () => {
+    const c = makeContainer();
+    new RowRange(c, { start: 2, end: 5 }); // starts with range checked
+    const selRadio = c.querySelector<HTMLInputElement>('input[value="selection"]')!;
+    selRadio.checked = true;
+    selRadio.dispatchEvent(new Event("change"));
+    expect(c.querySelector<HTMLElement>(".range-inputs")?.style.display).toBe("none");
+  });
+
+  it("getValue() returns undefined when range is checked but inputs are empty", () => {
+    const c = makeContainer();
+    const r = new RowRange(c);
+    const rangeRadio = c.querySelector<HTMLInputElement>('input[value="range"]')!;
+    rangeRadio.checked = true;
+    rangeRadio.dispatchEvent(new Event("change"));
+    // inputs left empty — parseInt("", 10) is NaN
+    expect(r.getValue()).toBeUndefined();
+  });
 });

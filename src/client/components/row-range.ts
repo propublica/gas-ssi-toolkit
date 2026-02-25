@@ -4,6 +4,7 @@ export interface RowRangeValue {
 }
 
 export class RowRange {
+  private static instanceCount = 0;
   private readonly container: HTMLElement;
   private startInput: HTMLInputElement;
   private endInput: HTMLInputElement;
@@ -11,13 +12,17 @@ export class RowRange {
 
   constructor(container: HTMLElement, selected?: RowRangeValue) {
     this.container = container;
-    const refs = this.render(selected);
+    const groupName = `row-range-${RowRange.instanceCount++}`;
+    const refs = this.render(selected, groupName);
     this.startInput = refs.startInput;
     this.endInput = refs.endInput;
     this.rangeRadio = refs.rangeRadio;
   }
 
-  private render(selected?: RowRangeValue): {
+  private render(
+    selected: RowRangeValue | undefined,
+    groupName: string,
+  ): {
     startInput: HTMLInputElement;
     endInput: HTMLInputElement;
     rangeRadio: HTMLInputElement;
@@ -29,7 +34,7 @@ export class RowRange {
     const selLabel = document.createElement("label");
     const selRadio = document.createElement("input");
     selRadio.type = "radio";
-    selRadio.name = "row-range";
+    selRadio.name = groupName;
     selRadio.value = "selection";
     selRadio.checked = !selected;
     selLabel.append(selRadio, " Use sheet selection");
@@ -37,7 +42,7 @@ export class RowRange {
     const rangeLabel = document.createElement("label");
     const rangeRadio = document.createElement("input");
     rangeRadio.type = "radio";
-    rangeRadio.name = "row-range";
+    rangeRadio.name = groupName;
     rangeRadio.value = "range";
     rangeRadio.checked = !!selected;
     rangeLabel.append(rangeRadio, " Specify range");
