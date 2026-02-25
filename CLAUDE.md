@@ -24,7 +24,7 @@ npm run lint                # ESLint on src/
 npm run lint:fix            # ESLint with auto-fix
 npm run format              # Prettier on src/ (rewrites files)
 npm run format:check        # Check Prettier formatting without modifying files
-npm run typecheck           # TypeScript type check without building (tsc --noEmit)
+npm run typecheck           # TypeScript type check without building (server + client tsconfigs)
 npm run deploy:dev          # Build + clasp push to dev script
 npm run deploy:prod         # Build + clasp push to prod script
 npm run deploy:watch:dev    # Continuous build + clasp push watch (dev)
@@ -41,13 +41,17 @@ Run a single test by name: `npx jest -t "extractId"`
 
 ### Build Pipeline
 
+The build produces two outputs via a `rollup.config.js` array:
+
+**Config 1 — Server bundle:**
+
 `src/server/index.ts` → Rollup (IIFE format, assigned to `_GASEntry`) → `dist/index.js`
 
 Apps Script has no module system — it only sees top-level functions in the global scope. Rollup wraps everything in an IIFE assigned to `_GASEntry`, so exports from `index.ts` are not directly visible. The `footer` field in `rollup.config.js` bridges this gap by appending plain global function stubs that delegate into the IIFE:
 
 ```js
 function onOpen(e) { _GASEntry.onOpen(e); }
-function showSourceDialog() { _GASEntry.showSourceDialog(); }
+function showSidebar() { _GASEntry.showSidebar(); }
 // ... one stub per public entry point
 ```
 
@@ -62,8 +66,22 @@ If you skip step 2, the function will exist in the bundle but Apps Script won't 
 
 The TypeScript-level JSDoc is compiled away by Rollup and does not appear on the global stub. Google Sheets only registers a function as a custom function when `@customfunction` is present in a JSDoc comment on the **global** declaration — the one in the footer. Without it the function executes correctly when called explicitly but does not appear in autocomplete and is not recognized as a custom function by Sheets.
 
+**Config 2 — Client bundle → `dist/Sidebar.html`:**
+
+`src/client/sidebar-entry.ts` → Rollup (IIFE) → `inlineSidebarHtml` plugin → `dist/Sidebar.html`
+
+HtmlService can only serve `.html` files — all JavaScript and CSS must be inlined at build time. The custom `inlineSidebarHtml` Rollup plugin handles this:
+1. Compiles `sidebar-entry.ts` to an intermediate JS chunk
+2. Reads `src/Sidebar.html` (the template), `src/client/sidebar.css`
+3. Replaces `{{STYLES}}` with `<style>…css…</style>` and `{{SCRIPTS}}` with `<script>…js…</script>`
+4. Emits `dist/Sidebar.html` as an asset
+5. Deletes the intermediate `.js` chunk so clasp never pushes it as a `.gs` file
+
+The `src/Sidebar.html` template is also read at test time by `__tests__/helpers/sidebar-fixtures.ts` to keep DOM fixtures structurally in sync with the real template.
+
 ### Module Dependency Graph
 
+**Server:**
 ```
 src/server/index.ts          (entry point — menu, 4 tool orchestrators, UI handlers, re-exports custom functions)
 ├── src/server/config.ts         (CONFIG object: API key property name, model, column names, limits)
@@ -75,9 +93,31 @@ src/server/index.ts          (entry point — menu, 4 tool orchestrators, UI han
 └── src/shared/types.ts          (shared interfaces: AppConfig, AIMode, ColumnMap, GeminiRequest, etc.)
 ```
 
+**Client:**
+```
+src/client/sidebar-entry.ts  (GAS-coupled entry point — showAIPanel, hideAIPanel, dispatchTool, runAI, init)
+└── src/client/sidebar.ts        (pure helpers — buildTagList, buildSingleTagList, applyPreset, assembleRunConfig, handleRowRangeChange)
+    └── src/shared/types.ts
+
+src/client/google.d.ts       (compile-time type stub for google.script.run — uses declare global{} pattern)
+src/client/sidebar.css       (sidebar styles — inlined into dist/Sidebar.html at build time)
+src/Sidebar.html             (sidebar template — {{STYLES}} and {{SCRIPTS}} placeholders replaced at build time)
+```
+
 Source files use relative imports (e.g. `../shared/types`). The `@server/*` and `@shared/*` aliases are **Jest-only** (mapped in `jest.config.cjs`) and are not available in TypeScript source.
 
-Only `index.ts` should reference Google Apps Script UI services (SpreadsheetApp, HtmlService, PropertiesService). Other modules use injected values or specific GAS globals documented in their headers.
+Only `index.ts` should reference Google Apps Script UI services (SpreadsheetApp, HtmlService, PropertiesService). On the client side, only `sidebar-entry.ts` calls `google.script.run`.
+
+### TypeScript Configuration
+
+Two tsconfigs for two build environments:
+
+- **`tsconfig.json`** — server build. Targets ES2019, no DOM lib, excludes `src/client/`.
+- **`tsconfig.client.json`** — client build and client tests. Extends base, adds `"lib": ["ES2019", "DOM"]`, sets `rootDir: "."` (covers both `src/` and `__tests__/`). Includes precise file patterns: `src/client/**/*.ts`, `src/shared/**/*.ts`, and the three client-side test files.
+
+`npm run typecheck` runs both: `tsc --noEmit && tsc -p tsconfig.client.json --noEmit`.
+
+**Note on types:** `tsconfig.client.json` uses `"types": ["google-apps-script", "jest"]` — do **not** add `"node"` here, as it causes `MimeType` collisions with the google-apps-script types. When a file needs Node.js types (e.g. `readFileSync`), use a triple-slash directive at the top of that file: `/// <reference types="node" />`.
 
 ### Testing
 
@@ -85,7 +125,38 @@ Jest with ts-jest preset. Tests live in `__tests__/`. Path aliases `@server/*` a
 
 **Pattern for mocking GAS globals:** Declare mocks (UrlFetchApp, DriveApp, SpreadsheetApp, etc.) as `globalThis` properties **before** importing the module under test, since imports execute immediately.
 
-**Coverage:** Run `npm run test:coverage` to collect coverage and enforce per-file thresholds. Coverage is opt-in — the pre-commit hook runs `jest --bail` without `--coverage`. `src/server/index.ts` is excluded from coverage collection: `onOpen` and `openQuickstartDoc` are tested in `menu.test.ts`, but the four tool orchestrators are deeply coupled to SpreadsheetApp UI globals and are not unit-tested. See `docs/plans/2026-02-18-testing-coverage-design.md` for full rationale.
+**Client-side mock pattern:** For `google.script.run`, capture the success/failure handlers registered by the function under test:
+
+```ts
+const mockRun = {
+  withSuccessHandler: jest.fn().mockReturnThis(),
+  withFailureHandler: jest.fn().mockReturnThis(),
+  getSheetHeaders: jest.fn(),
+  // ...
+};
+(globalThis as unknown as { google: unknown }).google = { script: { run: mockRun } };
+
+let capturedSuccess: (v: unknown) => void;
+beforeEach(() => {
+  mockRun.withSuccessHandler.mockImplementation((fn) => { capturedSuccess = fn; return mockRun; });
+});
+// Then invoke capturedSuccess(...) / capturedFailure(...) to simulate GAS callbacks.
+```
+
+**Shared DOM fixtures:** `__tests__/helpers/sidebar-fixtures.ts` exports:
+- `FULL_SIDEBAR_HTML` — the sidebar HTML template read from `src/Sidebar.html` at test time (placeholders stripped), so tests stay structurally in sync with the real template without manual drift.
+- `setupConfigPanel(headers?)` — sets `document.body.innerHTML` and populates all tag containers.
+- `setupWithSelections(opts)` — calls `setupConfigPanel` then pre-selects values via `applyPreset`.
+
+The `__tests__/helpers/` directory is excluded from test discovery via `testPathIgnorePatterns` in `jest.config.cjs`.
+
+**Coverage:** Run `npm run test:coverage` to collect coverage and enforce per-file thresholds. Coverage is opt-in — the pre-commit hook runs `jest --bail` without `--coverage`.
+
+Two boundary files are excluded from high thresholds:
+- `src/server/index.ts` — excluded from coverage collection entirely. The four tool orchestrators are deeply coupled to SpreadsheetApp UI globals and are not unit-tested.
+- `src/client/sidebar-entry.ts` — included in collection with lower per-file thresholds. The four exported functions (`showAIPanel`, `hideAIPanel`, `dispatchTool`, `runAI`) are fully tested. `init()` and its inner `addEventListener` arrow functions run at module load time before `beforeEach` sets up the DOM, so they are never invoked.
+
+See `docs/plans/2026-02-18-testing-coverage-design.md` and `docs/plans/2026-02-24-sidebar-entry-testing-design.md` for full rationale.
 
 **CI:** `.github/workflows/lint-typecheck-format-test.yml` runs on push to `main` and PRs targeting `main`: lint → typecheck → format check → test with coverage.
 

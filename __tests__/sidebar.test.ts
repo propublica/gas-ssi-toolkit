@@ -19,6 +19,7 @@ import {
   assembleRunConfig,
   handleRowRangeChange,
 } from "../src/client/sidebar";
+import { setupConfigPanel, setupWithSelections } from "./helpers/sidebar-fixtures";
 
 // ── buildTagList ──────────────────────────────────────────────────────────────
 
@@ -150,28 +151,8 @@ describe("handleRowRangeChange", () => {
 // ── applyPreset ───────────────────────────────────────────────────────────────
 
 describe("applyPreset", () => {
-  function setupPanel(headers: string[]): void {
-    document.body.innerHTML = `
-      <div id="user-prompt-cols"></div>
-      <div id="drive-file-cols"></div>
-      <div id="system-prompt-col"></div>
-      <div id="output-col"></div>
-      <input id="new-col-input" type="text" style="display:none">
-      <input type="radio" name="row-range" value="selection" checked>
-      <input type="radio" name="row-range" value="range">
-      <div id="range-inputs" style="display:none">
-        <input type="number" id="row-start">
-        <input type="number" id="row-end">
-      </div>
-    `;
-    buildTagList(document.getElementById("user-prompt-cols")!, headers);
-    buildTagList(document.getElementById("drive-file-cols")!, headers);
-    buildSingleTagList(document.getElementById("system-prompt-col")!, headers, false);
-    buildSingleTagList(document.getElementById("output-col")!, headers, true);
-  }
-
   it("pre-selects userPromptCols", () => {
-    setupPanel(["col_a", "col_b", "col_c"]);
+    setupConfigPanel(["col_a", "col_b", "col_c"]);
     applyPreset({ userPromptCols: ["col_a", "col_c"] });
     const selected = document.querySelectorAll("#user-prompt-cols .tag.selected");
     expect(selected).toHaveLength(2);
@@ -180,7 +161,7 @@ describe("applyPreset", () => {
   });
 
   it("pre-selects driveFileCols", () => {
-    setupPanel(["source_drive", "source_text"]);
+    setupConfigPanel(["source_drive", "source_text"]);
     applyPreset({ driveFileCols: ["source_drive"] });
     const selected = document.querySelectorAll("#drive-file-cols .tag.selected");
     expect(selected).toHaveLength(1);
@@ -188,7 +169,7 @@ describe("applyPreset", () => {
   });
 
   it("pre-selects systemPromptCol (single-select)", () => {
-    setupPanel(["system_prompt", "user_prompt"]);
+    setupConfigPanel(["system_prompt", "user_prompt"]);
     applyPreset({ systemPromptCol: "system_prompt" });
     const selected = document.querySelectorAll("#system-prompt-col .tag.selected");
     expect(selected).toHaveLength(1);
@@ -196,7 +177,7 @@ describe("applyPreset", () => {
   });
 
   it("pre-selects outputCol (single-select)", () => {
-    setupPanel(["ai_inference", "col_b"]);
+    setupConfigPanel(["ai_inference", "col_b"]);
     applyPreset({ outputCol: "ai_inference" });
     const selected = document.querySelectorAll("#output-col .tag.selected");
     expect(selected).toHaveLength(1);
@@ -204,7 +185,7 @@ describe("applyPreset", () => {
   });
 
   it("sets rowRange radio and populates inputs", () => {
-    setupPanel(["col_a"]);
+    setupConfigPanel(["col_a"]);
     applyPreset({ rowRange: { start: 2, end: 10 } });
     const rangeRadio = document.querySelector<HTMLInputElement>(
       'input[name="row-range"][value="range"]',
@@ -216,13 +197,13 @@ describe("applyPreset", () => {
   });
 
   it("ignores fields absent from the preset", () => {
-    setupPanel(["col_a", "col_b"]);
+    setupConfigPanel(["col_a", "col_b"]);
     applyPreset({ userPromptCols: ["col_a"] });
     expect(document.querySelectorAll("#drive-file-cols .tag.selected")).toHaveLength(0);
   });
 
   it("pre-selects __new__ and reveals new-col-input", () => {
-    setupPanel(["ai_inference"]);
+    setupConfigPanel(["ai_inference"]);
     applyPreset({ outputCol: "__new__" });
     const selected = document.querySelectorAll("#output-col .tag.selected");
     expect(selected).toHaveLength(1);
@@ -241,49 +222,6 @@ describe("assembleRunConfig", () => {
   afterEach(() => {
     (globalThis.alert as jest.Mock).mockClear();
   });
-
-  const PANEL_HTML = `
-    <div id="user-prompt-cols"></div>
-    <div id="drive-file-cols"></div>
-    <div id="system-prompt-col"></div>
-    <div id="output-col"></div>
-    <input id="new-col-input" type="text" style="display:none">
-    <input type="radio" name="row-range" value="selection" checked>
-    <input type="radio" name="row-range" value="range">
-    <div id="range-inputs" style="display:none">
-      <input type="number" id="row-start">
-      <input type="number" id="row-end">
-    </div>
-  `;
-
-  function setupWithSelections({
-    userPrompt = [] as string[],
-    drive = [] as string[],
-    system = undefined as string | undefined,
-    output = undefined as string | undefined,
-    newOutputName = undefined as string | undefined,
-    rowRange = undefined as { start: number; end: number } | undefined,
-  } = {}): void {
-    document.body.innerHTML = PANEL_HTML;
-    buildTagList(document.getElementById("user-prompt-cols")!, ["col_a", "col_b", "col_c"]);
-    buildTagList(document.getElementById("drive-file-cols")!, ["source_drive"]);
-    buildSingleTagList(document.getElementById("system-prompt-col")!, ["system_prompt"], false);
-    buildSingleTagList(document.getElementById("output-col")!, ["ai_inference"], true);
-
-    if (userPrompt.length) applyPreset({ userPromptCols: userPrompt });
-    if (drive.length) applyPreset({ driveFileCols: drive });
-    if (system) applyPreset({ systemPromptCol: system });
-    if (output) applyPreset({ outputCol: output });
-    if (rowRange) applyPreset({ rowRange });
-
-    if (newOutputName !== undefined) {
-      const newBtn = document.querySelector<HTMLButtonElement>(
-        '#output-col [data-value="__new__"]',
-      )!;
-      newBtn.click();
-      (document.getElementById("new-col-input") as HTMLInputElement).value = newOutputName;
-    }
-  }
 
   it("returns a valid RunConfig when all required fields are selected", () => {
     setupWithSelections({ userPrompt: ["col_a"], output: "ai_inference" });
