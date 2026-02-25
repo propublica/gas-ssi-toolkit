@@ -134,7 +134,7 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     );
   });
 
-  it("calls nav.back() on success", async () => {
+  it("calls nav.back() on success and restores button", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
     const { container } = await mountAndLoad({
       userPromptCols: ["col_a"],
@@ -143,6 +143,9 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     await Promise.resolve();
     expect(mockNav.back).toHaveBeenCalled();
+    const btn = container.querySelector<HTMLButtonElement>("#run-btn")!;
+    expect(btn.disabled).toBe(false);
+    expect(btn.textContent).toBe("Run AI");
   });
 
   it("alerts and re-enables button on failure", async () => {
@@ -156,6 +159,7 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     expect(globalThis.alert).toHaveBeenCalledWith("Error: API error");
     const btn = container.querySelector<HTMLButtonElement>("#run-btn")!;
     expect(btn.disabled).toBe(false);
+    expect(btn.textContent).toBe("Run AI");
   });
 });
 
