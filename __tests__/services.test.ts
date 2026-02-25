@@ -114,4 +114,11 @@ describe("runTool", () => {
     await expect(promise).resolves.toBeUndefined();
     expect(mockRun.runTool).toHaveBeenCalledWith("importDriveLinks");
   });
+
+  it("rejects on failure", async () => {
+    const handlers = captureHandlers();
+    const promise = services.runTool("importDriveLinks");
+    handlers.reject(new Error("tool error"));
+    await expect(promise).rejects.toThrow("tool error");
+  });
 });

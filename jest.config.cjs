@@ -3,10 +3,8 @@ module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",
   transform: {
-    // Client source files, sidebar tests, and shared test helpers use the client tsconfig (DOM lib).
+    // Client source files and shared test helpers use the client tsconfig (DOM lib).
     "^.+/src/client/.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
-    "^.+/__tests__/sidebar\\.test\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
-    "^.+/__tests__/sidebar-entry\\.test\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
     "^.+/__tests__/helpers/.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
     "^.+/__tests__/components/.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
     "^.+/__tests__/panels/.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
@@ -24,12 +22,13 @@ module.exports = {
   // Scope coverage to source files only.
   // src/server/index.ts is excluded: the four tool orchestrators are deeply
   // coupled to SpreadsheetApp UI globals and are not unit-tested.
-  // sidebar-entry.ts is now partially covered — init() and its inner arrow
-  // functions remain untested (addEventListener wiring only); see threshold below.
+  // src/client/sidebar-entry.ts is excluded: contains only init() which is
+  // untestable (runs at module load time before beforeEach sets up the DOM).
   // See docs/plans/2026-02-18-testing-coverage-design.md for full rationale.
   collectCoverageFrom: [
     "src/**/*.ts",
     "!src/server/index.ts",
+    "!src/client/sidebar-entry.ts",
   ],
   coverageThreshold: {
     // Thresholds are set ~5 points below observed full-suite coverage to allow
@@ -62,19 +61,45 @@ module.exports = {
       branches: 80,
       functions: 100,
     },
-    "./src/client/sidebar.ts": {
+    "./src/client/router.ts": {
+      statements: 90,
+      branches: 85,
+      functions: 100,
+    },
+    "./src/client/services.ts": {
+      statements: 90,
+      branches: 80,
+      functions: 100,
+    },
+    "./src/client/components/tag-list.ts": {
       statements: 95,
-      branches: 81,
+      branches: 80,
+      functions: 100,
+    },
+    "./src/client/components/single-tag-list.ts": {
+      statements: 90,
+      branches: 85,
       functions: 95,
     },
-    // init() and its 8 inner arrow functions (addEventListener wiring) are not
-    // unit-tested — init() runs at module load time before beforeEach sets up
-    // the DOM, so all ?.addEventListener calls are no-ops and the callbacks
-    // are never invoked. The four exported functions are fully tested.
-    "./src/client/sidebar-entry.ts": {
-      statements: 82,
-      branches: 52,
-      functions: 52,
+    "./src/client/components/row-range.ts": {
+      statements: 90,
+      branches: 85,
+      functions: 100,
+    },
+    "./src/client/components/lockable-field.ts": {
+      statements: 95,
+      branches: 90,
+      functions: 100,
+    },
+    "./src/client/panels/tool-list.ts": {
+      statements: 85,
+      branches: 75,
+      functions: 90,
+    },
+    "./src/client/panels/configure-ai-run.ts": {
+      statements: 85,
+      branches: 70,
+      functions: 90,
     },
   },
 };

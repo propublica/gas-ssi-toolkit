@@ -79,6 +79,20 @@ describe("Router", () => {
     expect(restoreCall.savedState).toEqual({ scroll: 42 });
   });
 
+  it("start() throws for unknown panel ID", () => {
+    const router = new Router(container, new Map([["tool-list", makePanel("home")]]));
+    expect(() => router.start("configure-ai-run" as never)).toThrow(
+      "Unknown panel: configure-ai-run",
+    );
+  });
+
+  it("navigate() throws for unknown panel ID", () => {
+    const home = makePanel("home");
+    const router = new Router(container, new Map([["tool-list", home]]));
+    router.start("tool-list");
+    expect(() => router.navigate("configure-ai-run")).toThrow("Unknown panel: configure-ai-run");
+  });
+
   it("back() does nothing when stack has only one entry", () => {
     const home = makePanel("home");
     const router = new Router(container, new Map([["tool-list", home]]));
@@ -123,8 +137,12 @@ describe("Router", () => {
     router.start("tool-list");
     router.navigate("recipes-list");
     expect(capturedNav).not.toBeNull();
-    expect(typeof capturedNav!.navigate).toBe("function");
-    expect(typeof capturedNav!.back).toBe("function");
-    expect(typeof capturedNav!.canGoBack).toBe("function");
+
+    // Verify delegates actually invoke router methods.
+    expect(capturedNav!.canGoBack()).toBe(true); // stack has 2 entries
+    capturedNav!.navigate("configure-ai-run"); // delegates to router.navigate
+    expect(container.querySelector("[data-panel='ai']")).not.toBeNull();
+    capturedNav!.back(); // delegates to router.back
+    expect(container.querySelector("[data-panel='spy']")).not.toBeNull();
   });
 });

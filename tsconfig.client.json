@@ -15,9 +15,6 @@
   "include": [
     "src/client/**/*.ts",
     "src/shared/**/*.ts",
-    "__tests__/sidebar.test.ts",
-    "__tests__/sidebar-entry.test.ts",
-    "__tests__/helpers/*.ts",
     "__tests__/components/**/*.ts",
     "__tests__/panels/**/*.ts",
     "__tests__/router.test.ts",
