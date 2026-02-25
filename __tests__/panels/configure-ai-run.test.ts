@@ -8,6 +8,7 @@ jest.mock("../../src/client/services", () => ({
 }));
 
 import { ConfigureAIRunPanel } from "../../src/client/panels/configure-ai-run";
+import type { SavedState } from "../../src/client/panels/configure-ai-run";
 import * as services from "../../src/client/services";
 import type { NavigationContext } from "../../src/client/types";
 import type { RunConfig } from "../../src/shared/types";
@@ -27,13 +28,13 @@ const DEFAULT_HEADERS = ["col_a", "col_b", "system_prompt", "ai_inference"];
 
 async function mountAndLoad(
   params?: Partial<RunConfig>,
-  savedState?: unknown,
+  savedState?: Partial<SavedState>,
   headers = DEFAULT_HEADERS,
 ): Promise<{ container: HTMLElement; panel: ConfigureAIRunPanel }> {
   (services.getSheetHeaders as jest.Mock).mockResolvedValue(headers);
   const container = makeContainer();
   const panel = new ConfigureAIRunPanel();
-  panel.mount(container, mockNav, params, savedState as never);
+  panel.mount(container, mockNav, params, savedState as SavedState);
   await Promise.resolve(); // flush the getSheetHeaders promise
   return { container, panel };
 }

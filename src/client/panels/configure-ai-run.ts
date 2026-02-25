@@ -5,7 +5,7 @@ import { SingleTagList } from "../components/single-tag-list";
 import { RowRange } from "../components/row-range";
 import { getSheetHeaders, runBatchAI } from "../services";
 
-interface SavedState {
+export interface SavedState {
   userPromptCols: string[];
   driveFileCols: string[];
   systemPromptCol: string;
