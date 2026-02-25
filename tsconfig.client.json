@@ -19,7 +19,9 @@
     "__tests__/sidebar-entry.test.ts",
     "__tests__/helpers/*.ts",
     "__tests__/components/**/*.ts",
-    "__tests__/panels/**/*.ts"
+    "__tests__/panels/**/*.ts",
+    "__tests__/router.test.ts",
+    "__tests__/services.test.ts"
   ],
   "exclude": []
 }
