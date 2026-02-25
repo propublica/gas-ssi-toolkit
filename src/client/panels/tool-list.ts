@@ -60,18 +60,18 @@ export class ToolListPanel implements Panel {
       </div>
       <div class="section">
         <h3>Main Tools</h3>
-        <button id="btn-import-drive-links" class="tool-btn">
-          <span class="icon">📂</span> Import Drive Links
+        <button id="btn-recipes" class="tool-btn">
+          <span class="icon">🥞</span> Recipes
         </button>
         <button id="btn-run-ai" class="tool-btn">
           <span class="icon">▶️</span> Run AI Inference
         </button>
-        <button id="btn-recipes" class="tool-btn">
-          <span class="icon">🥞</span> Recipes
-        </button>
       </div>
       <div class="section">
         <h3>Extras</h3>
+        <button id="btn-import-drive-links" class="tool-btn">
+          <span class="icon">📂</span> Import Drive Links
+        </button>
         <button id="btn-sample-rows" class="tool-btn">
           <span class="icon">🎲</span> Sample Rows
         </button>

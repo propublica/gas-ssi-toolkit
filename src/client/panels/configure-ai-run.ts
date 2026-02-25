@@ -5,13 +5,7 @@ import { SingleTagList } from "../components/single-tag-list";
 import { RowRange } from "../components/row-range";
 import { getSheetHeaders, runBatchAI } from "../services";
 
-export interface SavedState {
-  userPromptCols: string[];
-  driveFileCols: string[];
-  systemPromptCol: string;
-  outputCol: string;
-  rowRange?: { start: number; end: number };
-}
+export type SavedState = Required<Omit<RunConfig, "rowRange">> & Pick<RunConfig, "rowRange">;
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
   private userPromptList: TagList | null = null;
