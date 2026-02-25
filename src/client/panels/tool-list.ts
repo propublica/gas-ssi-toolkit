@@ -33,15 +33,18 @@ export class ToolListPanel implements Panel {
     const btn = e.currentTarget as HTMLButtonElement;
     const orig = btn.innerHTML;
     btn.classList.add("loading");
+    btn.disabled = true;
     btn.innerHTML = '<span class="icon">⏳</span> Working...';
     runTool(fn).then(
       () => {
         btn.classList.remove("loading");
+        btn.disabled = false;
         btn.innerHTML = orig;
       },
       (err: Error) => {
         globalThis.alert("Error: " + err.message);
         btn.classList.remove("loading");
+        btn.disabled = false;
         btn.innerHTML = orig;
       },
     );

@@ -73,6 +73,7 @@ describe("ToolListPanel", () => {
     const btn = c.querySelector<HTMLButtonElement>("#btn-import-drive-links")!;
     btn.click();
     expect(btn.classList.contains("loading")).toBe(true);
+    expect(btn.disabled).toBe(true);
     expect(btn.textContent).toContain("Working...");
     resolveRunTool();
   });
