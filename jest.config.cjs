@@ -8,6 +8,8 @@ module.exports = {
     "^.+/__tests__/sidebar\\.test\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
     "^.+/__tests__/sidebar-entry\\.test\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
     "^.+/__tests__/helpers/.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
+    "^.+/__tests__/components/.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
+    "^.+/__tests__/panels/.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
     // All other TypeScript files use the main tsconfig.
     "^.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.json" }],
   },
