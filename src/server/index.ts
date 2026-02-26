@@ -18,8 +18,10 @@ import {
   sampleRows,
   truncateText,
   resolveColumns,
+  findOrCreateColumn,
+  writeColumn,
 } from "./utils";
-import type { RunConfig } from "../shared/types";
+import type { RunConfig, PrepRecipeParams, PrepRecipeResult } from "../shared/types";
 
 // ==========================================
 // 🚀 MENU & INITIALIZATION
@@ -337,4 +339,56 @@ export function runTool(functionName: string): void {
   const fn = TOOLS[functionName];
   if (!fn) throw new Error("Function not found: " + functionName);
   fn();
+}
+
+// ==========================================
+// RECIPE PREP
+// ==========================================
+
+export function prepRecipe(params: PrepRecipeParams): PrepRecipeResult {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const colNames: PrepRecipeResult["colNames"] = {};
+  let numRows = 1;
+
+  if (params.driveFolder) {
+    const folderId = extractId(params.driveFolder.url);
+    const folder = DriveApp.getFolderById(folderId);
+    const files: { url: string }[] = [];
+    getAllFilesRecursive(folder, files);
+    numRows = files.length || 1;
+    const col = findOrCreateColumn(sheet, params.driveFolder.colTitle);
+    writeColumn(
+      sheet,
+      col,
+      files.map((f) => f.url),
+    );
+    colNames.driveLink = params.driveFolder.colTitle;
+  }
+
+  if (params.systemPrompt) {
+    const col = findOrCreateColumn(sheet, params.systemPrompt.colTitle);
+    writeColumn(sheet, col, Array(numRows).fill(params.systemPrompt.value) as string[]);
+    colNames.systemPrompt = params.systemPrompt.colTitle;
+  }
+
+  if (params.userPrompts) {
+    colNames.userPrompts = [];
+    for (const up of params.userPrompts) {
+      const col = findOrCreateColumn(sheet, up.colTitle);
+      writeColumn(sheet, col, Array(numRows).fill(up.value) as string[]);
+      colNames.userPrompts.push(up.colTitle);
+    }
+  }
+
+  if (params.outputCol) {
+    findOrCreateColumn(sheet, params.outputCol.colTitle);
+    colNames.outputCol = params.outputCol.colTitle;
+  }
+
+  SpreadsheetApp.flush();
+
+  return {
+    rowRange: { start: 2, end: 2 + numRows - 1 },
+    colNames,
+  };
 }
