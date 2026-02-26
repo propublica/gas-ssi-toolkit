@@ -1,12 +1,15 @@
 import type { NavigationContext, Panel } from "../types";
+import { RECIPES } from "../recipes";
 
 export class RecipesListPanel implements Panel {
   mount(container: HTMLElement, nav: NavigationContext): void {
     container.innerHTML = this.template();
     container.querySelector("#back-btn")?.addEventListener("click", () => nav.back());
-    container
-      .querySelector("#btn-document-summarization")
-      ?.addEventListener("click", () => nav.navigate("document-summarization"));
+    RECIPES.forEach((recipe) => {
+      container
+        .querySelector(`#btn-${recipe.id}`)
+        ?.addEventListener("click", () => nav.navigate(recipe.panelId, recipe.params));
+    });
   }
 
   unmount(): undefined {
@@ -20,10 +23,13 @@ export class RecipesListPanel implements Panel {
         <span class="panel-title">🥞 Recipes</span>
       </div>
       <div class="section">
-        <button id="btn-document-summarization" class="tool-btn">
-          <span class="icon">📄</span> Document Summarization
-          <span class="tool-btn-sub">Summarize each file in a Google Drive folder</span>
-        </button>
+        ${RECIPES.map(
+          (r) => `
+          <button id="btn-${r.id}" class="tool-btn">
+            <span class="icon">${r.icon}</span> ${r.name}
+            <span class="tool-btn-sub">${r.description}</span>
+          </button>`,
+        ).join("")}
       </div>
     `;
   }
