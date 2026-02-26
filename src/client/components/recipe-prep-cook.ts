@@ -27,7 +27,7 @@ export class RecipePrepCook {
     container.innerHTML = `
       <div class="panel-buttons">
         <button id="prep-btn" class="btn-outline">Prep Recipe</button>
-        <button id="cook-btn" class="btn-run" disabled>Cook</button>
+        <button id="cook-btn" class="btn-run" disabled>Cook ➡️</button>
       </div>
     `;
     this.prepBtn = container.querySelector<HTMLButtonElement>("#prep-btn")!;
