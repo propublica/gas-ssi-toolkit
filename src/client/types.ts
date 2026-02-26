@@ -1,7 +1,7 @@
 /**
  * All registered panel identifiers. Add new panels here first.
  */
-export type PanelId = "tool-list" | "configure-ai-run" | "recipes-list" | "document-summarization";
+export type PanelId = "tool-list" | "configure-ai-run" | "recipes-list" | "recipe";
 
 /**
  * Passed to each panel's mount() so panels can trigger navigation
@@ -21,4 +21,13 @@ export interface NavigationContext {
 export interface Panel<P = unknown, S = unknown> {
   mount(container: HTMLElement, nav: NavigationContext, params?: P, savedState?: S): void;
   unmount(): S | undefined;
+}
+
+export interface RecipeDefinition {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  panelId: PanelId;
+  params?: unknown;
 }
