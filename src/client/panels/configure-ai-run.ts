@@ -92,7 +92,6 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
 
   private wireNavButtons(container: HTMLElement): void {
     container.querySelector("#back-btn")?.addEventListener("click", () => this.nav?.back());
-    container.querySelector("#cancel-btn")?.addEventListener("click", () => this.nav?.back());
   }
 
   private handleRun(container: HTMLElement): void {
@@ -175,7 +174,6 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           <div id="row-range-container"></div>
         </div>
         <div class="panel-buttons">
-          <button id="cancel-btn" class="btn-cancel">Cancel</button>
           <button id="run-btn" class="btn-run">Run AI</button>
         </div>
       </div>

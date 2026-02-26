@@ -164,16 +164,10 @@ describe("ConfigureAIRunPanel — Run AI", () => {
   });
 });
 
-describe("ConfigureAIRunPanel — back/cancel", () => {
+describe("ConfigureAIRunPanel — back", () => {
   it("back-btn calls nav.back()", async () => {
     const { container } = await mountAndLoad();
     container.querySelector<HTMLButtonElement>("#back-btn")!.click();
-    expect(mockNav.back).toHaveBeenCalled();
-  });
-
-  it("cancel-btn calls nav.back()", async () => {
-    const { container } = await mountAndLoad();
-    container.querySelector<HTMLButtonElement>("#cancel-btn")!.click();
     expect(mockNav.back).toHaveBeenCalled();
   });
 });

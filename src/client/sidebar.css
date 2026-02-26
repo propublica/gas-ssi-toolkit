@@ -225,6 +225,22 @@
         .btn-run:hover { background: #1557b0; }
         .btn-run:disabled { background: #9aa0a6; cursor: default; }
 
+        .btn-outline {
+            flex: 1;
+            padding: 10px;
+            background: white;
+            color: var(--primary-blue);
+            border: 1px solid var(--primary-blue);
+            border-radius: 4px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            font-weight: 500;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .btn-outline:hover { background: #e8f0fe; }
+        .btn-outline:disabled { color: #9aa0a6; border-color: #9aa0a6; cursor: default; }
+
         .btn-cancel {
             padding: 10px 16px;
             background: white;
