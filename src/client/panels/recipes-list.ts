@@ -8,7 +8,7 @@ export class RecipesListPanel implements Panel {
     RECIPES.forEach((recipe) => {
       container
         .querySelector(`#btn-${recipe.id}`)
-        ?.addEventListener("click", () => nav.navigate(recipe.panelId, recipe.params));
+        ?.addEventListener("click", () => nav.navigate(recipe.panelId, recipe));
     });
   }
 
@@ -26,10 +26,19 @@ export class RecipesListPanel implements Panel {
         ${RECIPES.map(
           (r) => `
           <button id="btn-${r.id}" class="tool-btn">
-            <span class="icon">${r.icon}</span> ${r.name}
-            <span class="tool-btn-sub">${r.description}</span>
+            <span class="icon">${r.icon}</span>
+            <div class="tool-btn-text">
+              <span class="tool-btn-name">${r.name}</span>
+              <span class="tool-btn-sub">${r.description}</span>
+            </div>
           </button>`,
         ).join("")}
+        <div class="tool-btn-stub">
+          <span class="icon">✨</span>
+          <div class="tool-btn-text">
+            <span class="tool-btn-name">More recipes coming soon…</span>
+          </div>
+        </div>
       </div>
     `;
   }

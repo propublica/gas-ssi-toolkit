@@ -356,32 +356,51 @@ export function prepRecipe(params: PrepRecipeParams): PrepRecipeResult {
     const files: { url: string }[] = [];
     getAllFilesRecursive(folder, files);
     numRows = files.length || 1;
-    const col = findOrCreateColumn(sheet, params.driveFolder.colTitle);
+    const col = findOrCreateColumn(
+      sheet,
+      params.driveFolder.colTitle,
+      SpreadsheetApp.WrapStrategy.CLIP,
+    );
     writeColumn(
       sheet,
       col,
       files.map((f) => f.url),
+      SpreadsheetApp.WrapStrategy.CLIP,
     );
     colNames.driveLink = params.driveFolder.colTitle;
   }
 
   if (params.systemPrompt) {
-    const col = findOrCreateColumn(sheet, params.systemPrompt.colTitle);
-    writeColumn(sheet, col, Array(numRows).fill(params.systemPrompt.value) as string[]);
+    const col = findOrCreateColumn(
+      sheet,
+      params.systemPrompt.colTitle,
+      SpreadsheetApp.WrapStrategy.CLIP,
+    );
+    writeColumn(
+      sheet,
+      col,
+      Array(numRows).fill(params.systemPrompt.value) as string[],
+      SpreadsheetApp.WrapStrategy.CLIP,
+    );
     colNames.systemPrompt = params.systemPrompt.colTitle;
   }
 
   if (params.userPrompts) {
     colNames.userPrompts = [];
     for (const up of params.userPrompts) {
-      const col = findOrCreateColumn(sheet, up.colTitle);
-      writeColumn(sheet, col, Array(numRows).fill(up.value) as string[]);
+      const col = findOrCreateColumn(sheet, up.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
+      writeColumn(
+        sheet,
+        col,
+        Array(numRows).fill(up.value) as string[],
+        SpreadsheetApp.WrapStrategy.CLIP,
+      );
       colNames.userPrompts.push(up.colTitle);
     }
   }
 
   if (params.outputCol) {
-    findOrCreateColumn(sheet, params.outputCol.colTitle);
+    findOrCreateColumn(sheet, params.outputCol.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
     colNames.outputCol = params.outputCol.colTitle;
   }
 

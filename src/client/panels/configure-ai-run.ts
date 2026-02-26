@@ -148,7 +148,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     return `
       <div class="panel-header">
         <button id="back-btn" class="back-btn">← Back</button>
-        <span class="panel-title">Configure AI Run</span>
+        <span class="panel-title">▶️ Run AI Inference</span>
       </div>
       <div id="no-headers-msg" class="no-headers-msg" style="display:none">
         No columns found — add headers to your sheet first.

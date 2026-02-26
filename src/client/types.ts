@@ -1,3 +1,5 @@
+import type { RecipeParams } from "../shared/types";
+
 /**
  * All registered panel identifiers. Add new panels here first.
  */
@@ -29,5 +31,5 @@ export interface RecipeDefinition {
   icon: string;
   description: string;
   panelId: PanelId;
-  params?: unknown;
+  params?: RecipeParams;
 }

@@ -1,4 +1,4 @@
-import type { NavigationContext, Panel } from "../types";
+import type { NavigationContext, Panel, RecipeDefinition } from "../types";
 import type {
   RecipeParams,
   PrepRecipeParams,
@@ -20,8 +20,9 @@ type SavedState = {
   preppedRunConfig?: Partial<RunConfig>;
 };
 
-export class RecipePanel implements Panel<RecipeParams, SavedState> {
+export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
   private nav: NavigationContext | null = null;
+  private definition: RecipeDefinition | null = null;
   private params: RecipeParams | null = null;
   private prepCook: RecipePrepCook | null = null;
   private preppedRunConfig: Partial<RunConfig> | null = null;
@@ -38,15 +39,16 @@ export class RecipePanel implements Panel<RecipeParams, SavedState> {
   mount(
     container: HTMLElement,
     nav: NavigationContext,
-    params?: RecipeParams,
+    definition?: RecipeDefinition,
     savedState?: SavedState,
   ): void {
     this.nav = nav;
-    this.params = params ?? {};
+    this.definition = definition ?? null;
+    this.params = definition?.params ?? {};
     this.fields = { userPromptTitles: [], userPromptValues: [] };
     this.preppedRunConfig = savedState?.preppedRunConfig ?? null;
 
-    container.innerHTML = this.template(this.params);
+    container.innerHTML = this.template(this.definition);
 
     container.querySelector("#back-btn")?.addEventListener("click", () => nav.back());
 
@@ -82,7 +84,7 @@ export class RecipePanel implements Panel<RecipeParams, SavedState> {
       this.fields.systemPromptTitle = new LockableField(
         container.querySelector("#system-prompt-title-container")!,
         {
-          label: "Column Title",
+          label: "Column",
           defaultValue: savedState?.systemPromptTitle ?? params.systemPrompt.colTitle.value,
           locked: params.systemPrompt.colTitle.locked,
           onUnlock: reset,
@@ -105,7 +107,7 @@ export class RecipePanel implements Panel<RecipeParams, SavedState> {
         this.fields.userPromptTitles[i] = new LockableField(
           container.querySelector(`#user-prompt-title-${i}-container`)!,
           {
-            label: "Column Title",
+            label: "Column",
             defaultValue: savedState?.userPromptTitles?.[i] ?? up.colTitle.value,
             locked: up.colTitle.locked,
             onUnlock: reset,
@@ -128,7 +130,7 @@ export class RecipePanel implements Panel<RecipeParams, SavedState> {
       this.fields.outputColTitle = new LockableField(
         container.querySelector("#output-col-title-container")!,
         {
-          label: "Output Column Name",
+          label: "Column",
           defaultValue: savedState?.outputColTitle ?? params.outputCol.colTitle.value,
           locked: params.outputCol.colTitle.locked,
           onUnlock: reset,
@@ -201,17 +203,21 @@ export class RecipePanel implements Panel<RecipeParams, SavedState> {
     };
   }
 
-  private template(params: RecipeParams): string {
+  private template(definition: RecipeDefinition | null): string {
+    const params = definition?.params ?? {};
+    const title = definition ? `${definition.icon} ${definition.name}` : "Recipe";
+    const numUserPrompts = params.userPrompts?.length ?? 0;
+
     return `
       <div class="panel-header">
         <button id="back-btn" class="back-btn">← Back</button>
-        <span class="panel-title">Recipe</span>
+        <span class="panel-title">${title}</span>
       </div>
       ${
         params.driveFolder
           ? `
-      <div class="field-group">
-        <span class="field-label">Google Drive Folder Link <span class="required">*</span></span>
+      <div class="recipe-section-card">
+        <div class="recipe-section-card-title">Drive Folder <span class="required">*</span></div>
         ${params.driveFolder.helperText ? `<p class="field-helper">${params.driveFolder.helperText}</p>` : ""}
         <input id="drive-folder-input" type="text" class="text-input"
           placeholder="Paste Google Drive folder URL or ID" />
@@ -221,8 +227,8 @@ export class RecipePanel implements Panel<RecipeParams, SavedState> {
       ${
         params.systemPrompt
           ? `
-      <div class="field-group">
-        <span class="field-label">System Prompt</span>
+      <div class="recipe-section-card">
+        <div class="recipe-section-card-title">System Prompt</div>
         <div id="system-prompt-title-container"></div>
         <div id="system-prompt-value-container"></div>
       </div>`
@@ -231,8 +237,8 @@ export class RecipePanel implements Panel<RecipeParams, SavedState> {
       ${(params.userPrompts ?? [])
         .map(
           (_, i) => `
-      <div class="field-group">
-        <span class="field-label">User Prompt</span>
+      <div class="recipe-section-card">
+        <div class="recipe-section-card-title">User Prompt${numUserPrompts > 1 ? ` ${i + 1}` : ""}</div>
         <div id="user-prompt-title-${i}-container"></div>
         <div id="user-prompt-value-${i}-container"></div>
       </div>`,
@@ -241,8 +247,8 @@ export class RecipePanel implements Panel<RecipeParams, SavedState> {
       ${
         params.outputCol
           ? `
-      <div class="field-group">
-        <span class="field-label">Output Column</span>
+      <div class="recipe-section-card">
+        <div class="recipe-section-card-title">Output Column</div>
         <div id="output-col-title-container"></div>
       </div>`
           : ""

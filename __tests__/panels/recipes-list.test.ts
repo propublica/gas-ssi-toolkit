@@ -50,12 +50,18 @@ describe("RecipesListPanel", () => {
     expect(container.querySelector("#btn-custom")).not.toBeNull();
   });
 
-  it("clicking a recipe button calls nav.navigate with correct panelId and params", () => {
+  it("clicking a recipe button calls nav.navigate with the full RecipeDefinition", () => {
     const { container, nav } = mount();
     container.querySelector<HTMLButtonElement>("#btn-doc-sum")!.click();
-    expect(nav.navigate).toHaveBeenCalledWith("recipe", {
-      driveFolder: { colTitle: "Drive Link" },
-    });
+    expect(nav.navigate).toHaveBeenCalledWith(
+      "recipe",
+      expect.objectContaining({
+        id: "doc-sum",
+        name: "Document Summarization",
+        panelId: "recipe",
+        params: { driveFolder: { colTitle: "Drive Link" } },
+      }),
+    );
   });
 
   it("clicking back calls nav.back()", () => {
