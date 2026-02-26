@@ -40,7 +40,10 @@ export function runTool(fn: string): Promise<void> {
 export function prepRecipe(params: PrepRecipeParams): Promise<PrepRecipeResult> {
   return new Promise((resolve, reject) => {
     google.script.run
-      .withSuccessHandler((result: unknown) => resolve(result as PrepRecipeResult))
+      .withSuccessHandler((result: unknown) => {
+        invalidateHeaderCache();
+        resolve(result as PrepRecipeResult);
+      })
       .withFailureHandler((err: Error) => reject(err))
       .prepRecipe(params);
   });

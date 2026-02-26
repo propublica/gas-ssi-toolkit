@@ -141,6 +141,27 @@ describe("prepRecipe", () => {
     expect(mockRun.prepRecipe).toHaveBeenCalledWith(params);
   });
 
+  it("invalidates the header cache on success so next getSheetHeaders re-fetches", async () => {
+    // Prime the cache
+    const h1 = captureHandlers();
+    const p1 = services.getSheetHeaders();
+    h1.resolve([]);
+    await p1;
+
+    // Prep resolves — should bust the cache
+    const h2 = captureHandlers();
+    const prepPromise = services.prepRecipe({});
+    h2.resolve({ rowRange: { start: 2, end: 2 }, colNames: {} });
+    await prepPromise;
+
+    // Next getSheetHeaders must hit GAS again (not return cached [])
+    const h3 = captureHandlers();
+    const p3 = services.getSheetHeaders();
+    h3.resolve(["new_col"]);
+    await expect(p3).resolves.toEqual(["new_col"]);
+    expect(mockRun.getSheetHeaders).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects on failure", async () => {
     const handlers = captureHandlers();
     const promise = services.prepRecipe({});
