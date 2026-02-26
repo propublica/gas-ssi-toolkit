@@ -255,7 +255,7 @@ describe("resolveColumns", () => {
 
 describe("findOrCreateColumn", () => {
   function makeSheet(headers: string[]): GoogleAppsScript.Spreadsheet.Sheet {
-    const values = [headers.map((h) => h)];
+    const values = [headers.slice()];
     return {
       getLastColumn: () => headers.length,
       getRange: jest
@@ -313,5 +313,13 @@ describe("writeColumn", () => {
     writeColumn(sheet, 3, ["a", "b", "c"]);
     expect(sheet.getRange).toHaveBeenCalledWith(2, 3, 3, 1);
     expect(setValuesMock).toHaveBeenCalledWith([["a"], ["b"], ["c"]]);
+  });
+
+  it("does nothing when values array is empty", () => {
+    const sheet = {
+      getRange: jest.fn(),
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+    writeColumn(sheet, 1, []);
+    expect(sheet.getRange).not.toHaveBeenCalled();
   });
 });

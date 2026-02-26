@@ -1,8 +1,9 @@
 /**
- * utils.ts — Small pure helpers.
+ * utils.ts — Small helpers with no dependency on Apps Script global singletons.
  *
- * These have no dependency on Apps Script globals, which makes them
- * trivially testable without mocking.
+ * Functions that accept GAS object parameters (Sheet, Folder) receive them
+ * as arguments, making them testable via duck-typed fakes without globalThis mocking.
+ * Functions that operate purely on plain values have no GAS dependency at all.
  */
 
 import type { DriveFileInfo } from "../shared/types";
@@ -127,5 +128,6 @@ export function writeColumn(
   colIdx: number,
   values: string[],
 ): void {
+  if (values.length === 0) return;
   sheet.getRange(2, colIdx, values.length, 1).setValues(values.map((v) => [v]));
 }
