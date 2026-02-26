@@ -1,4 +1,4 @@
-import type { RunConfig } from "../shared/types";
+import type { PrepRecipeParams, PrepRecipeResult, RunConfig } from "../shared/types";
 
 let cachedHeaders: string[] | null = null;
 
@@ -34,5 +34,14 @@ export function runTool(fn: string): Promise<void> {
       .withSuccessHandler(() => resolve())
       .withFailureHandler((err: Error) => reject(err))
       .runTool(fn);
+  });
+}
+
+export function prepRecipe(params: PrepRecipeParams): Promise<PrepRecipeResult> {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler((result: unknown) => resolve(result as PrepRecipeResult))
+      .withFailureHandler((err: Error) => reject(err))
+      .prepRecipe(params);
   });
 }

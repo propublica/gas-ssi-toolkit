@@ -65,3 +65,26 @@ describe("LockableField", () => {
     expect(c.querySelector("input")).toBeNull();
   });
 });
+
+describe("onUnlock callback", () => {
+  it("calls onUnlock when the unlock button is clicked", () => {
+    const container = document.createElement("div");
+    const onUnlock = jest.fn();
+    new LockableField(container, {
+      label: "Test",
+      defaultValue: "hello",
+      locked: true,
+      onUnlock,
+    });
+    const btn = container.querySelector<HTMLButtonElement>(".unlock-btn")!;
+    btn.click();
+    expect(onUnlock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not error when onUnlock is not provided", () => {
+    const container = document.createElement("div");
+    new LockableField(container, { label: "Test", defaultValue: "hello" });
+    const btn = container.querySelector<HTMLButtonElement>(".unlock-btn")!;
+    expect(() => btn.click()).not.toThrow();
+  });
+});

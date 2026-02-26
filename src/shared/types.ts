@@ -18,6 +18,49 @@ export interface RunConfig {
   rowRange?: { start: number; end: number };
 }
 
+// ── Recipes ────────────────────────────────────────────────────
+
+export interface RecipeFieldConfig {
+  value: string;
+  locked?: boolean; // defaults to true
+  placeholder?: string;
+}
+
+export interface RecipeParams {
+  driveFolder?: {
+    colTitle: string;
+    helperText?: string;
+  };
+  systemPrompt?: {
+    colTitle: RecipeFieldConfig;
+    prompt: RecipeFieldConfig;
+  };
+  userPrompts?: Array<{
+    colTitle: RecipeFieldConfig;
+    prompt: RecipeFieldConfig;
+  }>;
+  outputCol?: {
+    colTitle: RecipeFieldConfig;
+  };
+}
+
+export interface PrepRecipeParams {
+  driveFolder?: { url: string; colTitle: string };
+  systemPrompt?: { colTitle: string; value: string };
+  userPrompts?: Array<{ colTitle: string; value: string }>;
+  outputCol?: { colTitle: string };
+}
+
+export interface PrepRecipeResult {
+  rowRange: { start: number; end: number };
+  colNames: {
+    driveLink?: string;
+    systemPrompt?: string;
+    userPrompts?: string[];
+    outputCol?: string;
+  };
+}
+
 // ── Gemini API ─────────────────────────────────────────────────
 
 export interface GeminiInlineData {

@@ -94,6 +94,7 @@ function sampleRowsToEvaluation() { _GASEntry.sampleRowsToEvaluation(); }
  * @customfunction
  */
 function SSI(userTexts, systemPrompt, toolNames) { return _GASEntry.SSI(userTexts, systemPrompt, toolNames); }
+function prepRecipe(params) { return _GASEntry.prepRecipe(params); }
 `,
     },
     plugins: [

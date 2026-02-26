@@ -15,6 +15,8 @@ import {
   truncateText,
   flattenArg,
   resolveColumns,
+  findOrCreateColumn,
+  writeColumn,
 } from "../src/server/utils";
 import type { DriveFileInfo } from "../src/shared/types";
 
@@ -246,5 +248,78 @@ describe("resolveColumns", () => {
 
   it("preserves the order of the names argument", () => {
     expect(resolveColumns(["x", "y", "z"], ["z", "x"])).toEqual([2, 0]);
+  });
+});
+
+// ── findOrCreateColumn ──────────────────────────────────────────
+
+describe("findOrCreateColumn", () => {
+  function makeSheet(headers: string[]): GoogleAppsScript.Spreadsheet.Sheet {
+    const values = [headers.slice()];
+    return {
+      getLastColumn: () => headers.length,
+      getRange: jest
+        .fn()
+        .mockImplementation((_row: number, _col: number, numRows?: number, numCols?: number) => {
+          if (numRows === 1 && numCols !== undefined) {
+            return { getValues: () => values };
+          }
+          return { setValue: jest.fn() };
+        }),
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+  }
+
+  it("returns 1-based index of existing column", () => {
+    const sheet = makeSheet(["Drive Link", "System Prompt", "Output"]);
+    expect(findOrCreateColumn(sheet, "System Prompt")).toBe(2);
+  });
+
+  it("appends new column and returns its 1-based index when not found", () => {
+    const sheet = makeSheet(["Drive Link"]);
+    const setValueMock = jest.fn();
+    (sheet.getRange as jest.Mock).mockImplementation(
+      (_row: number, _col: number, numRows?: number, numCols?: number) => {
+        if (numRows === 1 && numCols !== undefined) {
+          return { getValues: () => [["Drive Link"]] };
+        }
+        return { setValue: setValueMock };
+      },
+    );
+    const idx = findOrCreateColumn(sheet, "New Col");
+    expect(idx).toBe(2);
+    expect(setValueMock).toHaveBeenCalledWith("New Col");
+  });
+
+  it("appends to column 1 when sheet is empty", () => {
+    const setValueMock = jest.fn();
+    const sheet = {
+      getLastColumn: () => 0,
+      getRange: jest.fn().mockReturnValue({ setValue: setValueMock }),
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+    const idx = findOrCreateColumn(sheet, "My Col");
+    expect(idx).toBe(1);
+    expect(setValueMock).toHaveBeenCalledWith("My Col");
+  });
+});
+
+// ── writeColumn ─────────────────────────────────────────────────
+
+describe("writeColumn", () => {
+  it("writes values starting at row 2 using a single setValues call", () => {
+    const setValuesMock = jest.fn();
+    const sheet = {
+      getRange: jest.fn().mockReturnValue({ setValues: setValuesMock }),
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+    writeColumn(sheet, 3, ["a", "b", "c"]);
+    expect(sheet.getRange).toHaveBeenCalledWith(2, 3, 3, 1);
+    expect(setValuesMock).toHaveBeenCalledWith([["a"], ["b"], ["c"]]);
+  });
+
+  it("does nothing when values array is empty", () => {
+    const sheet = {
+      getRange: jest.fn(),
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+    writeColumn(sheet, 1, []);
+    expect(sheet.getRange).not.toHaveBeenCalled();
   });
 });

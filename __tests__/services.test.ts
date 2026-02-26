@@ -8,6 +8,7 @@ const mockRun = {
   getSheetHeaders: jest.fn(),
   runBatchAI: jest.fn(),
   runTool: jest.fn(),
+  prepRecipe: jest.fn(),
 };
 (globalThis as unknown as { google: unknown }).google = { script: { run: mockRun } };
 
@@ -120,5 +121,30 @@ describe("runTool", () => {
     const promise = services.runTool("importDriveLinks");
     handlers.reject(new Error("tool error"));
     await expect(promise).rejects.toThrow("tool error");
+  });
+});
+
+describe("prepRecipe", () => {
+  it("calls google.script.run.prepRecipe with params and resolves with result", async () => {
+    const handlers = captureHandlers();
+    const params: import("../src/shared/types").PrepRecipeParams = {
+      driveFolder: { url: "https://drive.google.com/folder/abc", colTitle: "Drive Link" },
+      outputCol: { colTitle: "AI_Summarization" },
+    };
+    const result: import("../src/shared/types").PrepRecipeResult = {
+      rowRange: { start: 2, end: 5 },
+      colNames: { driveLink: "Drive Link", outputCol: "AI_Summarization" },
+    };
+    const promise = services.prepRecipe(params);
+    handlers.resolve(result);
+    await expect(promise).resolves.toEqual(result);
+    expect(mockRun.prepRecipe).toHaveBeenCalledWith(params);
+  });
+
+  it("rejects on failure", async () => {
+    const handlers = captureHandlers();
+    const promise = services.prepRecipe({});
+    handlers.reject(new Error("prep error"));
+    await expect(promise).rejects.toThrow("prep error");
   });
 });

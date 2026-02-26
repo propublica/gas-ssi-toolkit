@@ -3,15 +3,14 @@ module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",
   transform: {
-    // Client source files and shared test helpers use the client tsconfig (DOM lib).
-    "^.+/src/client/.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
-    "^.+/__tests__/helpers/.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
-    "^.+/__tests__/components/.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
-    "^.+/__tests__/panels/.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
-    "^.+/__tests__/router\\.test\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
-    "^.+/__tests__/services\\.test\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
-    // All other TypeScript files use the main tsconfig.
-    "^.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.json" }],
+    // All TypeScript files use the client tsconfig (ES2019 + DOM lib). Using a single
+    // rule avoids a ts-jest static ConfigSet caching bug: TsJestTransformer._cachedConfigSets
+    // is keyed by global Jest config reference, not by transformerOptions. On CI (1 worker),
+    // a server-test transformer running first would cache ConfigSet(tsconfig.json, no DOM),
+    // causing all subsequent client transforms to inherit the wrong tsconfig and fail with
+    // "Cannot find name 'document'". Server code compiles cleanly under the client tsconfig
+    // since it never references DOM globals.
+    "^.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
   },
   roots: ["<rootDir>/__tests__"],
   testPathIgnorePatterns: ["/node_modules/", "/__tests__/helpers/"],
@@ -100,6 +99,21 @@ module.exports = {
       statements: 85,
       branches: 70,
       functions: 90,
+    },
+    "./src/client/components/recipe-prep-cook.ts": {
+      statements: 90,
+      branches: 95,
+      functions: 88,
+    },
+    "./src/client/panels/recipe.ts": {
+      statements: 88,
+      branches: 72,
+      functions: 72,
+    },
+    "./src/client/panels/recipes-list.ts": {
+      statements: 95,
+      branches: 70,
+      functions: 100,
     },
   },
 };

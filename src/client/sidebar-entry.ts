@@ -10,7 +10,7 @@ import { Router } from "./router";
 import { ToolListPanel } from "./panels/tool-list";
 import { ConfigureAIRunPanel } from "./panels/configure-ai-run";
 import { RecipesListPanel } from "./panels/recipes-list";
-import { DocumentSummarizationPanel } from "./panels/recipes/document-summarization";
+import { RecipePanel } from "./panels/recipe";
 import type { Panel, PanelId } from "./types";
 
 function init(): void {
@@ -21,7 +21,7 @@ function init(): void {
     ["tool-list", new ToolListPanel()],
     ["configure-ai-run", new ConfigureAIRunPanel()],
     ["recipes-list", new RecipesListPanel()],
-    ["document-summarization", new DocumentSummarizationPanel()],
+    ["recipe", new RecipePanel()],
   ]);
 
   const router = new Router(app, panels);

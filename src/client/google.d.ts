@@ -1,4 +1,4 @@
-import type { RunConfig } from "../shared/types";
+import type { RunConfig, PrepRecipeParams } from "../shared/types";
 
 declare global {
   interface GoogleScriptRun {
@@ -7,6 +7,7 @@ declare global {
     runTool(functionName: string): void;
     getSheetHeaders(): void;
     runBatchAI(config: RunConfig): void;
+    prepRecipe(params: PrepRecipeParams): void;
   }
 
   const google: {
