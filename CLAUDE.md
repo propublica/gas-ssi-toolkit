@@ -88,18 +88,29 @@ src/server/index.ts          (entry point — menu, 4 tool orchestrators, UI han
 ├── src/server/api.ts            (callGeminiAPI, buildGeminiPayload — pure HTTP adapter via UrlFetchApp)
 ├── src/server/drive.ts          (extractTextUniversal, fetchAndEncodeFile, checkDriveService)
 ├── src/server/dialog.ts         (HTML_TEMPLATE string for AI mode selection modal)
-├── src/server/utils.ts          (extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive, sampleRows, truncateText)
+├── src/server/utils.ts          (extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive, sampleRows, truncateText, findOrCreateColumn, writeColumn)
 ├── src/server/customFunctions.ts  (SSI — Sheets custom function; TOOL_REGISTRY for named tool declarations)
 └── src/shared/types.ts          (shared interfaces: AppConfig, AIMode, ColumnMap, GeminiRequest, etc.)
 ```
 
 **Client:**
 ```
-src/client/sidebar-entry.ts  (thin init — creates Router, registers panels, calls router.start())
+src/client/sidebar-entry.ts  (thin init — instantiates all panels, creates Router, calls router.start("tool-list"))
 └── src/client/router.ts         (Router class — push/pop navigation stack)
 └── src/client/services.ts       (GAS boundary — wraps google.script.run as Promises, header cache)
-└── src/client/panels/           (panel classes — mount/unmount lifecycle)
-└── src/client/components/       (reusable UI components — TagList, SingleTagList, RowRange, LockableField)
+└── src/client/types.ts          (PanelId, Panel<P,S>, NavigationContext, RecipeDefinition interfaces)
+└── src/client/recipes.ts        (RECIPES registry — RecipeDefinition[] for all standard recipes)
+└── src/client/panels/
+│   ├── tool-list.ts             (ToolListPanel — entry screen, dispatches to tool or recipes)
+│   ├── configure-ai-run.ts      (ConfigureAIRunPanel — column mapping, row range, AI run)
+│   ├── recipes-list.ts          (RecipesListPanel — browsable list of recipes)
+│   └── recipe.ts                (RecipePanel — generic panel driven by RecipeParams; prep → cook flow)
+└── src/client/components/       (reusable UI components)
+    ├── tag-list.ts              (TagList — multi-select tag chips)
+    ├── single-tag-list.ts       (SingleTagList — exclusive-select tag chips)
+    ├── row-range.ts             (RowRange — start/end row inputs)
+    ├── lockable-field.ts        (LockableField — value + lock/unlock toggle; optional onUnlock callback)
+    └── recipe-prep-cook.ts      (RecipePrepCook — 4-state machine: idle/prepping/prep-complete/cooking)
     └── src/shared/types.ts
 
 src/client/google.d.ts       (compile-time type stub for google.script.run — uses declare global{} pattern)
@@ -116,9 +127,11 @@ Only `index.ts` should reference Google Apps Script UI services (SpreadsheetApp,
 Two tsconfigs for two build environments:
 
 - **`tsconfig.json`** — server build. Targets ES2019, no DOM lib, excludes `src/client/`.
-- **`tsconfig.client.json`** — client build and client tests. Extends base, adds `"lib": ["ES2019", "DOM"]`, sets `rootDir: "."` (covers both `src/` and `__tests__/`). Includes precise file patterns: `src/client/**/*.ts`, `src/shared/**/*.ts`, and the three client-side test files.
+- **`tsconfig.client.json`** — client build and client tests. Extends base, adds `"lib": ["ES2019", "DOM"]`, sets `rootDir: "."` (covers both `src/` and `__tests__/`). Includes precise file patterns: `src/client/**/*.ts`, `src/shared/**/*.ts`, and the client-side test files.
 
 `npm run typecheck` runs both: `tsc --noEmit && tsc -p tsconfig.client.json --noEmit`.
+
+**Jest transform:** `jest.config.cjs` uses a single transform rule — `tsconfig.client.json` for all `.ts` files. This avoids a ts-jest static `_cachedConfigSets` bug where multiple transformer instances sharing one Jest worker (common on CI with few CPUs) would reuse the first-cached ConfigSet regardless of per-transform tsconfig options, causing client files to compile without DOM types. Server code compiles cleanly under `tsconfig.client.json` since it never references DOM globals.
 
 **Note on types:** `tsconfig.client.json` uses `"types": ["google-apps-script", "jest"]` — do **not** add `"node"` here, as it causes `MimeType` collisions with the google-apps-script types. When a file needs Node.js types (e.g. `readFileSync`), use a triple-slash directive at the top of that file: `/// <reference types="node" />`.
 
@@ -155,11 +168,11 @@ The `__tests__/helpers/` directory is excluded from test discovery via `testPath
 
 **Coverage:** Run `npm run test:coverage` to collect coverage and enforce per-file thresholds. Coverage is opt-in — the pre-commit hook runs `jest --bail` without `--coverage`.
 
-Two boundary files are excluded from high thresholds:
-- `src/server/index.ts` — excluded from coverage collection entirely. The four tool orchestrators are deeply coupled to SpreadsheetApp UI globals and are not unit-tested.
-- `src/client/sidebar-entry.ts` — included in collection with lower per-file thresholds. The four exported functions (`showAIPanel`, `hideAIPanel`, `dispatchTool`, `runAI`) are fully tested. `init()` and its inner `addEventListener` arrow functions run at module load time before `beforeEach` sets up the DOM, so they are never invoked.
+Two files are excluded from coverage collection entirely:
+- `src/server/index.ts` — the four tool orchestrators are deeply coupled to SpreadsheetApp UI globals and are not unit-tested.
+- `src/client/sidebar-entry.ts` — contains only `init()`, which is called immediately at module load time (before `beforeEach` can set up the DOM) and has no exports to test in isolation.
 
-See `docs/plans/2026-02-18-testing-coverage-design.md` and `docs/plans/2026-02-24-sidebar-entry-testing-design.md` for full rationale.
+See `docs/plans/2026-02-18-testing-coverage-design.md` for full rationale.
 
 **CI:** `.github/workflows/lint-typecheck-format-test.yml` runs on push to `main` and PRs targeting `main`: lint → typecheck → format check → test with coverage.
 
