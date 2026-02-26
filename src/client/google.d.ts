@@ -7,6 +7,7 @@ declare global {
     runTool(functionName: string): void;
     getSheetHeaders(): void;
     runBatchAI(config: RunConfig): void;
+    prepRecipe(params: unknown): void;
   }
 
   const google: {
