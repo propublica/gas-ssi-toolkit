@@ -300,6 +300,25 @@ describe("findOrCreateColumn", () => {
     expect(idx).toBe(1);
     expect(setValueMock).toHaveBeenCalledWith("My Col");
   });
+
+  it("applies wrapStrategy to the new column range when provided", () => {
+    const setValueMock = jest.fn();
+    const setWrapStrategyMock = jest.fn();
+    const sheet = {
+      getLastColumn: () => 0,
+      getMaxRows: () => 100,
+      getRange: jest
+        .fn()
+        .mockImplementation((_row: number, _col: number, numRows?: number) =>
+          numRows !== undefined
+            ? { setWrapStrategy: setWrapStrategyMock }
+            : { setValue: setValueMock },
+        ),
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+    const wrapStrategy = "CLIP" as unknown as GoogleAppsScript.Spreadsheet.WrapStrategy;
+    findOrCreateColumn(sheet, "My Col", wrapStrategy);
+    expect(setWrapStrategyMock).toHaveBeenCalledWith(wrapStrategy);
+  });
 });
 
 // ── writeColumn ─────────────────────────────────────────────────
@@ -321,5 +340,18 @@ describe("writeColumn", () => {
     } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
     writeColumn(sheet, 1, []);
     expect(sheet.getRange).not.toHaveBeenCalled();
+  });
+
+  it("applies wrapStrategy to the written range when provided", () => {
+    const setValuesMock = jest.fn();
+    const setWrapStrategyMock = jest.fn();
+    const sheet = {
+      getRange: jest
+        .fn()
+        .mockReturnValue({ setValues: setValuesMock, setWrapStrategy: setWrapStrategyMock }),
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+    const wrapStrategy = "CLIP" as unknown as GoogleAppsScript.Spreadsheet.WrapStrategy;
+    writeColumn(sheet, 3, ["a", "b"], wrapStrategy);
+    expect(setWrapStrategyMock).toHaveBeenCalledWith(wrapStrategy);
   });
 });
