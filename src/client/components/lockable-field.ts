@@ -4,6 +4,7 @@ export interface LockableFieldConfig {
   locked?: boolean; // defaults to true
   placeholder?: string;
   multiline?: boolean;
+  onUnlock?: () => void;
 }
 
 export class LockableField {
@@ -49,6 +50,9 @@ export class LockableField {
       this.locked = !this.locked;
       input.disabled = this.locked;
       unlockBtn.textContent = this.locked ? "🔒 Edit" : "🔓 Lock";
+      if (!this.locked) {
+        config.onUnlock?.();
+      }
     });
 
     container.append(header, input);
