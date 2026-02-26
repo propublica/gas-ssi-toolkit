@@ -150,6 +150,7 @@ describe("Prep flow", () => {
     const { container } = mount(fullParams);
     container.querySelector<HTMLButtonElement>("#prep-btn")!.click();
     await flush();
+    expect(alertMock).toHaveBeenCalledTimes(1);
     expect(alertMock).toHaveBeenCalledWith(expect.stringContaining("folder"));
     expect(mockPrepRecipe).not.toHaveBeenCalled();
   });

@@ -141,7 +141,7 @@ export class RecipePanel implements Panel<RecipeParams, SavedState> {
     this.prepCook = new RecipePrepCook(container.querySelector("#prep-cook-container")!, {
       onPrep: () => {
         const params = this.buildPrepParams();
-        if (!params) return Promise.reject(new Error("cancelled"));
+        if (!params) return Promise.reject(null); // validation alert already shown; bail silently
         return prepRecipe(params).then((result: PrepRecipeResult) => {
           this.preppedRunConfig = this.buildRunConfig(result);
         });

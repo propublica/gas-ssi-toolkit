@@ -49,8 +49,8 @@ export class RecipePrepCook {
         this.prepComplete = true;
         this.setPrepComplete();
       },
-      (err: Error) => {
-        globalThis.alert("Error: " + err.message);
+      (err: Error | null) => {
+        if (err !== null) globalThis.alert("Error: " + err.message);
         this.setIdle();
       },
     );
