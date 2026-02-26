@@ -22,20 +22,6 @@ export class LockableField {
   ): HTMLInputElement | HTMLTextAreaElement {
     container.innerHTML = "";
 
-    const header = document.createElement("div");
-    header.className = "lockable-field-header";
-
-    const label = document.createElement("span");
-    label.className = "field-label";
-    label.textContent = config.label;
-
-    const unlockBtn = document.createElement("button");
-    unlockBtn.type = "button";
-    unlockBtn.className = "unlock-btn";
-    unlockBtn.textContent = this.locked ? "🔒 Edit" : "🔓 Lock";
-
-    header.append(label, unlockBtn);
-
     const input: HTMLInputElement | HTMLTextAreaElement = config.multiline
       ? document.createElement("textarea")
       : document.createElement("input");
@@ -46,6 +32,11 @@ export class LockableField {
     if (config.placeholder) input.placeholder = config.placeholder;
     input.disabled = this.locked;
 
+    const unlockBtn = document.createElement("button");
+    unlockBtn.type = "button";
+    unlockBtn.className = "unlock-btn";
+    unlockBtn.textContent = this.locked ? "🔒 Edit" : "🔓 Lock";
+
     unlockBtn.addEventListener("click", () => {
       this.locked = !this.locked;
       input.disabled = this.locked;
@@ -55,7 +46,24 @@ export class LockableField {
       }
     });
 
-    container.append(header, input);
+    const label = document.createElement("span");
+    label.className = "field-label";
+    label.textContent = config.label;
+
+    if (config.multiline) {
+      // Block layout: label + lock button on header row, textarea below
+      const header = document.createElement("div");
+      header.className = "lockable-field-header";
+      header.append(label, unlockBtn);
+      container.append(header, input);
+    } else {
+      // Inline layout: label, input, and lock button all on one row
+      const row = document.createElement("div");
+      row.className = "lockable-field-row";
+      row.append(label, input, unlockBtn);
+      container.append(row);
+    }
+
     return input;
   }
 

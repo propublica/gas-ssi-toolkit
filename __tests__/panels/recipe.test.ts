@@ -8,7 +8,7 @@ jest.mock("../../src/client/services", () => ({
 import { RecipePanel } from "../../src/client/panels/recipe";
 import * as services from "../../src/client/services";
 import type { RecipeParams, PrepRecipeResult } from "../../src/shared/types";
-import type { NavigationContext } from "../../src/client/types";
+import type { NavigationContext, RecipeDefinition } from "../../src/client/types";
 
 const mockPrepRecipe = services.prepRecipe as jest.Mock;
 
@@ -24,7 +24,15 @@ function mount(params: RecipeParams, savedState?: unknown) {
   const container = document.createElement("div");
   const nav = makeNav();
   const panel = new RecipePanel();
-  panel.mount(container, nav, params, savedState as never);
+  const definition: RecipeDefinition = {
+    id: "test",
+    name: "Test Recipe",
+    icon: "🧪",
+    description: "Test",
+    panelId: "recipe",
+    params,
+  };
+  panel.mount(container, nav, definition, savedState as never);
   return { container, nav, panel };
 }
 

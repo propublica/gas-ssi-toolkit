@@ -103,10 +103,12 @@ export function resolveColumns(headers: string[], names: string[]): number[] {
 /**
  * Find a column by header title in row 1, or append a new one.
  * Returns the 1-based column index.
+ * Pass wrapStrategy to apply a wrap format to the entire new column on creation.
  */
 export function findOrCreateColumn(
   sheet: GoogleAppsScript.Spreadsheet.Sheet,
   title: string,
+  wrapStrategy?: GoogleAppsScript.Spreadsheet.WrapStrategy,
 ): number {
   const lastCol = sheet.getLastColumn();
   if (lastCol > 0) {
@@ -116,18 +118,27 @@ export function findOrCreateColumn(
   }
   const newCol = lastCol + 1;
   sheet.getRange(1, newCol).setValue(title);
+  if (wrapStrategy !== undefined) {
+    sheet.getRange(1, newCol, sheet.getMaxRows(), 1).setWrapStrategy(wrapStrategy);
+  }
   return newCol;
 }
 
 /**
  * Write an array of string values to a column starting at row 2.
  * Uses a single setValues() call for efficiency.
+ * Pass wrapStrategy to apply a wrap format to the written range.
  */
 export function writeColumn(
   sheet: GoogleAppsScript.Spreadsheet.Sheet,
   colIdx: number,
   values: string[],
+  wrapStrategy?: GoogleAppsScript.Spreadsheet.WrapStrategy,
 ): void {
   if (values.length === 0) return;
-  sheet.getRange(2, colIdx, values.length, 1).setValues(values.map((v) => [v]));
+  const range = sheet.getRange(2, colIdx, values.length, 1);
+  range.setValues(values.map((v) => [v]));
+  if (wrapStrategy !== undefined) {
+    range.setWrapStrategy(wrapStrategy);
+  }
 }
