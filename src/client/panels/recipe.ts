@@ -139,14 +139,14 @@ export class RecipePanel implements Panel<RecipeParams, SavedState> {
 
   private mountPrepCook(container: HTMLElement, prepComplete: boolean): void {
     this.prepCook = new RecipePrepCook(container.querySelector("#prep-cook-container")!, {
-      onPrep: () => {
+      onPrep: (): Promise<void> => {
         const params = this.buildPrepParams();
         if (!params) return Promise.reject(null); // validation alert already shown; bail silently
         return prepRecipe(params).then((result: PrepRecipeResult) => {
           this.preppedRunConfig = this.buildRunConfig(result);
         });
       },
-      onCook: () => {
+      onCook: (): void => {
         if (this.preppedRunConfig) {
           this.nav?.navigate("configure-ai-run", this.preppedRunConfig);
         }

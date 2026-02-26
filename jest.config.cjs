@@ -101,5 +101,20 @@ module.exports = {
       branches: 70,
       functions: 90,
     },
+    "./src/client/components/recipe-prep-cook.ts": {
+      statements: 90,
+      branches: 95,
+      functions: 88,
+    },
+    "./src/client/panels/recipe.ts": {
+      statements: 88,
+      branches: 72,
+      functions: 72,
+    },
+    "./src/client/panels/recipes-list.ts": {
+      statements: 95,
+      branches: 70,
+      functions: 100,
+    },
   },
 };
