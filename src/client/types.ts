@@ -1,12 +1,7 @@
 /**
  * All registered panel identifiers. Add new panels here first.
  */
-export type PanelId =
-  | "tool-list"
-  | "configure-ai-run"
-  | "recipes-list"
-  | "recipe"
-  | "document-summarization";
+export type PanelId = "tool-list" | "configure-ai-run" | "recipes-list" | "recipe";
 
 /**
  * Passed to each panel's mount() so panels can trigger navigation
