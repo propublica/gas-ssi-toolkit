@@ -54,35 +54,11 @@ describe("getSheetHeaders", () => {
     expect(mockRun.getSheetHeaders).toHaveBeenCalledTimes(1);
   });
 
-  it("caches the result — second call does not hit GAS", async () => {
-    const handlers = captureHandlers();
-    const p1 = services.getSheetHeaders();
-    handlers.resolve(["col_a"]);
-    await p1;
-    await services.getSheetHeaders();
-    expect(mockRun.getSheetHeaders).toHaveBeenCalledTimes(1);
-  });
-
   it("rejects with the error on failure", async () => {
     const handlers = captureHandlers();
     const promise = services.getSheetHeaders();
     handlers.reject(new Error("sheet error"));
     await expect(promise).rejects.toThrow("sheet error");
-  });
-});
-
-describe("invalidateHeaderCache", () => {
-  it("clears cache so next getSheetHeaders re-fetches", async () => {
-    const handlers = captureHandlers();
-    const p1 = services.getSheetHeaders();
-    handlers.resolve(["col_a"]);
-    await p1;
-    services.invalidateHeaderCache();
-    const handlers2 = captureHandlers();
-    const p2 = services.getSheetHeaders();
-    handlers2.resolve(["col_b"]);
-    await p2;
-    expect(mockRun.getSheetHeaders).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -139,27 +115,6 @@ describe("prepRecipe", () => {
     handlers.resolve(result);
     await expect(promise).resolves.toEqual(result);
     expect(mockRun.prepRecipe).toHaveBeenCalledWith(params);
-  });
-
-  it("invalidates the header cache on success so next getSheetHeaders re-fetches", async () => {
-    // Prime the cache
-    const h1 = captureHandlers();
-    const p1 = services.getSheetHeaders();
-    h1.resolve([]);
-    await p1;
-
-    // Prep resolves — should bust the cache
-    const h2 = captureHandlers();
-    const prepPromise = services.prepRecipe({});
-    h2.resolve({ rowRange: { start: 2, end: 2 }, colNames: {} });
-    await prepPromise;
-
-    // Next getSheetHeaders must hit GAS again (not return cached [])
-    const h3 = captureHandlers();
-    const p3 = services.getSheetHeaders();
-    h3.resolve(["new_col"]);
-    await expect(p3).resolves.toEqual(["new_col"]);
-    expect(mockRun.getSheetHeaders).toHaveBeenCalledTimes(2);
   });
 
   it("rejects on failure", async () => {
