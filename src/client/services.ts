@@ -1,22 +1,12 @@
 import type { PrepRecipeParams, PrepRecipeResult, RunConfig } from "../shared/types";
 
-let cachedHeaders: string[] | null = null;
-
 export function getSheetHeaders(): Promise<string[]> {
-  if (cachedHeaders !== null) return Promise.resolve(cachedHeaders);
   return new Promise((resolve, reject) => {
     google.script.run
-      .withSuccessHandler((headers: unknown) => {
-        cachedHeaders = headers as string[];
-        resolve(cachedHeaders);
-      })
+      .withSuccessHandler((headers: unknown) => resolve(headers as string[]))
       .withFailureHandler((err: Error) => reject(err))
       .getSheetHeaders();
   });
-}
-
-export function invalidateHeaderCache(): void {
-  cachedHeaders = null;
 }
 
 export function runBatchAI(config: RunConfig): Promise<void> {
@@ -40,10 +30,7 @@ export function runTool(fn: string): Promise<void> {
 export function prepRecipe(params: PrepRecipeParams): Promise<PrepRecipeResult> {
   return new Promise((resolve, reject) => {
     google.script.run
-      .withSuccessHandler((result: unknown) => {
-        invalidateHeaderCache();
-        resolve(result as PrepRecipeResult);
-      })
+      .withSuccessHandler((result: unknown) => resolve(result as PrepRecipeResult))
       .withFailureHandler((err: Error) => reject(err))
       .prepRecipe(params);
   });
