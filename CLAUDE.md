@@ -61,6 +61,11 @@ function showSidebar() { _GASEntry.showSidebar(); }
 
 If you skip step 2, the function will exist in the bundle but Apps Script won't be able to discover or call it.
 
+**If the function is also called from the client, add a third step:**
+3. Add it to `src/client/google.d.ts`
+
+`google.d.ts` is hand-maintained — it is not auto-generated from server code. If you skip step 3, the client will typecheck against stale declarations and only fail at runtime.
+
 **Custom functions (callable from spreadsheet cells) require one extra step:**
 3. Add a JSDoc comment with `@customfunction` directly on the stub in `rollup.config.js`
 
