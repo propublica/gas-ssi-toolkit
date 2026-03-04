@@ -16,8 +16,6 @@ import { flattenArg } from "./utils";
 import { TOOL_REGISTRY } from "./tools";
 import type { ToolId } from "../shared/types";
 
-export { TOOL_REGISTRY };
-
 /**
  * Call the Gemini API from a spreadsheet cell.
  *

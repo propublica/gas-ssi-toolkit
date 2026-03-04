@@ -186,8 +186,11 @@ describe("ConfigureAIRunPanel — tools TagList", () => {
     // Tools must be present immediately — no await
     const tags = container.querySelectorAll("#tools-list .tag");
     expect(tags.length).toBeGreaterThan(0);
-    expect(tags[0].getAttribute("data-value")).toBe("google_search");
-    expect(tags[0].textContent).toBe("Google Search");
+    const googleSearchTag = container.querySelector<HTMLElement>(
+      '#tools-list .tag[data-value="google_search"]',
+    );
+    expect(googleSearchTag).not.toBeNull();
+    expect(googleSearchTag!.textContent).toBe("Google Search");
   });
 
   it("includes selected tool IDs in runBatchAI call", async () => {
@@ -215,6 +218,7 @@ describe("ConfigureAIRunPanel — unmount", () => {
     const state = panel.unmount();
     expect(state).not.toBeUndefined();
     expect((state as { userPromptCols: string[] }).userPromptCols).toContain("col_a");
+    expect((state as { tools: string[] }).tools).toEqual([]); // no tools selected
   });
 
   it("unmount() before headers load returns undefined", () => {
