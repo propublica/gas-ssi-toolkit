@@ -8,8 +8,7 @@
  * tools array, but with different structures.
  */
 
-// TODO Task 2: replace with import from ../shared/types
-type ToolId = string;
+import type { ToolId } from "../shared/types";
 
 export interface AppConfig {
   API_KEY_PROPERTY: string;
