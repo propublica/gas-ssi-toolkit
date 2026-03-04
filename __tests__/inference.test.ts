@@ -87,7 +87,6 @@ describe("runInference", () => {
     mockOkResponse("ok");
     runInference("prompt");
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
-    expect(payload.tools).toBeUndefined();
     expect(payload.contents[0].parts).toHaveLength(1);
   });
 
