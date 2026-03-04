@@ -118,4 +118,19 @@ describe("runInference", () => {
       "Error: File not found",
     );
   });
+
+  it("passes tools to the payload when provided", () => {
+    mockOkResponse("ok");
+    runInference("prompt", undefined, undefined, ["google_search"]);
+    const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
+    expect(payload.tools).toBeDefined();
+    expect(payload.tools[0]).toHaveProperty("google_search");
+  });
+
+  it("omits tools from the payload when not provided", () => {
+    mockOkResponse("ok");
+    runInference("prompt");
+    const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
+    expect(payload.tools).toBeUndefined();
+  });
 });

@@ -10,6 +10,7 @@ import { invokeGemini } from "./api";
 import { fetchAndEncodeFile } from "./drive";
 import { flattenArg, isValidDriveLink, extractId } from "./utils";
 import type { GeminiInlineData } from "./types";
+import type { ToolId } from "../shared/types";
 
 /**
  * Execute a single Gemini inference from raw cell values.
@@ -20,6 +21,7 @@ import type { GeminiInlineData } from "./types";
  *                     Omit or pass `undefined` to skip Drive attachment.
  * @param systemPrompt Cell value for the system instruction. First non-empty
  *                     string is used. Omit or pass `undefined` to use the model default.
+ * @param tools        Tool IDs to enable for this inference call.
  * @returns The model response string, an "Error: ..." string on failure,
  *          or null if userPrompts is empty (signals caller to skip this row).
  */
@@ -27,6 +29,7 @@ export function runInference(
   userPrompts: unknown,
   driveLinks?: unknown,
   systemPrompt?: unknown,
+  tools?: ToolId[],
 ): string | null {
   const userTexts = flattenArg(userPrompts);
   if (userTexts.length === 0) return null;
@@ -43,6 +46,7 @@ export function runInference(
       systemPrompt: systemPrompt !== undefined ? flattenArg(systemPrompt)[0] : undefined,
       userTexts,
       inlineData: inlineData.length ? inlineData : undefined,
+      tools: tools?.length ? tools : undefined,
     });
   } catch (e) {
     return "Error: " + (e as Error).message;
