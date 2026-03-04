@@ -80,8 +80,8 @@ export class ToolListPanel implements Panel {
         </button>
       </div>
       <div class="status-footer">
-        <strong>SSI Tools v2.0</strong><br>
-        Powered by Gemini 2.0 Flash<br>
+        <strong>SSI Tools v2.1</strong><br>
+        Powered by Gemini 3.1 Flash Lite Preview<br>
         Evaluation Unrestricted Mode
       </div>
     `;
