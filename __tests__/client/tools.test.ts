@@ -7,7 +7,7 @@ import type { ToolId } from "../../src/shared/types";
 describe("TOOL_CATALOG", () => {
   it("contains an entry for every ToolId", () => {
     // If a ToolId is added to shared/types.ts but not TOOL_CATALOG, this test fails.
-    const knownIds: ToolId[] = ["google_search"];
+    const knownIds: ToolId[] = ["google_search", "url_context", "code_execution"];
     const catalogIds = TOOL_CATALOG.map((t) => t.id);
     expect(catalogIds).toEqual(expect.arrayContaining(knownIds));
     expect(TOOL_CATALOG).toHaveLength(knownIds.length);

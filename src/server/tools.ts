@@ -17,4 +17,6 @@ import type { GeminiTool } from "./types";
 
 export const TOOL_REGISTRY: Record<ToolId, GeminiTool> = {
   google_search: { kind: "grounding", id: "google_search" },
+  url_context: { kind: "grounding", id: "url_context" },
+  code_execution: { kind: "grounding", id: "code_execution" },
 };

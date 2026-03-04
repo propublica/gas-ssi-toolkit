@@ -15,7 +15,7 @@
  * require a matching entry in TOOL_REGISTRY (server/tools.ts)
  * and TOOL_CATALOG (client/tools.ts).
  */
-export type ToolId = "google_search";
+export type ToolId = "google_search" | "url_context" | "code_execution";
 
 // ── Configuration ───────────────────────────────────────────────
 
