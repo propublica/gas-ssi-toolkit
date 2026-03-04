@@ -29,4 +29,14 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     name: "Google Search",
     description: "Ground responses in live web search results",
   },
+  {
+    id: "url_context",
+    name: "URL Context",
+    description: "Fetch and include content from URLs mentioned in the prompt",
+  },
+  {
+    id: "code_execution",
+    name: "Code Execution",
+    description: "Run Python code to perform calculations and data analysis",
+  },
 ];
