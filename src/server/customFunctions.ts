@@ -14,6 +14,7 @@
 import { invokeGemini } from "./api";
 import { flattenArg } from "./utils";
 import { TOOL_REGISTRY } from "./tools";
+import type { ToolId } from "../shared/types";
 
 export { TOOL_REGISTRY };
 
@@ -25,23 +26,22 @@ export { TOOL_REGISTRY };
  *   Example: "Summarize this" or A1 or A1:A3 or {A1,B4,B10}
  * @param {string} [systemPrompt] (Optional) System-level instruction for the model.
  *   Example: "You are a concise summarizer."
- * @param {string|Array} [toolNames] (Optional) Names of pre-registered tools to enable.
- *   Example: "myTool" or {A5,A6}
+ * @param {string|Array} [toolNames] (Optional) Names of tools to enable.
+ *   Example: "google_search" or {A5,A6}
  * @return {string} The model's text response, or "[SSI Error: ...]" on failure.
  * @customfunction
  */
 export function SSI(userTexts: unknown, systemPrompt?: string, toolNames?: unknown): string {
   try {
-    const resolvedTools = flattenArg(toolNames).map((name) => {
-      const decl = TOOL_REGISTRY[name];
-      if (!decl) throw new Error(`unknown tool '${name}'`);
-      return decl;
+    const resolvedToolIds = flattenArg(toolNames).map((name) => {
+      if (!TOOL_REGISTRY[name as ToolId]) throw new Error(`unknown tool '${name}'`);
+      return name as ToolId;
     });
 
     return invokeGemini({
       systemPrompt: systemPrompt || undefined,
       userTexts: flattenArg(userTexts),
-      tools: resolvedTools.length ? (resolvedTools as unknown as import("../shared/types").ToolId[]) : undefined,
+      tools: resolvedToolIds.length ? resolvedToolIds : undefined,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
