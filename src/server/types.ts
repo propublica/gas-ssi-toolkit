@@ -44,6 +44,10 @@ export type GeminiTool =
   | { kind: "grounding"; id: ToolId }
   | { kind: "function"; declaration: GeminiFunctionDeclaration };
 
+export interface DriveFileInfo {
+  url: string;
+}
+
 export interface GeminiRequest {
   apiKey: string;
   modelName?: string; // defaults to CONFIG.MODEL_NAME if omitted
