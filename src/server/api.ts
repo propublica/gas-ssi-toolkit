@@ -8,6 +8,7 @@
  */
 
 import { CONFIG } from "./config";
+import { TOOL_REGISTRY } from "./tools";
 import type { GeminiInlineData, GeminiRequest } from "./types";
 
 interface GeminiPart {
@@ -35,7 +36,22 @@ export function buildGeminiPayload(req: GeminiRequest): Record<string, unknown> 
   }
 
   if (req.tools && req.tools.length > 0) {
-    payload.tools = [{ function_declarations: req.tools }];
+    const entries = req.tools.map((id) => TOOL_REGISTRY[id]);
+
+    const groundingEntries = entries
+      .filter((t): t is Extract<typeof t, { kind: "grounding" }> => t.kind === "grounding")
+      .map((t) => ({ [t.id]: {} }));
+
+    const functionDeclarations = entries
+      .filter((t): t is Extract<typeof t, { kind: "function" }> => t.kind === "function")
+      .map((t) => t.declaration);
+
+    const toolsPayload = [
+      ...groundingEntries,
+      ...(functionDeclarations.length ? [{ function_declarations: functionDeclarations }] : []),
+    ];
+
+    payload.tools = toolsPayload;
   }
 
   return payload;
