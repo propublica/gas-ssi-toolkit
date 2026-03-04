@@ -6,7 +6,7 @@
  * Functions that operate purely on plain values have no GAS dependency at all.
  */
 
-import type { DriveFileInfo } from "../shared/types";
+import type { DriveFileInfo } from "./types";
 
 /**
  * Extract a Google Drive file/folder ID from a URL or raw ID string.

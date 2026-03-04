@@ -1,20 +1,27 @@
+type TagItem = string | { label: string; value: string };
+
+function normalize(item: TagItem): { label: string; value: string } {
+  return typeof item === "string" ? { label: item, value: item } : item;
+}
+
 export class TagList {
   private readonly container: HTMLElement;
 
-  constructor(container: HTMLElement, headers: string[], selected: string[] = []) {
+  constructor(container: HTMLElement, items: TagItem[], selected: string[] = []) {
     this.container = container;
-    this.render(headers, selected);
+    this.render(items, selected);
   }
 
-  private render(headers: string[], selected: string[]): void {
+  private render(items: TagItem[], selected: string[]): void {
     this.container.innerHTML = "";
-    headers.forEach((h) => {
+    items.forEach((item) => {
+      const { label, value } = normalize(item);
       const btn = document.createElement("button");
       btn.className = "tag";
       btn.type = "button";
-      btn.textContent = h;
-      btn.setAttribute("data-value", h);
-      if (selected.includes(h)) btn.classList.add("selected");
+      btn.textContent = label;
+      btn.setAttribute("data-value", value);
+      if (selected.includes(value)) btn.classList.add("selected");
       btn.addEventListener("click", () => btn.classList.toggle("selected"));
       this.container.appendChild(btn);
     });

@@ -314,7 +314,7 @@ export function runBatchAI(config: RunConfig): void {
     const driveLinks = driveFileIdxs.length > 0 ? driveFileIdxs.map((idx) => row[idx]) : undefined;
     const systemPrompt = systemPromptIdx >= 0 ? row[systemPromptIdx] : undefined;
 
-    const result = runInference(userPrompts, driveLinks, systemPrompt);
+    const result = runInference(userPrompts, driveLinks, systemPrompt, config.tools);
     if (result === null) continue;
 
     sheet.getRange(realRowIndex, outputIdx + 1).setValue(result);
@@ -409,5 +409,6 @@ export function prepRecipe(params: PrepRecipeParams): PrepRecipeResult {
   return {
     rowRange: { start: 2, end: 2 + numRows - 1 },
     colNames,
+    tools: params.tools,
   };
 }

@@ -7,7 +7,7 @@
  */
 
 import { CONFIG } from "./config";
-import type { GeminiInlineData } from "../shared/types";
+import type { GeminiInlineData } from "./types";
 
 /**
  * Check that the Drive Advanced Service is available.

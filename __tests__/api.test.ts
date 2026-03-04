@@ -21,7 +21,7 @@
 
 import { buildGeminiPayload, callGeminiAPI, invokeGemini } from "../src/server/api";
 import { CONFIG } from "../src/server/config";
-import type { GeminiRequest } from "../src/shared/types";
+import type { GeminiRequest } from "../src/server/types";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -90,18 +90,23 @@ describe("buildGeminiPayload", () => {
     expect((payload.system_instruction as any).parts[0].text).toBe("You are a helpful assistant.");
   });
 
-  it("includes tools when provided", () => {
-    const req: GeminiRequest = {
-      ...baseReq,
-      tools: [{ name: "myFn", description: "does stuff" }],
-    };
-    const payload = buildGeminiPayload(req);
-    expect((payload.tools as any)[0].function_declarations[0].name).toBe("myFn");
-  });
+  describe("tool resolution in buildGeminiPayload", () => {
+    it("omits tools key when tools array is absent", () => {
+      const payload = buildGeminiPayload(baseReq);
+      expect(payload.tools).toBeUndefined();
+    });
 
-  it("omits tools key when tools array is empty or absent", () => {
-    const payload = buildGeminiPayload(baseReq);
-    expect(payload.tools).toBeUndefined();
+    it("omits tools key when tools array is empty", () => {
+      const payload = buildGeminiPayload({ ...baseReq, tools: [] });
+      expect(payload.tools).toBeUndefined();
+    });
+
+    it("assembles a grounding tool entry for google_search", () => {
+      const payload = buildGeminiPayload({ ...baseReq, tools: ["google_search"] });
+      const tools = payload.tools as unknown[];
+      expect(tools).toHaveLength(1);
+      expect(tools[0]).toEqual({ google_search: {} });
+    });
   });
 
   it("passes through generationConfig when provided", () => {

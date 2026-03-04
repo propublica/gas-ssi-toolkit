@@ -172,6 +172,42 @@ describe("ConfigureAIRunPanel — back", () => {
   });
 });
 
+describe("ConfigureAIRunPanel — tools TagList", () => {
+  it("renders a tools field group in the template", async () => {
+    const { container } = await mountAndLoad();
+    expect(container.querySelector("#tools-list")).not.toBeNull();
+  });
+
+  it("populates tools from TOOL_CATALOG synchronously (before headers load)", () => {
+    (services.getSheetHeaders as jest.Mock).mockReturnValue(new Promise(() => {})); // never resolves
+    const container = makeContainer();
+    const panel = new ConfigureAIRunPanel();
+    panel.mount(container, mockNav);
+    // Tools must be present immediately — no await
+    const tags = container.querySelectorAll("#tools-list .tag");
+    expect(tags.length).toBeGreaterThan(0);
+    const googleSearchTag = container.querySelector<HTMLElement>(
+      '#tools-list .tag[data-value="google_search"]',
+    );
+    expect(googleSearchTag).not.toBeNull();
+    expect(googleSearchTag!.textContent).toBe("Google Search");
+  });
+
+  it("includes selected tool IDs in runBatchAI call", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad({
+      userPromptCols: ["col_a"],
+      outputCol: "ai_inference",
+    });
+    container.querySelector<HTMLButtonElement>('[data-value="google_search"]')!.click();
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    await Promise.resolve();
+    expect(services.runBatchAI).toHaveBeenCalledWith(
+      expect.objectContaining({ tools: ["google_search"] }),
+    );
+  });
+});
+
 describe("ConfigureAIRunPanel — unmount", () => {
   it("unmount() returns current form state as SavedState", async () => {
     const { container, panel } = await mountAndLoad();
@@ -182,6 +218,7 @@ describe("ConfigureAIRunPanel — unmount", () => {
     const state = panel.unmount();
     expect(state).not.toBeUndefined();
     expect((state as { userPromptCols: string[] }).userPromptCols).toContain("col_a");
+    expect((state as { tools: string[] }).tools).toEqual([]); // no tools selected
   });
 
   it("unmount() before headers load returns undefined", () => {

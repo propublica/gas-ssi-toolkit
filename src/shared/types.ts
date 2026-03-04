@@ -1,14 +1,23 @@
 /**
- * Shared types for the SSI Drive & AI Tools project.
+ * Shared types for the SSI Toolkit.
+ *
+ * IMPORTANT: This file is the client↔server RPC boundary.
+ * Only types that cross google.script.run calls belong here.
+ * - Server-only types (Gemini API shapes, AppConfig): src/server/types.ts
+ * - Client-only types (UI, panels, recipes): src/client/types.ts
  */
 
-// ── Configuration ──────────────────────────────────────────────
+// ── Tool vocabulary ─────────────────────────────────────────────
 
-export interface AppConfig {
-  API_KEY_PROPERTY: string;
-  MODEL_NAME: string;
-  MAX_FILE_SIZE_BYTES: number;
-}
+/**
+ * All tool IDs recognized by the toolkit.
+ * Extend this union when adding a new tool — the compiler will then
+ * require a matching entry in TOOL_REGISTRY (server/tools.ts)
+ * and TOOL_CATALOG (client/tools.ts).
+ */
+export type ToolId = "google_search";
+
+// ── Configuration ───────────────────────────────────────────────
 
 export interface RunConfig {
   userPromptCols: string[];
@@ -16,39 +25,23 @@ export interface RunConfig {
   systemPromptCol?: string;
   outputCol: string;
   rowRange?: { start: number; end: number };
+  /** Tool IDs to enable for every row in this run. */
+  tools?: ToolId[];
 }
 
-// ── Recipes ────────────────────────────────────────────────────
-
-export interface RecipeFieldConfig {
-  value: string;
-  locked?: boolean; // defaults to true
-  placeholder?: string;
-}
-
-export interface RecipeParams {
-  driveFolder?: {
-    colTitle: string;
-    helperText?: string;
-  };
-  systemPrompt?: {
-    colTitle: RecipeFieldConfig;
-    prompt: RecipeFieldConfig;
-  };
-  userPrompts?: Array<{
-    colTitle: RecipeFieldConfig;
-    prompt: RecipeFieldConfig;
-  }>;
-  outputCol?: {
-    colTitle: RecipeFieldConfig;
-  };
-}
+// ── Recipes ─────────────────────────────────────────────────────
 
 export interface PrepRecipeParams {
   driveFolder?: { url: string; colTitle: string };
   systemPrompt?: { colTitle: string; value: string };
   userPrompts?: Array<{ colTitle: string; value: string }>;
   outputCol?: { colTitle: string };
+  /**
+   * Tool IDs to pass through to PrepRecipeResult.
+   * The server does not process these during prep — they are echoed back
+   * to preserve the single-source-of-truth invariant for preppedRunConfig.
+   */
+  tools?: ToolId[];
 }
 
 export interface PrepRecipeResult {
@@ -59,39 +52,6 @@ export interface PrepRecipeResult {
     userPrompts?: string[];
     outputCol?: string;
   };
-}
-
-// ── Gemini API ─────────────────────────────────────────────────
-
-export interface GeminiInlineData {
-  mime_type: string;
-  data: string; // base64-encoded bytes
-}
-
-export interface GeminiFunctionDeclaration {
-  name: string;
-  description: string;
-  parameters?: Record<string, unknown>; // JSON Schema object
-}
-
-export interface GeminiGenerationConfig {
-  temperature?: number;
-  maxOutputTokens?: number;
-  responseMimeType?: string;
-}
-
-export interface GeminiRequest {
-  apiKey: string;
-  modelName?: string; // defaults to CONFIG.MODEL_NAME if omitted
-  systemPrompt?: string;
-  userTexts: string[]; // assembled into parts: [{text}, {text}, ...]
-  inlineData?: GeminiInlineData[]; // each item appended as an inline_data part
-  tools?: GeminiFunctionDeclaration[];
-  generationConfig?: GeminiGenerationConfig;
-}
-
-// ── Drive ──────────────────────────────────────────────────────
-
-export interface DriveFileInfo {
-  url: string;
+  /** Echoed from PrepRecipeParams — no server-side processing. */
+  tools?: ToolId[];
 }

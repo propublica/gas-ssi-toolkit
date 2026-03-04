@@ -1,10 +1,6 @@
 import type { NavigationContext, Panel, RecipeDefinition } from "../types";
-import type {
-  RecipeParams,
-  PrepRecipeParams,
-  PrepRecipeResult,
-  RunConfig,
-} from "../../shared/types";
+import type { RecipeParams } from "../types";
+import type { PrepRecipeParams, PrepRecipeResult, RunConfig } from "../../shared/types";
 import { LockableField } from "../components/lockable-field";
 import { RecipePrepCook } from "../components/recipe-prep-cook";
 import { prepRecipe } from "../services";

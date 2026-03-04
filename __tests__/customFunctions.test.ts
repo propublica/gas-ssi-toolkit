@@ -19,7 +19,7 @@
 
 // ── Import after mocks ─────────────────────────────────────────
 
-import { SSI, TOOL_REGISTRY } from "../src/server/customFunctions";
+import { SSI } from "../src/server/customFunctions";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -107,13 +107,13 @@ describe("SSI", () => {
       expect(result).toMatch(/\[SSI Error:.*nonExistentTool/);
     });
 
-    it("includes a known tool declaration in the API payload", () => {
+    it("includes google_search in the API payload when specified", () => {
       mockOkResponse("ok");
-      TOOL_REGISTRY["testTool"] = { name: "testTool", description: "A test tool" };
-      SSI("prompt", undefined, "testTool");
-      delete TOOL_REGISTRY["testTool"];
+      SSI("prompt", undefined, "google_search");
       const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
-      expect(payload.tools[0].function_declarations[0].name).toBe("testTool");
+      // google_search is a grounding tool — appears as { google_search: {} }
+      expect(payload.tools).toBeDefined();
+      expect(payload.tools[0]).toHaveProperty("google_search");
     });
   });
 
