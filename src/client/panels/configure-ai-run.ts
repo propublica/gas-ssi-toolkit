@@ -1,9 +1,10 @@
 import type { NavigationContext, Panel } from "../types";
-import type { RunConfig } from "../../shared/types";
+import type { RunConfig, ToolId } from "../../shared/types";
 import { TagList } from "../components/tag-list";
 import { SingleTagList } from "../components/single-tag-list";
 import { RowRange } from "../components/row-range";
 import { getSheetHeaders, runBatchAI } from "../services";
+import { TOOL_CATALOG } from "../tools";
 
 export type SavedState = Required<Omit<RunConfig, "rowRange" | "tools">> &
   Pick<RunConfig, "rowRange" | "tools">;
@@ -14,6 +15,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private systemPromptList: SingleTagList | null = null;
   private outputColList: SingleTagList | null = null;
   private rowRangeComp: RowRange | null = null;
+  private toolsList: TagList | null = null;
   private nav: NavigationContext | null = null;
 
   mount(
@@ -34,8 +36,15 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           systemPromptCol: savedState.systemPromptCol || undefined,
           outputCol: savedState.outputCol || undefined,
           rowRange: savedState.rowRange,
+          tools: savedState.tools,
         }
       : (params ?? {});
+
+    this.toolsList = new TagList(
+      container.querySelector("#tools-list")!,
+      TOOL_CATALOG.map((t) => ({ label: t.name, value: t.id })),
+      preset.tools ?? [],
+    );
 
     getSheetHeaders().then(
       (headers) => {
@@ -88,6 +97,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       systemPromptCol: this.systemPromptList?.getValue() ?? "",
       outputCol: this.outputColList?.getValue() ?? "",
       rowRange: this.rowRangeComp?.getValue(),
+      tools: (this.toolsList?.getValue() ?? []) as ToolId[],
     };
   }
 
@@ -135,12 +145,15 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
 
     const rowRange = this.rowRangeComp?.getValue();
 
+    const tools = (this.toolsList?.getValue() ?? []) as ToolId[];
+
     return {
       userPromptCols,
       driveFileCols: driveFileCols.length > 0 ? driveFileCols : undefined,
       systemPromptCol,
       outputCol,
       rowRange,
+      tools: tools.length > 0 ? tools : undefined,
     };
   }
 
@@ -169,6 +182,10 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <div class="field-group">
           <span class="field-label">Output column <span class="required">*</span></span>
           <div id="output-col" class="tag-list"></div>
+        </div>
+        <div class="field-group">
+          <span class="field-label">Tools <span class="optional">(optional)</span></span>
+          <div id="tools-list" class="tag-list"></div>
         </div>
         <div class="field-group">
           <span class="field-label">Rows to process</span>
