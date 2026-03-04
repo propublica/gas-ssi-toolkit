@@ -18,7 +18,7 @@ import {
   findOrCreateColumn,
   writeColumn,
 } from "../src/server/utils";
-import type { DriveFileInfo } from "../src/shared/types";
+import type { DriveFileInfo } from "../src/server/types";
 
 describe("extractId", () => {
   it("extracts ID from a standard Drive file URL", () => {

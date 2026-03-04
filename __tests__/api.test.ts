@@ -21,7 +21,7 @@
 
 import { buildGeminiPayload, callGeminiAPI, invokeGemini } from "../src/server/api";
 import { CONFIG } from "../src/server/config";
-import type { GeminiRequest } from "../src/shared/types";
+import type { GeminiRequest } from "../src/server/types";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -93,7 +93,7 @@ describe("buildGeminiPayload", () => {
   it("includes tools when provided", () => {
     const req: GeminiRequest = {
       ...baseReq,
-      tools: [{ name: "myFn", description: "does stuff" }],
+      tools: [{ name: "myFn", description: "does stuff" }] as unknown as import("../src/shared/types").ToolId[],
     };
     const payload = buildGeminiPayload(req);
     expect((payload.tools as any)[0].function_declarations[0].name).toBe("myFn");

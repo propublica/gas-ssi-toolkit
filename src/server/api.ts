@@ -8,7 +8,7 @@
  */
 
 import { CONFIG } from "./config";
-import type { GeminiInlineData, GeminiRequest } from "../shared/types";
+import type { GeminiInlineData, GeminiRequest } from "./types";
 
 interface GeminiPart {
   text?: string;

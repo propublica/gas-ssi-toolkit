@@ -4,7 +4,7 @@
  * Matches the CONFIG object from the original Code.gs.
  */
 
-import type { AppConfig } from "../shared/types";
+import type { AppConfig } from "./types";
 
 export const CONFIG: AppConfig = {
   API_KEY_PROPERTY: "GEMINI_API_KEY",

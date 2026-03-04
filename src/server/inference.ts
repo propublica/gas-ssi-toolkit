@@ -9,7 +9,7 @@
 import { invokeGemini } from "./api";
 import { fetchAndEncodeFile } from "./drive";
 import { flattenArg, isValidDriveLink, extractId } from "./utils";
-import type { GeminiInlineData } from "../shared/types";
+import type { GeminiInlineData } from "./types";
 
 /**
  * Execute a single Gemini inference from raw cell values.

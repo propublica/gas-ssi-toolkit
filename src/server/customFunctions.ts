@@ -41,7 +41,7 @@ export function SSI(userTexts: unknown, systemPrompt?: string, toolNames?: unkno
     return invokeGemini({
       systemPrompt: systemPrompt || undefined,
       userTexts: flattenArg(userTexts),
-      tools: resolvedTools.length ? resolvedTools : undefined,
+      tools: resolvedTools.length ? (resolvedTools as unknown as import("../shared/types").ToolId[]) : undefined,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

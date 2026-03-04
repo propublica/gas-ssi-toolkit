@@ -7,7 +7,8 @@ jest.mock("../../src/client/services", () => ({
 
 import { RecipePanel } from "../../src/client/panels/recipe";
 import * as services from "../../src/client/services";
-import type { RecipeParams, PrepRecipeResult } from "../../src/shared/types";
+import type { PrepRecipeResult } from "../../src/shared/types";
+import type { RecipeParams } from "../../src/client/types";
 import type { NavigationContext, RecipeDefinition } from "../../src/client/types";
 
 const mockPrepRecipe = services.prepRecipe as jest.Mock;

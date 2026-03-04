@@ -5,7 +5,8 @@ import { SingleTagList } from "../components/single-tag-list";
 import { RowRange } from "../components/row-range";
 import { getSheetHeaders, runBatchAI } from "../services";
 
-export type SavedState = Required<Omit<RunConfig, "rowRange">> & Pick<RunConfig, "rowRange">;
+export type SavedState = Required<Omit<RunConfig, "rowRange" | "tools">> &
+  Pick<RunConfig, "rowRange" | "tools">;
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
   private userPromptList: TagList | null = null;
