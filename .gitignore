@@ -25,3 +25,6 @@ Thumbs.db
 
 # Gemini CLI internal
 .gemini/
+
+# Git worktrees
+.worktrees/
