@@ -49,4 +49,39 @@ describe("TagList", () => {
     const list = new TagList(c, ["col_a"]);
     expect(list.getValue()).toEqual([]);
   });
+
+  describe("label/value items", () => {
+    it("displays label as textContent but stores value in data-value", () => {
+      const c = makeContainer();
+      new TagList(c, [{ label: "Google Search", value: "google_search" }]);
+      const tag = c.querySelector<HTMLButtonElement>(".tag")!;
+      expect(tag.textContent).toBe("Google Search");
+      expect(tag.getAttribute("data-value")).toBe("google_search");
+    });
+
+    it("getValue() returns value (not label) for label/value items", () => {
+      const c = makeContainer();
+      const list = new TagList(c, [{ label: "Google Search", value: "google_search" }]);
+      c.querySelector<HTMLButtonElement>('[data-value="google_search"]')!.click();
+      expect(list.getValue()).toEqual(["google_search"]);
+    });
+
+    it("pre-selects by value when using label/value items", () => {
+      const c = makeContainer();
+      new TagList(c, [{ label: "Google Search", value: "google_search" }], ["google_search"]);
+      const selected = c.querySelectorAll(".tag.selected");
+      expect(selected).toHaveLength(1);
+      expect(selected[0].getAttribute("data-value")).toBe("google_search");
+    });
+
+    it("mixed string and label/value items render correctly", () => {
+      const c = makeContainer();
+      const list = new TagList(
+        c,
+        ["col_a", { label: "Google Search", value: "google_search" }],
+        ["col_a", "google_search"],
+      );
+      expect(list.getValue()).toEqual(["col_a", "google_search"]);
+    });
+  });
 });
