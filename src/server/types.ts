@@ -35,7 +35,10 @@ export interface GeminiGenerationConfig {
 }
 
 /**
- * Internal discriminated union. Not exported — only buildGeminiPayload acts on kind.
+ * Discriminated union for Gemini REST API tool payload construction.
+ * External callers pass ToolId[] — this type is internal to buildGeminiPayload,
+ * which resolves IDs and acts on the kind discriminant to assemble the correct
+ * payload shape for each tool category.
  * Lives here (rather than in api.ts) so TOOL_REGISTRY can reference it.
  */
 export type GeminiTool =
