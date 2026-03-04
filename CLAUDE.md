@@ -90,28 +90,41 @@ The `src/Sidebar.html` template is also read at test time by `__tests__/helpers/
 ```
 src/server/index.ts          (entry point — menu, 4 tool orchestrators, UI handlers, re-exports custom functions)
 ├── src/server/config.ts         (CONFIG object: API key property name, model, column names, limits)
-├── src/server/api.ts            (callGeminiAPI, buildGeminiPayload — pure HTTP adapter via UrlFetchApp)
+├── src/server/api.ts            (callGeminiAPI, buildGeminiPayload, invokeGemini — pure HTTP adapter via UrlFetchApp;
+│                                 buildGeminiPayload resolves ToolId[] via TOOL_REGISTRY, splits grounding vs function tools)
+├── src/server/inference.ts      (runInference — unified inference handler for menu-triggered AI calls; no SpreadsheetApp dep;
+│                                 returns string|null, null signals caller to skip the row)
+├── src/server/tools.ts          (TOOL_REGISTRY: Record<ToolId, GeminiTool> — exhaustive at compile time; adding a ToolId
+│                                 without a registry entry is a type error)
+├── src/server/types.ts          (server-only types: AppConfig, GeminiRequest, GeminiTool discriminated union,
+│                                 GeminiInlineData, GeminiFunctionDeclaration, DriveFileInfo; never imported by client)
 ├── src/server/drive.ts          (extractTextUniversal, fetchAndEncodeFile, checkDriveService)
 ├── src/server/dialog.ts         (HTML_TEMPLATE string for AI mode selection modal)
-├── src/server/utils.ts          (extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive, sampleRows, truncateText, findOrCreateColumn, writeColumn)
-├── src/server/customFunctions.ts  (SSI — Sheets custom function; TOOL_REGISTRY for named tool declarations)
-└── src/shared/types.ts          (shared interfaces: AppConfig, AIMode, ColumnMap, GeminiRequest, etc.)
+├── src/server/customFunctions.ts  (SSI — Sheets custom function; calls invokeGemini directly; always returns string,
+│                                 uses "[SSI Error: ...]" format)
+├── src/server/utils.ts          (extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive, sampleRows,
+│                                 truncateText, findOrCreateColumn, writeColumn, flattenArg)
+└── src/shared/types.ts          (RPC boundary ONLY — ToolId union, RunConfig, PrepRecipeParams, PrepRecipeResult;
+                                  all with optional tools?: ToolId[])
 ```
 
 **Client:**
 ```
 src/client/sidebar-entry.ts  (thin init — instantiates all panels, creates Router, calls router.start("tool-list"))
 └── src/client/router.ts         (Router class — push/pop navigation stack)
-└── src/client/services.ts       (GAS boundary — wraps google.script.run as Promises, header cache)
-└── src/client/types.ts          (PanelId, Panel<P,S>, NavigationContext, RecipeDefinition interfaces)
+└── src/client/services.ts       (GAS boundary — wraps google.script.run as Promises)
+└── src/client/types.ts          (PanelId, Panel<P,S>, NavigationContext, RecipeDefinition, RecipeParams,
+│                                 RecipeFieldConfig interfaces — client-only UI types)
+└── src/client/tools.ts          (TOOL_CATALOG: ToolCatalogEntry[] — display metadata for sidebar TagList;
+│                                 hardcoded at build time, no RPC needed)
 └── src/client/recipes.ts        (RECIPES registry — RecipeDefinition[] for all standard recipes)
 └── src/client/panels/
 │   ├── tool-list.ts             (ToolListPanel — entry screen, dispatches to tool or recipes)
-│   ├── configure-ai-run.ts      (ConfigureAIRunPanel — column mapping, row range, AI run)
+│   ├── configure-ai-run.ts      (ConfigureAIRunPanel — column mapping, row range, tool selection, AI run)
 │   ├── recipes-list.ts          (RecipesListPanel — browsable list of recipes)
 │   └── recipe.ts                (RecipePanel — generic panel driven by RecipeParams; prep → cook flow)
 └── src/client/components/       (reusable UI components)
-    ├── tag-list.ts              (TagList — multi-select tag chips)
+    ├── tag-list.ts              (TagList — multi-select tag chips; accepts string[] or {label,value}[] items)
     ├── single-tag-list.ts       (SingleTagList — exclusive-select tag chips)
     ├── row-range.ts             (RowRange — start/end row inputs)
     ├── lockable-field.ts        (LockableField — value + lock/unlock toggle; optional onUnlock callback)
@@ -122,6 +135,23 @@ src/client/google.d.ts       (compile-time type stub for google.script.run — u
 src/client/sidebar.css       (sidebar styles — inlined into dist/Sidebar.html at build time)
 src/Sidebar.html             (sidebar template — {{STYLES}} and {{SCRIPTS}} placeholders replaced at build time)
 ```
+
+### Tool System
+
+The Gemini tool system spans three layers. `ToolId` (a string union in `shared/types.ts`) is the RPC boundary — it's the only tool concept that crosses `google.script.run`.
+
+**To add a new tool, touch exactly three files:**
+1. **`src/shared/types.ts`** — add the string literal to `ToolId`
+2. **`src/server/tools.ts`** — add a `GeminiTool` entry to `TOOL_REGISTRY` (`Record<ToolId, GeminiTool>` enforces exhaustiveness at compile time)
+3. **`src/client/tools.ts`** — add a `ToolCatalogEntry` to `TOOL_CATALOG` for sidebar display
+
+**`GeminiTool` discriminated union** (in `server/types.ts`):
+- `{ kind: "grounding"; id: ToolId }` — produces `{ [id]: {} }` in the Gemini REST payload (e.g. `google_search`, `url_context`, `code_execution`)
+- `{ kind: "function"; declaration: GeminiFunctionDeclaration }` — produces `{ function_declarations: [...] }` in the payload
+
+`buildGeminiPayload` in `api.ts` resolves `ToolId[]` via `TOOL_REGISTRY`, splits by `kind`, and assembles both shapes into the `tools` array of the REST request.
+
+**Propagation path:** `ConfigureAIRunPanel` (UI TagList) → `RunConfig.tools` → `runBatchAI` → `runInference(tools?)` → `invokeGemini` → `callGeminiAPI` → `buildGeminiPayload`. For recipes: `RecipePanel` → `PrepRecipeParams.tools` → server echoes back as `PrepRecipeResult.tools` → assembled into `preppedRunConfig`.
 
 Source files use relative imports (e.g. `../shared/types`). The `@server/*` and `@shared/*` aliases are **Jest-only** (mapped in `jest.config.cjs`) and are not available in TypeScript source.
 
