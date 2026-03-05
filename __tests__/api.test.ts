@@ -19,9 +19,9 @@
 
 // ── Import after mocks ─────────────────────────────────────────
 
-import { buildGeminiPayload, callGeminiAPI, invokeGemini } from "../src/server/api";
+import { buildGeminiPayload, callGeminiAPI, invokeGemini, getCitations } from "../src/server/api";
 import { CONFIG } from "../src/server/config";
-import type { GeminiRequest } from "../src/server/types";
+import type { GeminiRequest, GeminiResponse } from "../src/server/types";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -272,5 +272,85 @@ describe("invokeGemini", () => {
     });
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.contents[0].parts[1].inline_data.mime_type).toBe("application/pdf");
+  });
+});
+
+// ── getCitations tests ─────────────────────────────────────────
+
+describe("getCitations", () => {
+  it("returns empty array when no groundingMetadata", () => {
+    expect(getCitations({ text: "hello" })).toEqual([]);
+  });
+
+  it("returns empty array when groundingSupports is absent", () => {
+    expect(
+      getCitations({
+        text: "hello",
+        groundingMetadata: {
+          groundingChunks: [{ web: { uri: "https://a.com", title: "A" } }],
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it("maps a single support entry to a citation with resolved sources", () => {
+    const response: GeminiResponse = {
+      text: "The sky is blue.",
+      groundingMetadata: {
+        groundingChunks: [
+          { web: { uri: "https://a.com", title: "Source A" } },
+          { web: { uri: "https://b.com", title: "Source B" } },
+        ],
+        groundingSupports: [
+          {
+            segment: { startIndex: 4, endIndex: 10, text: "sky is" },
+            groundingChunkIndices: [0, 1],
+          },
+        ],
+      },
+    };
+    const citations = getCitations(response);
+    expect(citations).toHaveLength(1);
+    expect(citations[0].startIndex).toBe(4);
+    expect(citations[0].endIndex).toBe(10);
+    expect(citations[0].sources).toEqual([
+      { uri: "https://a.com", title: "Source A" },
+      { uri: "https://b.com", title: "Source B" },
+    ]);
+  });
+
+  it("resolves retrievedContext chunks (url_context) the same way", () => {
+    const response: GeminiResponse = {
+      text: "Some claim.",
+      groundingMetadata: {
+        groundingChunks: [{ retrievedContext: { uri: "https://c.com", title: "Source C" } }],
+        groundingSupports: [
+          {
+            segment: { startIndex: 0, endIndex: 4, text: "Some" },
+            groundingChunkIndices: [0],
+          },
+        ],
+      },
+    };
+    expect(getCitations(response)[0].sources[0]).toEqual({
+      uri: "https://c.com",
+      title: "Source C",
+    });
+  });
+
+  it("skips chunk indices that point to chunks with neither web nor retrievedContext", () => {
+    const response: GeminiResponse = {
+      text: "text",
+      groundingMetadata: {
+        groundingChunks: [{}],
+        groundingSupports: [
+          {
+            segment: { startIndex: 0, endIndex: 4, text: "text" },
+            groundingChunkIndices: [0],
+          },
+        ],
+      },
+    };
+    expect(getCitations(response)[0].sources).toEqual([]);
   });
 });

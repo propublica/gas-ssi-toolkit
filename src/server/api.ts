@@ -9,11 +9,23 @@
 
 import { CONFIG } from "./config";
 import { TOOL_REGISTRY } from "./tools";
-import type { GeminiInlineData, GeminiRequest, GeminiResponse, GeminiCodePair } from "./types";
+import type {
+  GeminiInlineData,
+  GeminiRequest,
+  GeminiResponse,
+  GeminiCodePair,
+  GeminiGroundingSupport,
+} from "./types";
 
 interface GeminiPart {
   text?: string;
   inline_data?: GeminiInlineData;
+}
+
+export interface Citation {
+  startIndex: number;
+  endIndex: number;
+  sources: Array<{ uri: string; title: string }>;
 }
 
 /**
@@ -120,4 +132,23 @@ export function invokeGemini(params: Omit<GeminiRequest, "apiKey">): GeminiRespo
   const apiKey = PropertiesService.getScriptProperties().getProperty(CONFIG.API_KEY_PROPERTY);
   if (!apiKey) throw new Error(`${CONFIG.API_KEY_PROPERTY} script property not set`);
   return callGeminiAPI({ apiKey, ...params });
+}
+
+/**
+ * Resolve groundingSupports entries into Citation objects with sources
+ * joined from groundingChunks by index. Pure — no GAS globals.
+ */
+export function getCitations(response: GeminiResponse): Citation[] {
+  const supports = response.groundingMetadata?.groundingSupports ?? [];
+  const chunks = response.groundingMetadata?.groundingChunks ?? [];
+  return supports.map((s: GeminiGroundingSupport) => ({
+    startIndex: s.segment.startIndex,
+    endIndex: s.segment.endIndex,
+    sources: s.groundingChunkIndices
+      .map((i) => {
+        const chunk = chunks[i];
+        return chunk?.web ?? chunk?.retrievedContext ?? null;
+      })
+      .filter((src): src is { uri: string; title: string } => src !== null),
+  }));
 }
