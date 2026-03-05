@@ -150,6 +150,9 @@ function getAllSources(response: GeminiResponse): Array<{ uri: string; title: st
 export function buildInferenceCellContent(response: GeminiResponse): CellContent {
   const { cleanText, ranges: mdRanges, mapIndex } = parseMarkdown(response.text);
 
+  // Sort citations and merge overlapping ranges (Gemini can return overlapping supports).
+  // When ranges overlap we keep the first source URI — the first support is generally
+  // the highest-confidence citation for the merged span.
   const citations = getCitations(response).sort((a, b) => a.startIndex - b.startIndex);
   const merged: Array<{ startIndex: number; endIndex: number; url: string }> = [];
   for (const { startIndex, endIndex, sources } of citations) {
@@ -232,11 +235,13 @@ export function buildGroundingCellContent(response: GeminiResponse): CellContent
         : -1;
 
     if (sourceSectionStart >= 0) {
+      let searchFrom = sourceSectionStart;
       sources.forEach(({ uri, title }) => {
         const bullet = `\u2022 ${title}`;
-        const idx = fullText.indexOf(bullet, sourceSectionStart);
+        const idx = fullText.indexOf(bullet, searchFrom);
         if (idx !== -1 && idx < sourceSectionEnd) {
           ranges.push({ startIndex: idx + 2, endIndex: idx + 2 + title.length, url: uri });
+          searchFrom = idx + bullet.length; // advance past this occurrence
         }
       });
     }

@@ -208,9 +208,18 @@ describe("buildGroundingCellContent", () => {
     const result = buildGroundingCellContent(response)!;
     const links = result.ranges.filter((r) => r.url);
     expect(links).toHaveLength(2);
-    expect(links.map((r) => r.url)).toEqual(
-      expect.arrayContaining(["https://a.com", "https://b.com"]),
-    );
+
+    const linkA = links.find((r) => r.url === "https://a.com");
+    const linkB = links.find((r) => r.url === "https://b.com");
+    expect(linkA).toBeDefined();
+    expect(linkB).toBeDefined();
+
+    const idxA = result.text.indexOf("Site A");
+    const idxB = result.text.indexOf("Site B");
+    expect(linkA?.startIndex).toBe(idxA);
+    expect(linkA?.endIndex).toBe(idxA + "Site A".length);
+    expect(linkB?.startIndex).toBe(idxB);
+    expect(linkB?.endIndex).toBe(idxB + "Site B".length);
   });
 
   it("handles multiple search queries with individual url ranges", () => {
