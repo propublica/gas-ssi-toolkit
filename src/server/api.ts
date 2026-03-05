@@ -165,14 +165,26 @@ export function getUngroundedSpans(response: GeminiResponse): Span[] {
   let cursor = 0;
   for (const { start, end } of merged) {
     if (cursor < start) {
-      const gapText = response.text.slice(cursor, start).trim();
-      if (gapText) gaps.push({ startIndex: cursor, endIndex: start, text: gapText });
+      const rawSlice = response.text.slice(cursor, start);
+      const gapText = rawSlice.trim();
+      if (gapText) {
+        const trimmedStart = cursor + rawSlice.indexOf(gapText);
+        gaps.push({
+          startIndex: trimmedStart,
+          endIndex: trimmedStart + gapText.length,
+          text: gapText,
+        });
+      }
     }
     cursor = end;
   }
   if (cursor < response.text.length) {
-    const tail = response.text.slice(cursor).trim();
-    if (tail) gaps.push({ startIndex: cursor, endIndex: response.text.length, text: tail });
+    const rawTail = response.text.slice(cursor);
+    const tail = rawTail.trim();
+    if (tail) {
+      const trimmedStart = cursor + rawTail.indexOf(tail);
+      gaps.push({ startIndex: trimmedStart, endIndex: trimmedStart + tail.length, text: tail });
+    }
   }
   return gaps;
 }

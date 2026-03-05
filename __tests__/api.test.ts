@@ -399,7 +399,7 @@ describe("getUngroundedSpans", () => {
     expect(spans).toHaveLength(1);
     expect(spans[0].text).toBe("Preamble.");
     expect(spans[0].startIndex).toBe(0);
-    expect(spans[0].endIndex).toBe(10);
+    expect(spans[0].endIndex).toBe(9);
   });
 
   it("finds a gap after the last support", () => {
@@ -416,6 +416,8 @@ describe("getUngroundedSpans", () => {
     });
     expect(spans).toHaveLength(1);
     expect(spans[0].text).toBe("Trailing remark.");
+    expect(spans[0].startIndex).toBe(13);
+    expect(spans[0].endIndex).toBe(29);
   });
 
   it("finds a gap between two non-overlapping supports", () => {
@@ -474,5 +476,36 @@ describe("getUngroundedSpans", () => {
       },
     });
     expect(spans).toEqual([]); // gap is whitespace only
+  });
+
+  it("treats adjacent (touching) supports as a single covered region with no gap", () => {
+    const spans = getUngroundedSpans({
+      text: "FirstSecond",
+      groundingMetadata: {
+        groundingSupports: [
+          { segment: { startIndex: 0, endIndex: 5, text: "First" }, groundingChunkIndices: [0] },
+          { segment: { startIndex: 5, endIndex: 11, text: "Second" }, groundingChunkIndices: [1] },
+        ],
+      },
+    });
+    expect(spans).toEqual([]); // no gap between adjacent supports
+  });
+
+  it("handles supports provided in reverse order (validates sort)", () => {
+    const spans = getUngroundedSpans({
+      text: "First. Gap text. Second.",
+      groundingMetadata: {
+        groundingSupports: [
+          // Intentionally reversed order
+          {
+            segment: { startIndex: 17, endIndex: 24, text: "Second." },
+            groundingChunkIndices: [1],
+          },
+          { segment: { startIndex: 0, endIndex: 6, text: "First." }, groundingChunkIndices: [0] },
+        ],
+      },
+    });
+    expect(spans).toHaveLength(1);
+    expect(spans[0].text).toBe("Gap text.");
   });
 });
