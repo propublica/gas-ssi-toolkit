@@ -317,7 +317,7 @@ export function runBatchAI(config: RunConfig): void {
     const result = runInference(userPrompts, driveLinks, systemPrompt, config.tools);
     if (result === null) continue;
 
-    sheet.getRange(realRowIndex, outputIdx + 1).setValue(result);
+    sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
     processed++;
     SpreadsheetApp.flush();
   }

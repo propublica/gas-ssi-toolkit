@@ -49,7 +49,7 @@ describe("runInference", () => {
 
   it("returns the model response string for a scalar user prompt", () => {
     mockOkResponse("AI response");
-    expect(runInference("Hello AI")).toBe("AI response");
+    expect(runInference("Hello AI")?.text).toBe("AI response");
   });
 
   it("returns null when userPrompts flattens to empty", () => {
@@ -106,14 +106,14 @@ describe("runInference", () => {
 
   it("returns an error string when invokeGemini throws", () => {
     mockFetchResponse({ error: { message: "quota exceeded" } });
-    expect(runInference("prompt")).toBe("Error: quota exceeded");
+    expect(runInference("prompt")?.text).toBe("Error: quota exceeded");
   });
 
   it("returns an error string when Drive fetch throws", () => {
     (DriveApp.getFileById as jest.Mock).mockImplementationOnce(() => {
       throw new Error("File not found");
     });
-    expect(runInference("prompt", "https://drive.google.com/file/d/abc123/view")).toBe(
+    expect(runInference("prompt", "https://drive.google.com/file/d/abc123/view")?.text).toBe(
       "Error: File not found",
     );
   });
