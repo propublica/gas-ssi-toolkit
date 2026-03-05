@@ -9,7 +9,7 @@
 
 import { CONFIG } from "./config";
 import { TOOL_REGISTRY } from "./tools";
-import type { GeminiInlineData, GeminiRequest } from "./types";
+import type { GeminiInlineData, GeminiRequest, GeminiResponse, GeminiCodePair } from "./types";
 
 interface GeminiPart {
   text?: string;
@@ -58,9 +58,9 @@ export function buildGeminiPayload(req: GeminiRequest): Record<string, unknown> 
 }
 
 /**
- * Call the Gemini generateContent endpoint and return the response text.
+ * Call the Gemini generateContent endpoint and return the response as GeminiResponse.
  */
-export function callGeminiAPI(req: GeminiRequest): string {
+export function callGeminiAPI(req: GeminiRequest): GeminiResponse {
   const modelName = req.modelName ?? CONFIG.MODEL_NAME;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${req.apiKey}`;
 
@@ -75,10 +75,40 @@ export function callGeminiAPI(req: GeminiRequest): string {
   const json = JSON.parse(response.getContentText()) as Record<string, unknown>;
 
   if (json.error) throw new Error((json.error as { message: string }).message);
-  const candidates = json.candidates as
-    | Array<{ content: { parts: Array<{ text: string }> } }>
+
+  const candidate = (json.candidates as Array<Record<string, unknown>> | undefined)?.[0];
+  const parts =
+    (candidate?.content as { parts?: Array<Record<string, unknown>> } | undefined)?.parts ?? [];
+
+  // Assemble text from all text parts (may be interspersed with code execution parts)
+  const textParts = parts
+    .filter((p): p is { text: string } => typeof p["text"] === "string")
+    .map((p) => p.text);
+  const text = textParts.join("\n\n") || "No response.";
+
+  // Extract consecutive executable_code + code_execution_result pairs (snake_case REST JSON)
+  const codePairs: GeminiCodePair[] = [];
+  for (let i = 0; i < parts.length - 1; i++) {
+    const curr = parts[i];
+    const next = parts[i + 1];
+    if (curr["executable_code"] !== undefined && next["code_execution_result"] !== undefined) {
+      codePairs.push({
+        code: curr["executable_code"] as GeminiCodePair["code"],
+        result: next["code_execution_result"] as GeminiCodePair["result"],
+      });
+      i++; // skip the result part — already consumed
+    }
+  }
+
+  const groundingMetadata = candidate?.["groundingMetadata"] as
+    | GeminiResponse["groundingMetadata"]
     | undefined;
-  return candidates?.[0]?.content?.parts?.[0]?.text ?? "No response.";
+
+  return {
+    text,
+    ...(groundingMetadata !== undefined && { groundingMetadata }),
+    ...(codePairs.length > 0 && { codePairs }),
+  };
 }
 
 /**
@@ -86,7 +116,7 @@ export function callGeminiAPI(req: GeminiRequest): string {
  * This is the preferred entry point for all production Gemini calls.
  * Throws if the API key property is not set.
  */
-export function invokeGemini(params: Omit<GeminiRequest, "apiKey">): string {
+export function invokeGemini(params: Omit<GeminiRequest, "apiKey">): GeminiResponse {
   const apiKey = PropertiesService.getScriptProperties().getProperty(CONFIG.API_KEY_PROPERTY);
   if (!apiKey) throw new Error(`${CONFIG.API_KEY_PROPERTY} script property not set`);
   return callGeminiAPI({ apiKey, ...params });

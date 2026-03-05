@@ -47,7 +47,7 @@ export function runInference(
       userTexts,
       inlineData: inlineData.length ? inlineData : undefined,
       tools: tools?.length ? tools : undefined,
-    });
+    }).text;
   } catch (e) {
     return "Error: " + (e as Error).message;
   }
