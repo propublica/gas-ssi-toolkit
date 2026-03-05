@@ -6,8 +6,8 @@ import { RowRange } from "../components/row-range";
 import { getSheetHeaders, runBatchAI } from "../services";
 import { TOOL_CATALOG } from "../tools";
 
-export type SavedState = Required<Omit<RunConfig, "rowRange" | "tools">> &
-  Pick<RunConfig, "rowRange" | "tools">;
+export type SavedState = Required<Omit<RunConfig, "rowRange" | "tools" | "includeGrounding">> &
+  Pick<RunConfig, "rowRange" | "tools" | "includeGrounding">;
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
   private userPromptList: TagList | null = null;

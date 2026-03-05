@@ -38,9 +38,20 @@ export interface GeminiGroundingChunk {
   retrievedContext?: { uri: string; title: string };
 }
 
+export interface GeminiGroundingSupport {
+  segment: {
+    startIndex: number;
+    endIndex: number;
+    text: string;
+  };
+  groundingChunkIndices: number[];
+  confidenceScores?: number[];
+}
+
 export interface GeminiGroundingMetadata {
   webSearchQueries?: string[];
   groundingChunks?: GeminiGroundingChunk[];
+  groundingSupports?: GeminiGroundingSupport[];
 }
 
 export interface GeminiCodePair {
