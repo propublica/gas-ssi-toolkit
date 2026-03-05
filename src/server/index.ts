@@ -10,8 +10,11 @@
 
 export { SSI } from "./customFunctions";
 import { runInference } from "./inference";
-import { getCitations, getAllSources } from "./rich-text";
-import type { GeminiResponse } from "./types";
+import {
+  buildInferenceCellContent,
+  buildGroundingCellContent,
+  type CellContent,
+} from "./rich-text";
 import { checkDriveService, extractTextUniversal } from "./drive";
 import {
   extractId,
@@ -227,85 +230,17 @@ export function sampleRowsToEvaluation(): void {
 // 🧠 TOOL 4: AI BATCH PROCESSOR
 // ==========================================
 
-function renderInference(response: GeminiResponse): GoogleAppsScript.Spreadsheet.RichTextValue {
-  // NOTE: citation offsets from groundingSupports index the raw Gemini candidate text.
-  // google_search and code_execution are distinct tools and are not combined in practice,
-  // so the joined text in response.text should align with the support offsets.
-  const builder = SpreadsheetApp.newRichTextValue().setText(response.text);
-
-  // Sort citations and merge overlapping ranges (Gemini can return overlapping supports).
-  // Overlapping setLinkUrl calls throw in Apps Script — merge before applying.
-  const citations = getCitations(response).sort((a, b) => a.startIndex - b.startIndex);
-  const merged: Array<{ startIndex: number; endIndex: number; uri: string }> = [];
-  for (const { startIndex, endIndex, sources } of citations) {
-    if (!sources[0]) continue;
-    const last = merged[merged.length - 1];
-    if (last && startIndex < last.endIndex) {
-      last.endIndex = Math.max(last.endIndex, endIndex);
-    } else {
-      merged.push({ startIndex, endIndex, uri: sources[0].uri });
+function toCellValue(content: CellContent): GoogleAppsScript.Spreadsheet.RichTextValue {
+  const builder = SpreadsheetApp.newRichTextValue().setText(content.text);
+  content.ranges.forEach(({ startIndex, endIndex, bold, italic, url }) => {
+    if (bold === true || italic === true) {
+      const style = SpreadsheetApp.newTextStyle();
+      if (bold === true) style.setBold(true);
+      if (italic === true) style.setItalic(true);
+      builder.setTextStyle(startIndex, endIndex, style.build());
     }
-  }
-  merged.forEach(({ startIndex, endIndex, uri }) => {
-    builder.setLinkUrl(startIndex, endIndex, uri);
+    if (url) builder.setLinkUrl(startIndex, endIndex, url);
   });
-
-  return builder.build();
-}
-
-function renderGrounding(
-  response: GeminiResponse,
-): GoogleAppsScript.Spreadsheet.RichTextValue | null {
-  const sources = getAllSources(response);
-  const queries = response.groundingMetadata?.webSearchQueries ?? [];
-  const codePairs = response.codePairs ?? [];
-
-  if (!sources.length && !queries.length && !codePairs.length) {
-    return null;
-  }
-
-  const sections: string[] = [];
-
-  if (codePairs.length > 0) {
-    codePairs.forEach(({ code, result }) => {
-      sections.push(
-        `Code:\n\`\`\`${code.language.toLowerCase()}\n${code.code}\n\`\`\`\n\nOutput:\n${result.output}`,
-      );
-    });
-  } else {
-    if (queries.length) {
-      sections.push(`Search queries: ${queries.map((q) => `"${q}"`).join(", ")}`);
-    }
-    if (sources.length) {
-      sections.push(
-        `Sources (${sources.length}):\n${sources.map((s) => `• ${s.title}`).join("\n")}`,
-      );
-    }
-  }
-
-  const fullText = sections.join("\n\n");
-  const builder = SpreadsheetApp.newRichTextValue().setText(fullText);
-
-  // Hyperlink source titles within the Sources section only.
-  const sourcesHeader = sources.length > 0 ? `Sources (${sources.length}):` : null;
-  const sourceSectionStart = sourcesHeader ? fullText.indexOf(sourcesHeader) : -1;
-  const sourceSectionEnd =
-    sourceSectionStart >= 0
-      ? fullText.indexOf("\n\n", sourceSectionStart + sourcesHeader!.length) !== -1
-        ? fullText.indexOf("\n\n", sourceSectionStart + sourcesHeader!.length)
-        : fullText.length
-      : -1;
-
-  if (sourceSectionStart >= 0) {
-    sources.forEach(({ uri, title }) => {
-      const bullet = `• ${title}`;
-      const idx = fullText.indexOf(bullet, sourceSectionStart);
-      if (idx !== -1 && idx < sourceSectionEnd) {
-        builder.setLinkUrl(idx + 2, idx + 2 + title.length, uri);
-      }
-    });
-  }
-
   return builder.build();
 }
 
@@ -416,12 +351,16 @@ export function runBatchAI(config: RunConfig): void {
     if (result === null) continue;
 
     try {
-      sheet.getRange(realRowIndex, outputIdx + 1).setRichTextValue(renderInference(result));
+      sheet
+        .getRange(realRowIndex, outputIdx + 1)
+        .setRichTextValue(toCellValue(buildInferenceCellContent(result)));
 
       if (config.includeGrounding && groundingIdx >= 0) {
-        const groundingValue = renderGrounding(result);
-        if (groundingValue !== null) {
-          sheet.getRange(realRowIndex, groundingIdx + 1).setRichTextValue(groundingValue);
+        const groundingContent = buildGroundingCellContent(result);
+        if (groundingContent !== null) {
+          sheet
+            .getRange(realRowIndex, groundingIdx + 1)
+            .setRichTextValue(toCellValue(groundingContent));
         }
       }
     } catch (_e) {
