@@ -10,6 +10,8 @@
 
 export { SSI } from "./customFunctions";
 import { runInference } from "./inference";
+import { getCitations, getUngroundedSpans, getAllSources } from "./api";
+import type { GeminiResponse } from "./types";
 import { checkDriveService, extractTextUniversal } from "./drive";
 import {
   extractId,
@@ -225,6 +227,66 @@ export function sampleRowsToEvaluation(): void {
 // 🧠 TOOL 4: AI BATCH PROCESSOR
 // ==========================================
 
+function renderInference(response: GeminiResponse): GoogleAppsScript.Spreadsheet.RichTextValue {
+  const builder = SpreadsheetApp.newRichTextValue().setText(response.text);
+  getCitations(response).forEach(({ startIndex, endIndex, sources }) => {
+    if (sources[0]) builder.setLinkUrl(startIndex, endIndex, sources[0].uri);
+  });
+  return builder.build();
+}
+
+function renderGrounding(
+  response: GeminiResponse,
+): GoogleAppsScript.Spreadsheet.RichTextValue | null {
+  const sources = getAllSources(response);
+  const queries = response.groundingMetadata?.webSearchQueries ?? [];
+  const unverified = getUngroundedSpans(response);
+  const codePairs = response.codePairs ?? [];
+
+  if (!sources.length && !queries.length && !unverified.length && !codePairs.length) {
+    return null;
+  }
+
+  const sections: string[] = [];
+
+  if (codePairs.length > 0) {
+    codePairs.forEach(({ code, result }) => {
+      sections.push(
+        `Code:\n\`\`\`${code.language.toLowerCase()}\n${code.code}\n\`\`\`\n\nOutput:\n${result.output}`,
+      );
+    });
+  } else {
+    if (queries.length) {
+      sections.push(`Search queries: ${queries.map((q) => `"${q}"`).join(", ")}`);
+    }
+    if (sources.length) {
+      sections.push(
+        `Sources (${sources.length}):\n${sources.map((s) => `• ${s.title}`).join("\n")}`,
+      );
+    }
+    if (unverified.length) {
+      sections.push(`Unverified:\n${unverified.map((s) => `• "${s.text}"`).join("\n")}`);
+    }
+  }
+
+  const fullText = sections.join("\n\n");
+  const builder = SpreadsheetApp.newRichTextValue().setText(fullText);
+
+  // Hyperlink each source title in the Sources section
+  sources.forEach(({ uri, title }) => {
+    const bullet = `• ${title}`;
+    let searchFrom = 0;
+    let idx = fullText.indexOf(bullet, searchFrom);
+    while (idx !== -1) {
+      builder.setLinkUrl(idx + 2, idx + 2 + title.length, uri); // +2 skips "• "
+      searchFrom = idx + bullet.length;
+      idx = fullText.indexOf(bullet, searchFrom);
+    }
+  });
+
+  return builder.build();
+}
+
 export function runBatchAI(config: RunConfig): void {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getActiveSheet();
@@ -286,6 +348,19 @@ export function runBatchAI(config: RunConfig): void {
     outputIdx = newColIdx - 1;
   }
 
+  // Resolve grounding column — create if not found (only when opted in)
+  let groundingIdx = -1;
+  const groundingColName = config.outputCol + "_grounding";
+  if (config.includeGrounding) {
+    groundingIdx = headers.indexOf(groundingColName);
+    if (groundingIdx === -1) {
+      const newColIdx = sheet.getLastColumn() + 1;
+      sheet.getRange(1, newColIdx).setValue(groundingColName);
+      groundingIdx = newColIdx - 1;
+      headers.push(groundingColName); // keep in sync for subsequent rows
+    }
+  }
+
   // Determine row range
   let startRow: number;
   let numRows: number;
@@ -317,7 +392,15 @@ export function runBatchAI(config: RunConfig): void {
     const result = runInference(userPrompts, driveLinks, systemPrompt, config.tools);
     if (result === null) continue;
 
-    sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
+    sheet.getRange(realRowIndex, outputIdx + 1).setRichTextValue(renderInference(result));
+
+    if (config.includeGrounding && groundingIdx >= 0) {
+      const groundingValue = renderGrounding(result);
+      if (groundingValue !== null) {
+        sheet.getRange(realRowIndex, groundingIdx + 1).setRichTextValue(groundingValue);
+      }
+    }
+
     processed++;
     SpreadsheetApp.flush();
   }
