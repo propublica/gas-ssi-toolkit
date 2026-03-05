@@ -19,7 +19,13 @@
 
 // ── Import after mocks ─────────────────────────────────────────
 
-import { buildGeminiPayload, callGeminiAPI, invokeGemini, getCitations } from "../src/server/api";
+import {
+  buildGeminiPayload,
+  callGeminiAPI,
+  invokeGemini,
+  getCitations,
+  getUngroundedSpans,
+} from "../src/server/api";
 import { CONFIG } from "../src/server/config";
 import type { GeminiRequest, GeminiResponse } from "../src/server/types";
 
@@ -352,5 +358,121 @@ describe("getCitations", () => {
       },
     };
     expect(getCitations(response)[0].sources).toEqual([]);
+  });
+});
+
+describe("getUngroundedSpans", () => {
+  it("returns empty array when no groundingMetadata", () => {
+    expect(getUngroundedSpans({ text: "hello" })).toEqual([]);
+  });
+
+  it("returns empty array when groundingSupports is absent", () => {
+    expect(
+      getUngroundedSpans({
+        text: "hello",
+        groundingMetadata: { groundingChunks: [] },
+      }),
+    ).toEqual([]);
+  });
+
+  it("returns empty array when groundingSupports is empty array", () => {
+    expect(
+      getUngroundedSpans({
+        text: "Nothing is grounded.",
+        groundingMetadata: { groundingSupports: [] },
+      }),
+    ).toEqual([]);
+  });
+
+  it("finds a gap before the first support", () => {
+    const spans = getUngroundedSpans({
+      text: "Preamble. Cited claim.",
+      groundingMetadata: {
+        groundingSupports: [
+          {
+            segment: { startIndex: 10, endIndex: 22, text: "Cited claim." },
+            groundingChunkIndices: [0],
+          },
+        ],
+      },
+    });
+    expect(spans).toHaveLength(1);
+    expect(spans[0].text).toBe("Preamble.");
+    expect(spans[0].startIndex).toBe(0);
+    expect(spans[0].endIndex).toBe(10);
+  });
+
+  it("finds a gap after the last support", () => {
+    const spans = getUngroundedSpans({
+      text: "Cited claim. Trailing remark.",
+      groundingMetadata: {
+        groundingSupports: [
+          {
+            segment: { startIndex: 0, endIndex: 12, text: "Cited claim." },
+            groundingChunkIndices: [0],
+          },
+        ],
+      },
+    });
+    expect(spans).toHaveLength(1);
+    expect(spans[0].text).toBe("Trailing remark.");
+  });
+
+  it("finds a gap between two non-overlapping supports", () => {
+    const spans = getUngroundedSpans({
+      text: "First. Gap text. Second.",
+      groundingMetadata: {
+        groundingSupports: [
+          {
+            segment: { startIndex: 0, endIndex: 6, text: "First." },
+            groundingChunkIndices: [0],
+          },
+          {
+            segment: { startIndex: 17, endIndex: 24, text: "Second." },
+            groundingChunkIndices: [1],
+          },
+        ],
+      },
+    });
+    expect(spans).toHaveLength(1);
+    expect(spans[0].text).toBe("Gap text.");
+  });
+
+  it("merges overlapping supports before finding gaps", () => {
+    const spans = getUngroundedSpans({
+      text: "AAAABBBBCCCC",
+      groundingMetadata: {
+        groundingSupports: [
+          {
+            segment: { startIndex: 0, endIndex: 8, text: "AAAABBBB" },
+            groundingChunkIndices: [0],
+          },
+          {
+            segment: { startIndex: 4, endIndex: 12, text: "BBBBCCCC" },
+            groundingChunkIndices: [1],
+          },
+        ],
+      },
+    });
+    expect(spans).toEqual([]); // fully covered after merge
+  });
+
+  it("skips whitespace-only gaps", () => {
+    const spans = getUngroundedSpans({
+      text: "First.   Second.",
+      groundingMetadata: {
+        groundingSupports: [
+          {
+            segment: { startIndex: 0, endIndex: 6, text: "First." },
+            groundingChunkIndices: [0],
+          },
+          {
+            segment: { startIndex: 9, endIndex: 16, text: "Second." },
+            groundingChunkIndices: [1],
+          },
+        ],
+      },
+    });
+    expect(spans).toEqual([]); // gap is whitespace only
   });
 });
