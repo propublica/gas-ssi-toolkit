@@ -157,31 +157,35 @@ describe("callGeminiAPI", () => {
 
   it("assembles text from multiple text parts (code execution interleaving)", () => {
     mockFetchResponse({
-      candidates: [{
-        content: {
-          parts: [
-            { text: "Let me check." },
-            { executable_code: { language: "PYTHON", code: "1+1" } },
-            { code_execution_result: { outcome: "OUTCOME_OK", output: "2\n" } },
-            { text: "The answer is 2." },
-          ],
+      candidates: [
+        {
+          content: {
+            parts: [
+              { text: "Let me check." },
+              { executable_code: { language: "PYTHON", code: "1+1" } },
+              { code_execution_result: { outcome: "OUTCOME_OK", output: "2\n" } },
+              { text: "The answer is 2." },
+            ],
+          },
         },
-      }],
+      ],
     });
     expect(callGeminiAPI(baseReq).text).toBe("Let me check.\n\nThe answer is 2.");
   });
 
   it("populates codePairs when executable_code and code_execution_result parts are present", () => {
     mockFetchResponse({
-      candidates: [{
-        content: {
-          parts: [
-            { text: "Sure." },
-            { executable_code: { language: "PYTHON", code: "print(42)" } },
-            { code_execution_result: { outcome: "OUTCOME_OK", output: "42\n" } },
-          ],
+      candidates: [
+        {
+          content: {
+            parts: [
+              { text: "Sure." },
+              { executable_code: { language: "PYTHON", code: "print(42)" } },
+              { code_execution_result: { outcome: "OUTCOME_OK", output: "42\n" } },
+            ],
+          },
         },
-      }],
+      ],
     });
     const resp = callGeminiAPI(baseReq);
     expect(resp.codePairs).toHaveLength(1);
@@ -191,13 +195,15 @@ describe("callGeminiAPI", () => {
 
   it("populates groundingMetadata for google_search results", () => {
     mockFetchResponse({
-      candidates: [{
-        content: { parts: [{ text: "Found it." }] },
-        groundingMetadata: {
-          webSearchQueries: ["test query"],
-          groundingChunks: [{ web: { uri: "https://example.com", title: "Example" } }],
+      candidates: [
+        {
+          content: { parts: [{ text: "Found it." }] },
+          groundingMetadata: {
+            webSearchQueries: ["test query"],
+            groundingChunks: [{ web: { uri: "https://example.com", title: "Example" } }],
+          },
         },
-      }],
+      ],
     });
     const resp = callGeminiAPI(baseReq);
     expect(resp.groundingMetadata?.webSearchQueries).toEqual(["test query"]);
@@ -206,15 +212,21 @@ describe("callGeminiAPI", () => {
 
   it("populates groundingMetadata for url_context results", () => {
     mockFetchResponse({
-      candidates: [{
-        content: { parts: [{ text: "From the URL." }] },
-        groundingMetadata: {
-          groundingChunks: [{ retrievedContext: { uri: "https://example.com", title: "Example" } }],
+      candidates: [
+        {
+          content: { parts: [{ text: "From the URL." }] },
+          groundingMetadata: {
+            groundingChunks: [
+              { retrievedContext: { uri: "https://example.com", title: "Example" } },
+            ],
+          },
         },
-      }],
+      ],
     });
     const resp = callGeminiAPI(baseReq);
-    expect(resp.groundingMetadata?.groundingChunks![0].retrievedContext?.uri).toBe("https://example.com");
+    expect(resp.groundingMetadata?.groundingChunks![0].retrievedContext?.uri).toBe(
+      "https://example.com",
+    );
   });
 
   it("returns undefined groundingMetadata and codePairs when not present", () => {
@@ -232,10 +244,10 @@ describe("callGeminiAPI", () => {
 describe("invokeGemini", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("calls callGeminiAPI with the resolved API key", () => {
+  it("returns a GeminiResponse with text from the first candidate", () => {
     mockFetchResponse({ candidates: [{ content: { parts: [{ text: "result" }] } }] });
     const result = invokeGemini({ userTexts: ["hello"] });
-    expect(result).toBe("result");
+    expect(result.text).toBe("result");
     const url = (UrlFetchApp.fetch as jest.Mock).mock.calls[0][0] as string;
     expect(url).toContain("test-api-key");
   });
