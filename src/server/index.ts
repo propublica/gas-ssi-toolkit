@@ -10,7 +10,7 @@
 
 export { SSI } from "./customFunctions";
 import { runInference } from "./inference";
-import { getCitations, getUngroundedSpans, getAllSources } from "./api";
+import { getCitations, getAllSources } from "./api";
 import type { GeminiResponse } from "./types";
 import { checkDriveService, extractTextUniversal } from "./drive";
 import {
@@ -258,10 +258,9 @@ function renderGrounding(
 ): GoogleAppsScript.Spreadsheet.RichTextValue | null {
   const sources = getAllSources(response);
   const queries = response.groundingMetadata?.webSearchQueries ?? [];
-  const unverified = getUngroundedSpans(response);
   const codePairs = response.codePairs ?? [];
 
-  if (!sources.length && !queries.length && !unverified.length && !codePairs.length) {
+  if (!sources.length && !queries.length && !codePairs.length) {
     return null;
   }
 
@@ -281,9 +280,6 @@ function renderGrounding(
       sections.push(
         `Sources (${sources.length}):\n${sources.map((s) => `• ${s.title}`).join("\n")}`,
       );
-    }
-    if (unverified.length) {
-      sections.push(`Unverified:\n${unverified.map((s) => `• "${s.text}"`).join("\n")}`);
     }
   }
 

@@ -28,12 +28,6 @@ export interface Citation {
   sources: Array<{ uri: string; title: string }>;
 }
 
-export interface Span {
-  startIndex: number;
-  endIndex: number;
-  text: string;
-}
-
 /**
  * Assemble the Gemini generateContent request payload from a GeminiRequest.
  * Pure function — no GAS globals. Independently testable.
@@ -138,55 +132,6 @@ export function invokeGemini(params: Omit<GeminiRequest, "apiKey">): GeminiRespo
   const apiKey = PropertiesService.getScriptProperties().getProperty(CONFIG.API_KEY_PROPERTY);
   if (!apiKey) throw new Error(`${CONFIG.API_KEY_PROPERTY} script property not set`);
   return callGeminiAPI({ apiKey, ...params });
-}
-
-/**
- * Find regions of response.text NOT covered by any groundingSupports segment.
- * These are claims the model made without citation evidence. Pure — no GAS globals.
- */
-export function getUngroundedSpans(response: GeminiResponse): Span[] {
-  const supports = response.groundingMetadata?.groundingSupports;
-  if (!supports || supports.length === 0) return [];
-
-  // Sort by startIndex, then merge overlapping/adjacent intervals
-  const sorted = [...supports].sort((a, b) => a.segment.startIndex - b.segment.startIndex);
-  const merged: Array<{ start: number; end: number }> = [];
-  for (const s of sorted) {
-    const last = merged[merged.length - 1];
-    if (last && s.segment.startIndex <= last.end) {
-      last.end = Math.max(last.end, s.segment.endIndex);
-    } else {
-      merged.push({ start: s.segment.startIndex, end: s.segment.endIndex });
-    }
-  }
-
-  // Find gaps between merged covered intervals
-  const gaps: Span[] = [];
-  let cursor = 0;
-  for (const { start, end } of merged) {
-    if (cursor < start) {
-      const rawSlice = response.text.slice(cursor, start);
-      const gapText = rawSlice.trim();
-      if (gapText) {
-        const trimmedStart = cursor + rawSlice.indexOf(gapText);
-        gaps.push({
-          startIndex: trimmedStart,
-          endIndex: trimmedStart + gapText.length,
-          text: gapText,
-        });
-      }
-    }
-    cursor = end;
-  }
-  if (cursor < response.text.length) {
-    const rawTail = response.text.slice(cursor);
-    const tail = rawTail.trim();
-    if (tail) {
-      const trimmedStart = cursor + rawTail.indexOf(tail);
-      gaps.push({ startIndex: trimmedStart, endIndex: trimmedStart + tail.length, text: tail });
-    }
-  }
-  return gaps;
 }
 
 /**
