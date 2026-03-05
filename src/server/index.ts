@@ -228,10 +228,28 @@ export function sampleRowsToEvaluation(): void {
 // ==========================================
 
 function renderInference(response: GeminiResponse): GoogleAppsScript.Spreadsheet.RichTextValue {
+  // NOTE: citation offsets from groundingSupports index the raw Gemini candidate text.
+  // google_search and code_execution are distinct tools and are not combined in practice,
+  // so the joined text in response.text should align with the support offsets.
   const builder = SpreadsheetApp.newRichTextValue().setText(response.text);
-  getCitations(response).forEach(({ startIndex, endIndex, sources }) => {
-    if (sources[0]) builder.setLinkUrl(startIndex, endIndex, sources[0].uri);
+
+  // Sort citations and merge overlapping ranges (Gemini can return overlapping supports).
+  // Overlapping setLinkUrl calls throw in Apps Script — merge before applying.
+  const citations = getCitations(response).sort((a, b) => a.startIndex - b.startIndex);
+  const merged: Array<{ startIndex: number; endIndex: number; uri: string }> = [];
+  for (const { startIndex, endIndex, sources } of citations) {
+    if (!sources[0]) continue;
+    const last = merged[merged.length - 1];
+    if (last && startIndex < last.endIndex) {
+      last.endIndex = Math.max(last.endIndex, endIndex);
+    } else {
+      merged.push({ startIndex, endIndex, uri: sources[0].uri });
+    }
+  }
+  merged.forEach(({ startIndex, endIndex, uri }) => {
+    builder.setLinkUrl(startIndex, endIndex, uri);
   });
+
   return builder.build();
 }
 
@@ -272,17 +290,25 @@ function renderGrounding(
   const fullText = sections.join("\n\n");
   const builder = SpreadsheetApp.newRichTextValue().setText(fullText);
 
-  // Hyperlink each source title in the Sources section
-  sources.forEach(({ uri, title }) => {
-    const bullet = `• ${title}`;
-    let searchFrom = 0;
-    let idx = fullText.indexOf(bullet, searchFrom);
-    while (idx !== -1) {
-      builder.setLinkUrl(idx + 2, idx + 2 + title.length, uri); // +2 skips "• "
-      searchFrom = idx + bullet.length;
-      idx = fullText.indexOf(bullet, searchFrom);
-    }
-  });
+  // Hyperlink source titles within the Sources section only.
+  const sourcesHeader = sources.length > 0 ? `Sources (${sources.length}):` : null;
+  const sourceSectionStart = sourcesHeader ? fullText.indexOf(sourcesHeader) : -1;
+  const sourceSectionEnd =
+    sourceSectionStart >= 0
+      ? fullText.indexOf("\n\n", sourceSectionStart + sourcesHeader!.length) !== -1
+        ? fullText.indexOf("\n\n", sourceSectionStart + sourcesHeader!.length)
+        : fullText.length
+      : -1;
+
+  if (sourceSectionStart >= 0) {
+    sources.forEach(({ uri, title }) => {
+      const bullet = `• ${title}`;
+      const idx = fullText.indexOf(bullet, sourceSectionStart);
+      if (idx !== -1 && idx < sourceSectionEnd) {
+        builder.setLinkUrl(idx + 2, idx + 2 + title.length, uri);
+      }
+    });
+  }
 
   return builder.build();
 }
@@ -346,6 +372,7 @@ export function runBatchAI(config: RunConfig): void {
     const newColIdx = sheet.getLastColumn() + 1;
     sheet.getRange(1, newColIdx).setValue(config.outputCol);
     outputIdx = newColIdx - 1;
+    headers.push(config.outputCol); // keep in sync, matching grounding column pattern
   }
 
   // Resolve grounding column — create if not found (only when opted in)
@@ -392,13 +419,18 @@ export function runBatchAI(config: RunConfig): void {
     const result = runInference(userPrompts, driveLinks, systemPrompt, config.tools);
     if (result === null) continue;
 
-    sheet.getRange(realRowIndex, outputIdx + 1).setRichTextValue(renderInference(result));
+    try {
+      sheet.getRange(realRowIndex, outputIdx + 1).setRichTextValue(renderInference(result));
 
-    if (config.includeGrounding && groundingIdx >= 0) {
-      const groundingValue = renderGrounding(result);
-      if (groundingValue !== null) {
-        sheet.getRange(realRowIndex, groundingIdx + 1).setRichTextValue(groundingValue);
+      if (config.includeGrounding && groundingIdx >= 0) {
+        const groundingValue = renderGrounding(result);
+        if (groundingValue !== null) {
+          sheet.getRange(realRowIndex, groundingIdx + 1).setRichTextValue(groundingValue);
+        }
       }
+    } catch (_e) {
+      // Fall back to plain text if rich text rendering fails for this row.
+      sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
     }
 
     processed++;
