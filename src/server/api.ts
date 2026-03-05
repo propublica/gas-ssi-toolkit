@@ -190,6 +190,17 @@ export function getUngroundedSpans(response: GeminiResponse): Span[] {
 }
 
 /**
+ * Return all grounding sources as a flat { uri, title } array.
+ * Covers both web (google_search) and retrievedContext (url_context) chunks.
+ * Pure — no GAS globals.
+ */
+export function getAllSources(response: GeminiResponse): Array<{ uri: string; title: string }> {
+  return (response.groundingMetadata?.groundingChunks ?? [])
+    .map((chunk) => chunk.web ?? chunk.retrievedContext ?? null)
+    .filter((src): src is { uri: string; title: string } => src !== null);
+}
+
+/**
  * Resolve groundingSupports entries into Citation objects with sources
  * joined from groundingChunks by index. Pure — no GAS globals.
  */

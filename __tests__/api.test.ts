@@ -25,6 +25,7 @@ import {
   invokeGemini,
   getCitations,
   getUngroundedSpans,
+  getAllSources,
 } from "../src/server/api";
 import { CONFIG } from "../src/server/config";
 import type { GeminiRequest, GeminiResponse } from "../src/server/types";
@@ -507,5 +508,51 @@ describe("getUngroundedSpans", () => {
     });
     expect(spans).toHaveLength(1);
     expect(spans[0].text).toBe("Gap text.");
+  });
+});
+
+describe("getAllSources", () => {
+  it("returns empty array when no groundingMetadata", () => {
+    expect(getAllSources({ text: "hello" })).toEqual([]);
+  });
+
+  it("returns empty array when groundingChunks is absent", () => {
+    expect(getAllSources({ text: "hello", groundingMetadata: {} })).toEqual([]);
+  });
+
+  it("returns web sources", () => {
+    const response: GeminiResponse = {
+      text: "text",
+      groundingMetadata: {
+        groundingChunks: [
+          { web: { uri: "https://a.com", title: "A" } },
+          { web: { uri: "https://b.com", title: "B" } },
+        ],
+      },
+    };
+    expect(getAllSources(response)).toEqual([
+      { uri: "https://a.com", title: "A" },
+      { uri: "https://b.com", title: "B" },
+    ]);
+  });
+
+  it("returns retrievedContext sources", () => {
+    const response: GeminiResponse = {
+      text: "text",
+      groundingMetadata: {
+        groundingChunks: [{ retrievedContext: { uri: "https://c.com", title: "C" } }],
+      },
+    };
+    expect(getAllSources(response)).toEqual([{ uri: "https://c.com", title: "C" }]);
+  });
+
+  it("skips chunks with neither web nor retrievedContext", () => {
+    const response: GeminiResponse = {
+      text: "text",
+      groundingMetadata: {
+        groundingChunks: [{ web: { uri: "https://a.com", title: "A" } }, {}],
+      },
+    };
+    expect(getAllSources(response)).toEqual([{ uri: "https://a.com", title: "A" }]);
   });
 });
