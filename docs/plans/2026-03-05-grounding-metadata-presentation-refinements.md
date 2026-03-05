@@ -2,9 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Polish the grounding column and sources-column checkbox UX based on four user-requested changes: remove the "Unverified" section, hyperlink search queries to Google, move the checkbox into the Tools field-group with conditional visibility, and fix the code execution format in the grounding column.
+**Goal:** Polish the grounding column, sources-column checkbox UX, and output cell formatting based on five user-requested changes: remove the "Unverified" section, hyperlink search queries to Google, move the checkbox into the Tools field-group with conditional visibility, fix the code execution format in the grounding column, and render Gemini markdown (bold, italic, headings) in the output cell.
 
-**Architecture:** Three focused tasks — (1) strip `getUngroundedSpans`/`Span` from `api.ts` and `index.ts`; (2) update `renderGrounding` in `index.ts` with query hyperlinks and a plain-text code format; (3) rework the checkbox placement and show/hide logic in `configure-ai-run.ts` + one CSS addition. No new pure helpers needed; no new types needed.
+**Architecture:** Four focused tasks — (1) strip `getUngroundedSpans`/`Span` from `api.ts` and `index.ts`; (2) update `renderGrounding` in `index.ts` with query hyperlinks and a plain-text code format; (3) rework the checkbox placement and show/hide logic in `configure-ai-run.ts` + one CSS addition; (4) add a `parseMarkdown` pure helper to `api.ts` that strips markdown syntax, records styled spans, and returns a position-remapping function so citation offsets (from `groundingSupports`) are correctly adjusted after marker removal — then update `renderInference` in `index.ts` to use it.
 
 **Tech Stack:** TypeScript, Jest/jsdom, Google Apps Script (`SpreadsheetApp.newRichTextValue`)
 
@@ -486,7 +486,322 @@ git commit -m "feat: move grounding checkbox into Tools section with conditional
 
 ---
 
-## Task 4: Full verification
+## Task 4: Markdown rendering in the output cell (`parseMarkdown` + `renderInference`)
+
+**Files:**
+- Modify: `src/server/api.ts`
+- Modify: `src/server/index.ts`
+- Modify: `__tests__/api.test.ts`
+
+### Background
+
+Gemini often returns text with markdown (`**bold**`, `*italic*`, `## Heading`). The output cell should display formatted text — not raw markers. The tricky part is that `groundingSupports` character offsets index the *original* text (with markers). Stripping markers shifts character positions, so citation hyperlinks would land on the wrong text if we don't remap the offsets.
+
+`parseMarkdown` solves both problems:
+- returns `cleanText` (markers stripped)
+- returns `spans` (styled character ranges in `cleanText`)
+- returns `mapIndex(originalIdx)` — maps an index in the original text to the corresponding index in `cleanText`
+
+`renderInference` is updated to: parse markdown first, build on `cleanText`, apply bold/italic `TextStyle`, then remap citation offsets through `mapIndex` before calling `setLinkUrl`.
+
+### Step 1: Write the failing tests
+
+Add the new `import` and describe block to `__tests__/api.test.ts`.
+
+**Update the import line** to include `parseMarkdown`:
+
+```typescript
+import {
+  buildGeminiPayload,
+  callGeminiAPI,
+  invokeGemini,
+  getCitations,
+  getAllSources,
+  parseMarkdown,
+} from "../src/server/api";
+```
+
+**Add the describe block** at the end of `__tests__/api.test.ts`:
+
+```typescript
+describe("parseMarkdown", () => {
+  it("passes plain text through unchanged", () => {
+    const { cleanText, spans } = parseMarkdown("Hello world");
+    expect(cleanText).toBe("Hello world");
+    expect(spans).toHaveLength(0);
+  });
+
+  it("strips **bold** markers and records a bold span", () => {
+    const { cleanText, spans } = parseMarkdown("The **sky** is blue.");
+    expect(cleanText).toBe("The sky is blue.");
+    expect(spans).toHaveLength(1);
+    expect(spans[0]).toEqual({ startIndex: 4, endIndex: 7, bold: true });
+  });
+
+  it("strips *italic* markers and records an italic span", () => {
+    const { cleanText, spans } = parseMarkdown("A *quick* test.");
+    expect(cleanText).toBe("A quick test.");
+    expect(spans).toHaveLength(1);
+    expect(spans[0]).toEqual({ startIndex: 2, endIndex: 7, italic: true });
+  });
+
+  it("strips ## heading prefix and records a bold span for the heading text", () => {
+    const { cleanText, spans } = parseMarkdown("## Section Title\nBody text.");
+    expect(cleanText).toBe("Section Title\nBody text.");
+    expect(spans).toHaveLength(1);
+    expect(spans[0]).toEqual({ startIndex: 0, endIndex: 13, bold: true });
+  });
+
+  it("handles # heading at the very start of the string", () => {
+    const { cleanText, spans } = parseMarkdown("# Title");
+    expect(cleanText).toBe("Title");
+    expect(spans[0]).toEqual({ startIndex: 0, endIndex: 5, bold: true });
+  });
+
+  it("handles multiple bold spans", () => {
+    const { cleanText, spans } = parseMarkdown("**A** and **B**");
+    expect(cleanText).toBe("A and B");
+    expect(spans).toHaveLength(2);
+    expect(spans[0]).toEqual({ startIndex: 0, endIndex: 1, bold: true });
+    expect(spans[1]).toEqual({ startIndex: 6, endIndex: 7, bold: true });
+  });
+
+  it("mapIndex remaps original indices through bold markers", () => {
+    // "The **sky** is blue." → "The sky is blue."
+    // original 7 (first 's' of "sky", after '**') → clean 4
+    // original 10 (first '*' of closing '**') → clean 7
+    const { mapIndex } = parseMarkdown("The **sky** is blue.");
+    expect(mapIndex(7)).toBe(4);
+    expect(mapIndex(10)).toBe(7);
+  });
+
+  it("mapIndex remaps correctly when no markdown is present", () => {
+    const { mapIndex } = parseMarkdown("Hello world");
+    expect(mapIndex(0)).toBe(0);
+    expect(mapIndex(6)).toBe(6);
+    expect(mapIndex(11)).toBe(11);
+  });
+
+  it("does not treat unmatched * as italic", () => {
+    const { cleanText, spans } = parseMarkdown("Price: $5.00 * tax");
+    expect(cleanText).toBe("Price: $5.00 * tax");
+    expect(spans).toHaveLength(0);
+  });
+
+  it("handles bold and italic in the same string", () => {
+    const { cleanText, spans } = parseMarkdown("**bold** and *italic*");
+    expect(cleanText).toBe("bold and italic");
+    expect(spans).toHaveLength(2);
+    expect(spans[0]).toEqual({ startIndex: 0, endIndex: 4, bold: true });
+    expect(spans[1]).toEqual({ startIndex: 9, endIndex: 15, italic: true });
+  });
+});
+```
+
+### Step 2: Run to confirm failures
+
+```bash
+npx jest __tests__/api.test.ts -t "parseMarkdown"
+```
+
+Expected: FAIL — `parseMarkdown` not exported.
+
+### Step 3: Add `MarkdownSpan` interface and `parseMarkdown` to `src/server/api.ts`
+
+Add after the `Citation` interface (around line 35):
+
+```typescript
+export interface MarkdownSpan {
+  startIndex: number;
+  endIndex: number;
+  bold?: boolean;
+  italic?: boolean;
+}
+
+export interface ParsedMarkdown {
+  cleanText: string;
+  spans: MarkdownSpan[];
+  /** Maps a character index in the original text to the corresponding index in cleanText. */
+  mapIndex: (originalIndex: number) => number;
+}
+```
+
+Add the implementation after `getAllSources` (at the end of `api.ts`):
+
+```typescript
+/**
+ * Strip common markdown syntax from text, returning the clean string, styled
+ * character spans (positions in cleanText), and a function to remap original
+ * character indices to cleanText indices. Pure — no GAS globals.
+ *
+ * Handles: **bold**, *italic*, and # headings (1-6 levels).
+ * Unmatched markers are left verbatim.
+ */
+export function parseMarkdown(text: string): ParsedMarkdown {
+  const spans: MarkdownSpan[] = [];
+  // posMap[i] = position in cleanText for original position i.
+  // Positions that are part of stripped markers map to the next clean position.
+  const posMap = new Array<number>(text.length + 1).fill(0);
+  const cleanParts: string[] = [];
+  let cleanLen = 0;
+  let i = 0;
+
+  while (i < text.length) {
+    // **bold** — must be checked before single *
+    if (text[i] === "*" && text[i + 1] === "*") {
+      const closeIdx = text.indexOf("**", i + 2);
+      if (closeIdx > i + 2) {
+        posMap[i] = cleanLen;
+        posMap[i + 1] = cleanLen;
+        const spanStart = cleanLen;
+        const content = text.slice(i + 2, closeIdx);
+        for (let j = 0; j < content.length; j++) {
+          posMap[i + 2 + j] = cleanLen + j;
+          cleanParts.push(content[j]);
+        }
+        cleanLen += content.length;
+        posMap[closeIdx] = cleanLen;
+        posMap[closeIdx + 1] = cleanLen;
+        spans.push({ startIndex: spanStart, endIndex: cleanLen, bold: true });
+        i = closeIdx + 2;
+        continue;
+      }
+    }
+
+    // *italic* — single * with a matching closing *
+    if (text[i] === "*" && text[i + 1] !== "*") {
+      const closeIdx = text.indexOf("*", i + 1);
+      if (closeIdx > i + 1 && text[closeIdx + 1] !== "*") {
+        posMap[i] = cleanLen;
+        const spanStart = cleanLen;
+        const content = text.slice(i + 1, closeIdx);
+        for (let j = 0; j < content.length; j++) {
+          posMap[i + 1 + j] = cleanLen + j;
+          cleanParts.push(content[j]);
+        }
+        cleanLen += content.length;
+        posMap[closeIdx] = cleanLen;
+        spans.push({ startIndex: spanStart, endIndex: cleanLen, italic: true });
+        i = closeIdx + 1;
+        continue;
+      }
+    }
+
+    // # Heading — only at the start of the string or after a newline
+    if (text[i] === "#" && (i === 0 || text[i - 1] === "\n")) {
+      let level = 0;
+      while (i + level < text.length && text[i + level] === "#") level++;
+      if (level >= 1 && level <= 6 && text[i + level] === " ") {
+        const prefixLen = level + 1; // e.g. "## " = 3 chars
+        for (let j = 0; j < prefixLen; j++) posMap[i + j] = cleanLen;
+        const lineEnd = text.indexOf("\n", i + prefixLen);
+        const end = lineEnd === -1 ? text.length : lineEnd;
+        const content = text.slice(i + prefixLen, end);
+        const spanStart = cleanLen;
+        for (let j = 0; j < content.length; j++) {
+          posMap[i + prefixLen + j] = cleanLen + j;
+          cleanParts.push(content[j]);
+        }
+        cleanLen += content.length;
+        spans.push({ startIndex: spanStart, endIndex: cleanLen, bold: true });
+        i = end;
+        continue;
+      }
+    }
+
+    // Plain character — pass through verbatim
+    posMap[i] = cleanLen;
+    cleanParts.push(text[i]);
+    cleanLen++;
+    i++;
+  }
+  posMap[text.length] = cleanLen;
+
+  const cleanText = cleanParts.join("");
+  const mapIndex = (idx: number): number =>
+    posMap[Math.min(Math.max(0, idx), text.length)];
+
+  return { cleanText, spans, mapIndex };
+}
+```
+
+### Step 4: Run tests
+
+```bash
+npx jest __tests__/api.test.ts -t "parseMarkdown"
+```
+
+Expected: all 10 tests pass.
+
+### Step 5: Update `renderInference` in `src/server/index.ts`
+
+**a)** Add `parseMarkdown` to the api import:
+
+```typescript
+import { getCitations, getAllSources, parseMarkdown } from "./api";
+```
+
+**b)** Replace the `renderInference` function body:
+
+```typescript
+function renderInference(response: GeminiResponse): GoogleAppsScript.Spreadsheet.RichTextValue {
+  // NOTE: citation offsets from groundingSupports index the raw Gemini candidate text.
+  // google_search and code_execution are distinct tools and are not combined in practice,
+  // so the joined text in response.text should align with the support offsets.
+
+  const { cleanText, spans, mapIndex } = parseMarkdown(response.text);
+  const builder = SpreadsheetApp.newRichTextValue().setText(cleanText);
+
+  // Apply markdown text styles (bold, italic).
+  spans.forEach(({ startIndex, endIndex, bold, italic }) => {
+    const style = SpreadsheetApp.newTextStyle();
+    if (bold) style.setBold(true);
+    if (italic) style.setItalic(true);
+    builder.setTextStyle(startIndex, endIndex, style.build());
+  });
+
+  // Apply citation hyperlinks, remapping original offsets through the markdown position map.
+  // Sort and merge overlapping ranges (Gemini can return overlapping supports).
+  const citations = getCitations(response).sort((a, b) => a.startIndex - b.startIndex);
+  const merged: Array<{ startIndex: number; endIndex: number; uri: string }> = [];
+  for (const { startIndex, endIndex, sources } of citations) {
+    if (!sources[0]) continue;
+    const cleanStart = mapIndex(startIndex);
+    const cleanEnd = mapIndex(endIndex);
+    if (cleanStart >= cleanEnd) continue;
+    const last = merged[merged.length - 1];
+    if (last && cleanStart < last.endIndex) {
+      last.endIndex = Math.max(last.endIndex, cleanEnd);
+    } else {
+      merged.push({ startIndex: cleanStart, endIndex: cleanEnd, uri: sources[0].uri });
+    }
+  }
+  merged.forEach(({ startIndex, endIndex, uri }) => {
+    builder.setLinkUrl(startIndex, endIndex, uri);
+  });
+
+  return builder.build();
+}
+```
+
+### Step 6: Run full test suite and typecheck
+
+```bash
+npm run typecheck && npm test
+```
+
+Expected: all pass.
+
+### Step 7: Commit
+
+```bash
+git add src/server/api.ts src/server/index.ts __tests__/api.test.ts
+git commit -m "feat: render markdown (bold, italic, headings) in output cells via parseMarkdown"
+```
+
+---
+
+## Task 5: Full verification
 
 ### Step 1: Coverage
 
