@@ -10,7 +10,7 @@
 
 export { SSI } from "./customFunctions";
 import { runInference } from "./inference";
-import { getCitations, getAllSources } from "./api";
+import { getCitations, getAllSources } from "./rich-text";
 import type { GeminiResponse } from "./types";
 import { checkDriveService, extractTextUniversal } from "./drive";
 import {

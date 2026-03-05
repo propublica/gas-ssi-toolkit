@@ -124,7 +124,7 @@ interface CitationRange {
   sources: Array<{ uri: string; title: string }>;
 }
 
-function getCitations(response: GeminiResponse): CitationRange[] {
+export function getCitations(response: GeminiResponse): CitationRange[] {
   const supports = response.groundingMetadata?.groundingSupports ?? [];
   const chunks = response.groundingMetadata?.groundingChunks ?? [];
   return supports.map((s: GeminiGroundingSupport) => ({
@@ -139,7 +139,7 @@ function getCitations(response: GeminiResponse): CitationRange[] {
   }));
 }
 
-function getAllSources(response: GeminiResponse): Array<{ uri: string; title: string }> {
+export function getAllSources(response: GeminiResponse): Array<{ uri: string; title: string }> {
   return (response.groundingMetadata?.groundingChunks ?? [])
     .map((chunk) => chunk.web ?? chunk.retrievedContext ?? null)
     .filter((src): src is { uri: string; title: string } => src !== null);
