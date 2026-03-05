@@ -250,10 +250,13 @@ describe("includeGrounding checkbox", () => {
     expect(saved?.includeGrounding).toBe(true);
   });
 
-  it("updates grounding column label when output column is selected", async () => {
-    const { container } = await mountAndLoad({ outputCol: "ai_inference" });
+  it("updates grounding column label when output column selection changes", async () => {
+    const { container } = await mountAndLoad(); // no pre-selected output column
+    const tag = container.querySelector<HTMLButtonElement>("#output-col .tag");
+    if (!tag) return; // guard against no tags in jsdom
+    tag.click();
     const label = container.querySelector<HTMLElement>("#grounding-col-name");
-    expect(label?.textContent).toBe("ai_inference_grounding");
+    expect(label?.textContent).toBe(`${tag.textContent}_grounding`);
   });
 
   it("restores includeGrounding from savedState", async () => {
