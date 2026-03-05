@@ -238,16 +238,22 @@ describe("includeGrounding checkbox", () => {
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     await Promise.resolve();
     const config = (services.runBatchAI as jest.Mock).mock.calls[0]?.[0] as RunConfig | undefined;
-    expect(config?.includeGrounding).toBeFalsy();
+    expect(config?.includeGrounding).toBeUndefined();
   });
 
   it("unmount saves includeGrounding state", async () => {
     const { container, panel } = await mountAndLoad();
     container.querySelector<HTMLInputElement>("#include-grounding-cb")!.checked = true;
-    // Select required fields so unmount() doesn't return undefined
+    // Select at least one user-prompt column so unmount() returns a value (not undefined)
     container.querySelectorAll<HTMLElement>("#user-prompt-cols .tag")[0]?.click();
     const saved = panel.unmount();
     expect(saved?.includeGrounding).toBe(true);
+  });
+
+  it("updates grounding column label when output column is selected", async () => {
+    const { container } = await mountAndLoad({ outputCol: "ai_inference" });
+    const label = container.querySelector<HTMLElement>("#grounding-col-name");
+    expect(label?.textContent).toBe("ai_inference_grounding");
   });
 
   it("restores includeGrounding from savedState", async () => {

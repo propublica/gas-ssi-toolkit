@@ -79,6 +79,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           preset.rowRange,
         );
 
+        // Deferred with the rest of form setup — the form is hidden until headers load,
+        // so capturing the reference here keeps unmount() guard behaviour coherent.
         this.includeGroundingCb =
           container.querySelector<HTMLInputElement>("#include-grounding-cb");
         if (this.includeGroundingCb && preset.includeGrounding) {
@@ -92,6 +94,9 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         };
         updateGroundingLabel();
         container.querySelector("#output-col")?.addEventListener("click", updateGroundingLabel);
+        container
+          .querySelector("#output-col input")
+          ?.addEventListener("input", updateGroundingLabel);
 
         container.querySelector<HTMLElement>("#config-form")!.style.display = "block";
         container
