@@ -208,6 +208,61 @@ describe("ConfigureAIRunPanel — tools TagList", () => {
   });
 });
 
+describe("includeGrounding checkbox", () => {
+  it("renders the include-grounding checkbox", async () => {
+    const { container } = await mountAndLoad();
+    expect(container.querySelector("#include-grounding-cb")).not.toBeNull();
+  });
+
+  it("assembleRunConfig includes includeGrounding: true when checkbox is checked", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad({
+      userPromptCols: ["col_a"],
+      outputCol: "ai_inference",
+    });
+    const cb = container.querySelector<HTMLInputElement>("#include-grounding-cb")!;
+    cb.checked = true;
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    await Promise.resolve();
+    const config = (services.runBatchAI as jest.Mock).mock.calls[0]?.[0] as RunConfig | undefined;
+    expect(config?.includeGrounding).toBe(true);
+  });
+
+  it("assembleRunConfig omits includeGrounding when checkbox is unchecked", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad({
+      userPromptCols: ["col_a"],
+      outputCol: "ai_inference",
+    });
+    container.querySelector<HTMLInputElement>("#include-grounding-cb")!.checked = false;
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    await Promise.resolve();
+    const config = (services.runBatchAI as jest.Mock).mock.calls[0]?.[0] as RunConfig | undefined;
+    expect(config?.includeGrounding).toBeFalsy();
+  });
+
+  it("unmount saves includeGrounding state", async () => {
+    const { container, panel } = await mountAndLoad();
+    container.querySelector<HTMLInputElement>("#include-grounding-cb")!.checked = true;
+    // Select required fields so unmount() doesn't return undefined
+    container.querySelectorAll<HTMLElement>("#user-prompt-cols .tag")[0]?.click();
+    const saved = panel.unmount();
+    expect(saved?.includeGrounding).toBe(true);
+  });
+
+  it("restores includeGrounding from savedState", async () => {
+    const { container } = await mountAndLoad(undefined, {
+      userPromptCols: ["col_a"],
+      driveFileCols: [],
+      systemPromptCol: "",
+      outputCol: "ai_inference",
+      includeGrounding: true,
+    });
+    const cb = container.querySelector<HTMLInputElement>("#include-grounding-cb")!;
+    expect(cb.checked).toBe(true);
+  });
+});
+
 describe("ConfigureAIRunPanel — unmount", () => {
   it("unmount() returns current form state as SavedState", async () => {
     const { container, panel } = await mountAndLoad();

@@ -16,6 +16,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private outputColList: SingleTagList | null = null;
   private rowRangeComp: RowRange | null = null;
   private toolsList: TagList | null = null;
+  private includeGroundingCb: HTMLInputElement | null = null;
   private nav: NavigationContext | null = null;
 
   mount(
@@ -37,6 +38,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           outputCol: savedState.outputCol || undefined,
           rowRange: savedState.rowRange,
           tools: savedState.tools,
+          includeGrounding: savedState.includeGrounding,
         }
       : (params ?? {});
 
@@ -77,6 +79,20 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           preset.rowRange,
         );
 
+        this.includeGroundingCb =
+          container.querySelector<HTMLInputElement>("#include-grounding-cb");
+        if (this.includeGroundingCb && preset.includeGrounding) {
+          this.includeGroundingCb.checked = true;
+        }
+
+        const updateGroundingLabel = (): void => {
+          const val = this.outputColList?.getValue() ?? "";
+          const label = container.querySelector<HTMLElement>("#grounding-col-name");
+          if (label) label.textContent = val ? `${val}_grounding` : "_grounding";
+        };
+        updateGroundingLabel();
+        container.querySelector("#output-col")?.addEventListener("click", updateGroundingLabel);
+
         container.querySelector<HTMLElement>("#config-form")!.style.display = "block";
         container
           .querySelector<HTMLButtonElement>("#run-btn")!
@@ -98,6 +114,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       outputCol: this.outputColList?.getValue() ?? "",
       rowRange: this.rowRangeComp?.getValue(),
       tools: (this.toolsList?.getValue() ?? []) as ToolId[],
+      includeGrounding: this.includeGroundingCb?.checked ?? false,
     };
   }
 
@@ -147,6 +164,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
 
     const tools = (this.toolsList?.getValue() ?? []) as ToolId[];
 
+    const includeGrounding = this.includeGroundingCb?.checked ?? false;
+
     return {
       userPromptCols,
       driveFileCols: driveFileCols.length > 0 ? driveFileCols : undefined,
@@ -154,6 +173,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       outputCol,
       rowRange,
       tools: tools.length > 0 ? tools : undefined,
+      includeGrounding: includeGrounding || undefined,
     };
   }
 
@@ -186,6 +206,12 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <div class="field-group">
           <span class="field-label">Tools <span class="optional">(optional)</span></span>
           <div id="tools-list" class="tag-list"></div>
+        </div>
+        <div class="field-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="include-grounding-cb" />
+            Include sources column (<span id="grounding-col-name">_grounding</span>)
+          </label>
         </div>
         <div class="field-group">
           <span class="field-label">Rows to process</span>
