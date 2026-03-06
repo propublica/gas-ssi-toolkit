@@ -224,16 +224,16 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <div class="field-group">
           <span class="field-label">Output column <span class="required">*</span></span>
           <div id="output-col" class="tag-list"></div>
-          <label class="raw-output-hint">
+          <label class="checkbox-option">
             <input type="checkbox" id="raw-output-cb" />
-            <span>Raw output (skip markdown formatting)</span>
+            <span>Raw output (skip formatting)</span>
           </label>
         </div>
         <div class="field-group">
           <span class="field-label">Tools <span class="optional">(optional)</span></span>
           <div id="tools-list" class="tag-list"></div>
           <div id="include-grounding-group" style="display:none">
-            <label class="grounding-hint">
+            <label class="checkbox-option">
               <input type="checkbox" id="include-grounding-cb" />
               <span>Include sources column <span class="grounding-col-badge" id="grounding-col-name">_grounding</span></span>
             </label>

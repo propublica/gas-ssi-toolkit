@@ -260,7 +260,7 @@
             font-style: italic;
         }
 
-        .grounding-hint {
+        .checkbox-option {
             display: flex;
             align-items: center;
             gap: 6px;
