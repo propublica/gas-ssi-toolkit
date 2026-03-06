@@ -162,8 +162,8 @@ describe("callGeminiAPI", () => {
           content: {
             parts: [
               { text: "Let me check." },
-              { executable_code: { language: "PYTHON", code: "1+1" } },
-              { code_execution_result: { outcome: "OUTCOME_OK", output: "2\n" } },
+              { executableCode: { language: "PYTHON", code: "1+1" } },
+              { codeExecutionResult: { outcome: "OUTCOME_OK", output: "2\n" } },
               { text: "The answer is 2." },
             ],
           },
@@ -173,15 +173,15 @@ describe("callGeminiAPI", () => {
     expect(callGeminiAPI(baseReq).text).toBe("Let me check.\n\nThe answer is 2.");
   });
 
-  it("populates codePairs when executable_code and code_execution_result parts are present", () => {
+  it("populates codePairs when executableCode and codeExecutionResult parts are present", () => {
     mockFetchResponse({
       candidates: [
         {
           content: {
             parts: [
               { text: "Sure." },
-              { executable_code: { language: "PYTHON", code: "print(42)" } },
-              { code_execution_result: { outcome: "OUTCOME_OK", output: "42\n" } },
+              { executableCode: { language: "PYTHON", code: "print(42)" } },
+              { codeExecutionResult: { outcome: "OUTCOME_OK", output: "42\n" } },
             ],
           },
         },
