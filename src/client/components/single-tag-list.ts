@@ -13,10 +13,11 @@ export class SingleTagList {
   }
 
   private selectOnly(clicked: HTMLButtonElement): void {
+    const wasSelected = clicked.classList.contains("selected");
     this.container.querySelectorAll<HTMLButtonElement>(".tag").forEach((t) => {
       t.classList.remove("selected");
     });
-    clicked.classList.add("selected");
+    if (!wasSelected) clicked.classList.add("selected");
   }
 
   private render(headers: string[], opts: SingleTagListOpts): void {
