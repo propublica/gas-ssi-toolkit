@@ -220,7 +220,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           <div id="include-grounding-group" style="display:none">
             <label class="grounding-hint">
               <input type="checkbox" id="include-grounding-cb" />
-              Include sources column (<span id="grounding-col-name">_grounding</span>)
+              <span>Include sources column <span class="grounding-col-badge" id="grounding-col-name">_grounding</span></span>
             </label>
           </div>
         </div>

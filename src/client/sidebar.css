@@ -266,8 +266,22 @@
             gap: 6px;
             font-size: 11px;
             color: var(--text-secondary);
-            margin-top: 8px;
+            margin-top: 10px;
             cursor: pointer;
+            user-select: none;
+        }
+
+        .grounding-col-badge {
+            display: inline-block;
+            font-family: "SFMono-Regular", "Consolas", monospace;
+            font-size: 10px;
+            background: #f1f3f4;
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            padding: 1px 5px;
+            color: var(--text-main);
+            white-space: nowrap;
+            margin-left: 1px;
         }
 
         /* ── Recipe list button hierarchy ── */
