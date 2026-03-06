@@ -48,6 +48,20 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       preset.tools ?? [],
     );
 
+    this.includeGroundingCb = container.querySelector<HTMLInputElement>("#include-grounding-cb");
+    if (this.includeGroundingCb && preset.includeGrounding) {
+      this.includeGroundingCb.checked = true;
+    }
+
+    const updateGroundingVisibility = (): void => {
+      const group = container.querySelector<HTMLElement>("#include-grounding-group");
+      if (group) {
+        group.style.display = (this.toolsList?.getValue().length ?? 0) > 0 ? "block" : "none";
+      }
+    };
+    updateGroundingVisibility();
+    container.querySelector("#tools-list")?.addEventListener("click", updateGroundingVisibility);
+
     getSheetHeaders().then(
       (headers) => {
         if (headers.length === 0) {
@@ -78,14 +92,6 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           container.querySelector("#row-range-container")!,
           preset.rowRange,
         );
-
-        // Deferred with the rest of form setup — the form is hidden until headers load,
-        // so capturing the reference here keeps unmount() guard behaviour coherent.
-        this.includeGroundingCb =
-          container.querySelector<HTMLInputElement>("#include-grounding-cb");
-        if (this.includeGroundingCb && preset.includeGrounding) {
-          this.includeGroundingCb.checked = true;
-        }
 
         const updateGroundingLabel = (): void => {
           const val = this.outputColList?.getValue() ?? "";
@@ -211,12 +217,12 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <div class="field-group">
           <span class="field-label">Tools <span class="optional">(optional)</span></span>
           <div id="tools-list" class="tag-list"></div>
-        </div>
-        <div class="field-group">
-          <label class="checkbox-label">
-            <input type="checkbox" id="include-grounding-cb" />
-            Include sources column (<span id="grounding-col-name">_grounding</span>)
-          </label>
+          <div id="include-grounding-group" style="display:none">
+            <label class="grounding-hint">
+              <input type="checkbox" id="include-grounding-cb" />
+              Include sources column (<span id="grounding-col-name">_grounding</span>)
+            </label>
+          </div>
         </div>
         <div class="field-group">
           <span class="field-label">Rows to process</span>

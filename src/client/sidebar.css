@@ -260,6 +260,16 @@
             font-style: italic;
         }
 
+        .grounding-hint {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+            cursor: pointer;
+        }
+
         /* ── Recipe list button hierarchy ── */
 
         .tool-btn-text {

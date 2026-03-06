@@ -265,10 +265,46 @@ describe("includeGrounding checkbox", () => {
       driveFileCols: [],
       systemPromptCol: "",
       outputCol: "ai_inference",
+      tools: ["google_search"], // ← add this line
       includeGrounding: true,
     });
     const cb = container.querySelector<HTMLInputElement>("#include-grounding-cb")!;
     expect(cb.checked).toBe(true);
+  });
+
+  it("hides the grounding group when no tools are selected", async () => {
+    const { container } = await mountAndLoad();
+    const group = container.querySelector<HTMLElement>("#include-grounding-group");
+    expect(group?.style.display).toBe("none");
+  });
+
+  it("shows the grounding group when a tool is selected", async () => {
+    const { container } = await mountAndLoad();
+    container.querySelector<HTMLElement>("#tools-list .tag")?.click();
+    const group = container.querySelector<HTMLElement>("#include-grounding-group");
+    expect(group?.style.display).toBe("block");
+  });
+
+  it("shows the grounding group on mount when tools are pre-selected in savedState", async () => {
+    const { container } = await mountAndLoad(undefined, {
+      userPromptCols: ["col_a"],
+      driveFileCols: [],
+      systemPromptCol: "",
+      outputCol: "ai_inference",
+      tools: ["google_search"],
+      includeGrounding: false,
+    });
+    const group = container.querySelector<HTMLElement>("#include-grounding-group");
+    expect(group?.style.display).toBe("block");
+  });
+
+  it("hides the grounding group again when all tools are deselected", async () => {
+    const { container } = await mountAndLoad();
+    const tag = container.querySelector<HTMLElement>("#tools-list .tag")!;
+    tag.click(); // select
+    tag.click(); // deselect
+    const group = container.querySelector<HTMLElement>("#include-grounding-group");
+    expect(group?.style.display).toBe("none");
   });
 });
 
