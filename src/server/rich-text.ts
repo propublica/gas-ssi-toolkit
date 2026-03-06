@@ -56,7 +56,12 @@ function processInline(
     if (segment[i] === "[") {
       const closeBracket = segment.indexOf("]", i + 1);
       if (closeBracket > i && segment[closeBracket + 1] === "(") {
-        const closeParen = segment.indexOf(")", closeBracket + 2);
+        // Find the matching close paren — use lastIndexOf from end of segment
+        // to handle URLs containing literal parentheses (e.g. Wikipedia links).
+        // We don't look past the next '[' to avoid eating into subsequent links.
+        const nextBracket = segment.indexOf("[", closeBracket + 2);
+        const searchEnd = nextBracket === -1 ? segment.length - 1 : nextBracket - 1;
+        const closeParen = segment.lastIndexOf(")", searchEnd);
         if (closeParen > closeBracket + 1) {
           const linkText = segment.slice(i + 1, closeBracket);
           const url = segment.slice(closeBracket + 2, closeParen);
@@ -73,7 +78,9 @@ function processInline(
           for (let j = 0; j < syntaxTail; j++) {
             posMap[origOffset + closeBracket + j] = cleanLen;
           }
-          ranges.push({ startIndex: spanStart, endIndex: cleanLen, url });
+          if (cleanLen > spanStart) {
+            ranges.push({ startIndex: spanStart, endIndex: cleanLen, url });
+          }
           i = closeParen + 1;
           continue;
         }
