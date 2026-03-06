@@ -281,6 +281,58 @@ describe("buildGroundingCellContent", () => {
 // parseMarkdown edge cases (via buildInferenceCellContent)
 // ============================================================
 
+describe("buildInferenceCellContent inline links", () => {
+  it("strips [text](url) syntax and produces a url range", () => {
+    const result = buildInferenceCellContent(
+      makeResponse({ text: "See [Wikipedia](https://en.wikipedia.org) for details." }),
+    );
+    expect(result.text).toBe("See Wikipedia for details.");
+    const link = result.ranges.find((r) => r.url);
+    expect(link).toEqual({ startIndex: 4, endIndex: 13, url: "https://en.wikipedia.org" });
+  });
+
+  it("handles multiple inline links in one response", () => {
+    const result = buildInferenceCellContent(
+      makeResponse({ text: "[A](https://a.com) and [B](https://b.com)." }),
+    );
+    expect(result.text).toBe("A and B.");
+    const links = result.ranges.filter((r) => r.url);
+    expect(links).toHaveLength(2);
+    expect(links[0]).toEqual({ startIndex: 0, endIndex: 1, url: "https://a.com" });
+    expect(links[1]).toEqual({ startIndex: 6, endIndex: 7, url: "https://b.com" });
+  });
+
+  it("does not treat bare [text] without (url) as a link", () => {
+    const result = buildInferenceCellContent(makeResponse({ text: "See [note] for details." }));
+    expect(result.text).toBe("See [note] for details.");
+    expect(result.ranges.filter((r) => r.url)).toHaveLength(0);
+  });
+});
+
+describe("buildInferenceCellContent grounding — missing startIndex", () => {
+  it("treats absent startIndex as 0 (proto3 default omission)", () => {
+    const response = makeResponse({
+      text: "Paris is the capital.",
+      groundingMetadata: {
+        groundingChunks: [{ web: { uri: "https://example.com", title: "Example" } }],
+        groundingSupports: [
+          {
+            // startIndex intentionally omitted — simulates Gemini proto3 behaviour
+            segment: { startIndex: undefined as unknown as number, endIndex: 5, text: "Paris" },
+            groundingChunkIndices: [0],
+          },
+        ],
+        webSearchQueries: [],
+      },
+    });
+    const result = buildInferenceCellContent(response);
+    const link = result.ranges.find((r) => r.url);
+    expect(link).toBeDefined();
+    expect(link?.startIndex).toBe(0);
+    expect(link?.endIndex).toBe(5);
+  });
+});
+
 describe("buildInferenceCellContent markdown edge cases", () => {
   it("does not treat unmatched * as italic", () => {
     const result = buildInferenceCellContent(makeResponse({ text: "Price: $5 * tax" }));
