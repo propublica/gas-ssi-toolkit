@@ -115,5 +115,10 @@ module.exports = {
       branches: 70,
       functions: 100,
     },
+    "./src/server/rich-text.ts": {
+      statements: 94,
+      branches: 82,
+      functions: 100,
+    },
   },
 };

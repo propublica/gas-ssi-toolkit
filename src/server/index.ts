@@ -10,6 +10,11 @@
 
 export { SSI } from "./customFunctions";
 import { runInference } from "./inference";
+import {
+  buildInferenceCellContent,
+  buildGroundingCellContent,
+  type CellContent,
+} from "./rich-text";
 import { checkDriveService, extractTextUniversal } from "./drive";
 import {
   extractId,
@@ -225,6 +230,20 @@ export function sampleRowsToEvaluation(): void {
 // 🧠 TOOL 4: AI BATCH PROCESSOR
 // ==========================================
 
+function toCellValue(content: CellContent): GoogleAppsScript.Spreadsheet.RichTextValue {
+  const builder = SpreadsheetApp.newRichTextValue().setText(content.text);
+  content.ranges.forEach(({ startIndex, endIndex, bold, italic, url }) => {
+    if (bold === true || italic === true) {
+      const style = SpreadsheetApp.newTextStyle();
+      if (bold === true) style.setBold(true);
+      if (italic === true) style.setItalic(true);
+      builder.setTextStyle(startIndex, endIndex, style.build());
+    }
+    if (url) builder.setLinkUrl(startIndex, endIndex, url);
+  });
+  return builder.build();
+}
+
 export function runBatchAI(config: RunConfig): void {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getActiveSheet();
@@ -284,6 +303,20 @@ export function runBatchAI(config: RunConfig): void {
     const newColIdx = sheet.getLastColumn() + 1;
     sheet.getRange(1, newColIdx).setValue(config.outputCol);
     outputIdx = newColIdx - 1;
+    headers.push(config.outputCol); // keep in sync, matching grounding column pattern
+  }
+
+  // Resolve grounding column — create if not found (only when opted in)
+  let groundingIdx = -1;
+  const groundingColName = config.outputCol + "_grounding";
+  if (config.includeGrounding) {
+    groundingIdx = headers.indexOf(groundingColName);
+    if (groundingIdx === -1) {
+      const newColIdx = sheet.getLastColumn() + 1;
+      sheet.getRange(1, newColIdx).setValue(groundingColName);
+      groundingIdx = newColIdx - 1;
+      headers.push(groundingColName); // keep in sync for subsequent rows
+    }
   }
 
   // Determine row range
@@ -317,7 +350,24 @@ export function runBatchAI(config: RunConfig): void {
     const result = runInference(userPrompts, driveLinks, systemPrompt, config.tools);
     if (result === null) continue;
 
-    sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
+    try {
+      sheet
+        .getRange(realRowIndex, outputIdx + 1)
+        .setRichTextValue(toCellValue(buildInferenceCellContent(result)));
+
+      if (config.includeGrounding && groundingIdx >= 0) {
+        const groundingContent = buildGroundingCellContent(result);
+        if (groundingContent !== null) {
+          sheet
+            .getRange(realRowIndex, groundingIdx + 1)
+            .setRichTextValue(toCellValue(groundingContent));
+        }
+      }
+    } catch (_e) {
+      // Fall back to plain text if rich text rendering fails for this row.
+      sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
+    }
+
     processed++;
     SpreadsheetApp.flush();
   }

@@ -208,6 +208,106 @@ describe("ConfigureAIRunPanel — tools TagList", () => {
   });
 });
 
+describe("includeGrounding checkbox", () => {
+  it("renders the include-grounding checkbox", async () => {
+    const { container } = await mountAndLoad();
+    expect(container.querySelector("#include-grounding-cb")).not.toBeNull();
+  });
+
+  it("assembleRunConfig includes includeGrounding: true when checkbox is checked", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad({
+      userPromptCols: ["col_a"],
+      outputCol: "ai_inference",
+    });
+    const cb = container.querySelector<HTMLInputElement>("#include-grounding-cb")!;
+    cb.checked = true;
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    await Promise.resolve();
+    const config = (services.runBatchAI as jest.Mock).mock.calls[0]?.[0] as RunConfig | undefined;
+    expect(config?.includeGrounding).toBe(true);
+  });
+
+  it("assembleRunConfig omits includeGrounding when checkbox is unchecked", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad({
+      userPromptCols: ["col_a"],
+      outputCol: "ai_inference",
+    });
+    container.querySelector<HTMLInputElement>("#include-grounding-cb")!.checked = false;
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    await Promise.resolve();
+    const config = (services.runBatchAI as jest.Mock).mock.calls[0]?.[0] as RunConfig | undefined;
+    expect(config?.includeGrounding).toBeUndefined();
+  });
+
+  it("unmount saves includeGrounding state", async () => {
+    const { container, panel } = await mountAndLoad();
+    container.querySelector<HTMLInputElement>("#include-grounding-cb")!.checked = true;
+    // Select at least one user-prompt column so unmount() returns a value (not undefined)
+    container.querySelectorAll<HTMLElement>("#user-prompt-cols .tag")[0]?.click();
+    const saved = panel.unmount();
+    expect(saved?.includeGrounding).toBe(true);
+  });
+
+  it("updates grounding column label when output column selection changes", async () => {
+    const { container } = await mountAndLoad(); // no pre-selected output column
+    const tag = container.querySelector<HTMLButtonElement>("#output-col .tag");
+    if (!tag) return; // guard against no tags in jsdom
+    tag.click();
+    const label = container.querySelector<HTMLElement>("#grounding-col-name");
+    expect(label?.textContent).toBe(`${tag.textContent}_grounding`);
+  });
+
+  it("restores includeGrounding from savedState", async () => {
+    const { container } = await mountAndLoad(undefined, {
+      userPromptCols: ["col_a"],
+      driveFileCols: [],
+      systemPromptCol: "",
+      outputCol: "ai_inference",
+      tools: ["google_search"], // ← add this line
+      includeGrounding: true,
+    });
+    const cb = container.querySelector<HTMLInputElement>("#include-grounding-cb")!;
+    expect(cb.checked).toBe(true);
+  });
+
+  it("hides the grounding group when no tools are selected", async () => {
+    const { container } = await mountAndLoad();
+    const group = container.querySelector<HTMLElement>("#include-grounding-group");
+    expect(group?.style.display).toBe("none");
+  });
+
+  it("shows the grounding group when a tool is selected", async () => {
+    const { container } = await mountAndLoad();
+    container.querySelector<HTMLElement>("#tools-list .tag")?.click();
+    const group = container.querySelector<HTMLElement>("#include-grounding-group");
+    expect(group?.style.display).toBe("block");
+  });
+
+  it("shows the grounding group on mount when tools are pre-selected in savedState", async () => {
+    const { container } = await mountAndLoad(undefined, {
+      userPromptCols: ["col_a"],
+      driveFileCols: [],
+      systemPromptCol: "",
+      outputCol: "ai_inference",
+      tools: ["google_search"],
+      includeGrounding: false,
+    });
+    const group = container.querySelector<HTMLElement>("#include-grounding-group");
+    expect(group?.style.display).toBe("block");
+  });
+
+  it("hides the grounding group again when all tools are deselected", async () => {
+    const { container } = await mountAndLoad();
+    const tag = container.querySelector<HTMLElement>("#tools-list .tag")!;
+    tag.click(); // select
+    tag.click(); // deselect
+    const group = container.querySelector<HTMLElement>("#include-grounding-group");
+    expect(group?.style.display).toBe("none");
+  });
+});
+
 describe("ConfigureAIRunPanel — unmount", () => {
   it("unmount() returns current form state as SavedState", async () => {
     const { container, panel } = await mountAndLoad();

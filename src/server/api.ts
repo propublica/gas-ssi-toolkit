@@ -86,15 +86,15 @@ export function callGeminiAPI(req: GeminiRequest): GeminiResponse {
     .map((p) => p.text);
   const text = textParts.join("\n\n") || "No response.";
 
-  // Extract consecutive executable_code + code_execution_result pairs (snake_case REST JSON)
+  // Extract consecutive executableCode + codeExecutionResult pairs (camelCase REST JSON)
   const codePairs: GeminiCodePair[] = [];
   for (let i = 0; i < parts.length - 1; i++) {
     const curr = parts[i];
     const next = parts[i + 1];
-    if (curr["executable_code"] !== undefined && next["code_execution_result"] !== undefined) {
+    if (curr["executableCode"] !== undefined && next["codeExecutionResult"] !== undefined) {
       codePairs.push({
-        code: curr["executable_code"] as GeminiCodePair["code"],
-        result: next["code_execution_result"] as GeminiCodePair["result"],
+        code: curr["executableCode"] as GeminiCodePair["code"],
+        result: next["codeExecutionResult"] as GeminiCodePair["result"],
       });
       i++; // skip the result part — already consumed
     }
