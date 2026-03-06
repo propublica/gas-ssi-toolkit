@@ -82,6 +82,29 @@ function parseMarkdown(text: string): ParsedMarkdown {
       }
     }
 
+    // [link text](url) — inline markdown link
+    if (text[i] === "[") {
+      const closeLabel = text.indexOf("]", i + 1);
+      if (closeLabel > i && text[closeLabel + 1] === "(") {
+        const closeUrl = text.indexOf(")", closeLabel + 2);
+        if (closeUrl > closeLabel + 2) {
+          posMap[i] = cleanLen;
+          const linkText = text.slice(i + 1, closeLabel);
+          const url = text.slice(closeLabel + 2, closeUrl);
+          const spanStart = cleanLen;
+          for (let j = 0; j < linkText.length; j++) {
+            posMap[i + 1 + j] = cleanLen + j;
+            cleanParts.push(linkText[j]);
+          }
+          cleanLen += linkText.length;
+          posMap[closeUrl] = cleanLen;
+          ranges.push({ startIndex: spanStart, endIndex: cleanLen, url });
+          i = closeUrl + 1;
+          continue;
+        }
+      }
+    }
+
     // # Heading — only at the start of text or after a newline
     if (text[i] === "#" && (i === 0 || text[i - 1] === "\n")) {
       let level = 0;
@@ -128,7 +151,7 @@ function getCitations(response: GeminiResponse): CitationRange[] {
   const supports = response.groundingMetadata?.groundingSupports ?? [];
   const chunks = response.groundingMetadata?.groundingChunks ?? [];
   return supports.map((s: GeminiGroundingSupport) => ({
-    startIndex: s.segment.startIndex,
+    startIndex: s.segment.startIndex ?? 0, // Gemini omits startIndex when it is 0 (proto3 default)
     endIndex: s.segment.endIndex,
     sources: s.groundingChunkIndices
       .map((idx) => {

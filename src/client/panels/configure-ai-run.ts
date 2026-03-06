@@ -6,8 +6,10 @@ import { RowRange } from "../components/row-range";
 import { getSheetHeaders, runBatchAI } from "../services";
 import { TOOL_CATALOG } from "../tools";
 
-export type SavedState = Required<Omit<RunConfig, "rowRange" | "tools" | "includeGrounding">> &
-  Pick<RunConfig, "rowRange" | "tools" | "includeGrounding">;
+export type SavedState = Required<
+  Omit<RunConfig, "rowRange" | "tools" | "includeGrounding" | "rawOutput">
+> &
+  Pick<RunConfig, "rowRange" | "tools" | "includeGrounding" | "rawOutput">;
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
   private userPromptList: TagList | null = null;
@@ -17,6 +19,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private rowRangeComp: RowRange | null = null;
   private toolsList: TagList | null = null;
   private includeGroundingCb: HTMLInputElement | null = null;
+  private rawOutputCb: HTMLInputElement | null = null;
   private nav: NavigationContext | null = null;
 
   mount(
@@ -51,6 +54,11 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     this.includeGroundingCb = container.querySelector<HTMLInputElement>("#include-grounding-cb");
     if (this.includeGroundingCb && preset.includeGrounding) {
       this.includeGroundingCb.checked = true;
+    }
+
+    this.rawOutputCb = container.querySelector<HTMLInputElement>("#raw-output-cb");
+    if (this.rawOutputCb && preset.rawOutput) {
+      this.rawOutputCb.checked = true;
     }
 
     const updateGroundingVisibility = (): void => {
@@ -126,6 +134,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       rowRange: this.rowRangeComp?.getValue(),
       tools: (this.toolsList?.getValue() ?? []) as ToolId[],
       includeGrounding: this.includeGroundingCb?.checked ?? false,
+      rawOutput: this.rawOutputCb?.checked ?? false,
     };
   }
 
@@ -176,6 +185,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     const tools = (this.toolsList?.getValue() ?? []) as ToolId[];
 
     const includeGrounding = this.includeGroundingCb?.checked ?? false;
+    const rawOutput = this.rawOutputCb?.checked ?? false;
 
     return {
       userPromptCols,
@@ -185,6 +195,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       rowRange,
       tools: tools.length > 0 ? tools : undefined,
       includeGrounding: includeGrounding || undefined,
+      rawOutput: rawOutput || undefined,
     };
   }
 
@@ -213,6 +224,10 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <div class="field-group">
           <span class="field-label">Output column <span class="required">*</span></span>
           <div id="output-col" class="tag-list"></div>
+          <label class="raw-output-hint">
+            <input type="checkbox" id="raw-output-cb" />
+            <span>Raw output (skip markdown formatting)</span>
+          </label>
         </div>
         <div class="field-group">
           <span class="field-label">Tools <span class="optional">(optional)</span></span>
