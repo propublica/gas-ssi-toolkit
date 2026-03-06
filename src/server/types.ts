@@ -33,6 +33,45 @@ export interface GeminiGenerationConfig {
   responseMimeType?: string;
 }
 
+export interface GeminiGroundingChunk {
+  web?: { uri: string; title: string };
+  retrievedContext?: { uri: string; title: string };
+}
+
+export interface GeminiGroundingSupport {
+  segment: {
+    startIndex: number;
+    endIndex: number;
+    text: string;
+  };
+  groundingChunkIndices: number[];
+  confidenceScores?: number[];
+}
+
+export interface GeminiGroundingMetadata {
+  webSearchQueries?: string[];
+  groundingChunks?: GeminiGroundingChunk[];
+  groundingSupports?: GeminiGroundingSupport[];
+}
+
+export interface GeminiCodePair {
+  code: { language: string; code: string };
+  result: { outcome: string; output: string };
+}
+
+/**
+ * Structured representation of a Gemini generateContent response.
+ * Returned by callGeminiAPI and invokeGemini in place of a bare string.
+ */
+export interface GeminiResponse {
+  /** Assembled from all text parts in candidates[0].content.parts. */
+  text: string;
+  /** Present when google_search grounding was active. */
+  groundingMetadata?: GeminiGroundingMetadata;
+  /** Present when code_execution was active and code blocks were returned. */
+  codePairs?: GeminiCodePair[];
+}
+
 /**
  * Discriminated union for Gemini REST API tool payload construction.
  * External callers pass ToolId[] — this type is internal to buildGeminiPayload,

@@ -27,6 +27,8 @@ export interface RunConfig {
   rowRange?: { start: number; end: number };
   /** Tool IDs to enable for every row in this run. */
   tools?: ToolId[];
+  /** When true, runBatchAI writes a {outputCol}_grounding column with source attribution. */
+  includeGrounding?: boolean;
 }
 
 // ── Recipes ─────────────────────────────────────────────────────

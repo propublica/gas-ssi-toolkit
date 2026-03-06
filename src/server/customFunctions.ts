@@ -40,7 +40,7 @@ export function SSI(userTexts: unknown, systemPrompt?: string, toolNames?: unkno
       systemPrompt: systemPrompt || undefined,
       userTexts: flattenArg(userTexts),
       tools: resolvedToolIds.length ? resolvedToolIds : undefined,
-    });
+    }).text;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return `[SSI Error: ${msg}]`;

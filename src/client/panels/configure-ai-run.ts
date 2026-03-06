@@ -6,8 +6,8 @@ import { RowRange } from "../components/row-range";
 import { getSheetHeaders, runBatchAI } from "../services";
 import { TOOL_CATALOG } from "../tools";
 
-export type SavedState = Required<Omit<RunConfig, "rowRange" | "tools">> &
-  Pick<RunConfig, "rowRange" | "tools">;
+export type SavedState = Required<Omit<RunConfig, "rowRange" | "tools" | "includeGrounding">> &
+  Pick<RunConfig, "rowRange" | "tools" | "includeGrounding">;
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
   private userPromptList: TagList | null = null;
@@ -16,6 +16,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private outputColList: SingleTagList | null = null;
   private rowRangeComp: RowRange | null = null;
   private toolsList: TagList | null = null;
+  private includeGroundingCb: HTMLInputElement | null = null;
   private nav: NavigationContext | null = null;
 
   mount(
@@ -37,6 +38,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           outputCol: savedState.outputCol || undefined,
           rowRange: savedState.rowRange,
           tools: savedState.tools,
+          includeGrounding: savedState.includeGrounding,
         }
       : (params ?? {});
 
@@ -45,6 +47,20 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       TOOL_CATALOG.map((t) => ({ label: t.name, value: t.id })),
       preset.tools ?? [],
     );
+
+    this.includeGroundingCb = container.querySelector<HTMLInputElement>("#include-grounding-cb");
+    if (this.includeGroundingCb && preset.includeGrounding) {
+      this.includeGroundingCb.checked = true;
+    }
+
+    const updateGroundingVisibility = (): void => {
+      const group = container.querySelector<HTMLElement>("#include-grounding-group");
+      if (group) {
+        group.style.display = (this.toolsList?.getValue().length ?? 0) > 0 ? "block" : "none";
+      }
+    };
+    updateGroundingVisibility();
+    container.querySelector("#tools-list")?.addEventListener("click", updateGroundingVisibility);
 
     getSheetHeaders().then(
       (headers) => {
@@ -77,6 +93,17 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           preset.rowRange,
         );
 
+        const updateGroundingLabel = (): void => {
+          const val = this.outputColList?.getValue() ?? "";
+          const label = container.querySelector<HTMLElement>("#grounding-col-name");
+          if (label) label.textContent = val ? `${val}_grounding` : "_grounding";
+        };
+        updateGroundingLabel();
+        container.querySelector("#output-col")?.addEventListener("click", updateGroundingLabel);
+        container
+          .querySelector("#output-col input")
+          ?.addEventListener("input", updateGroundingLabel);
+
         container.querySelector<HTMLElement>("#config-form")!.style.display = "block";
         container
           .querySelector<HTMLButtonElement>("#run-btn")!
@@ -98,6 +125,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       outputCol: this.outputColList?.getValue() ?? "",
       rowRange: this.rowRangeComp?.getValue(),
       tools: (this.toolsList?.getValue() ?? []) as ToolId[],
+      includeGrounding: this.includeGroundingCb?.checked ?? false,
     };
   }
 
@@ -147,6 +175,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
 
     const tools = (this.toolsList?.getValue() ?? []) as ToolId[];
 
+    const includeGrounding = this.includeGroundingCb?.checked ?? false;
+
     return {
       userPromptCols,
       driveFileCols: driveFileCols.length > 0 ? driveFileCols : undefined,
@@ -154,6 +184,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       outputCol,
       rowRange,
       tools: tools.length > 0 ? tools : undefined,
+      includeGrounding: includeGrounding || undefined,
     };
   }
 
@@ -186,6 +217,12 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <div class="field-group">
           <span class="field-label">Tools <span class="optional">(optional)</span></span>
           <div id="tools-list" class="tag-list"></div>
+          <div id="include-grounding-group" style="display:none">
+            <label class="grounding-hint">
+              <input type="checkbox" id="include-grounding-cb" />
+              <span>Include sources column <span class="grounding-col-badge" id="grounding-col-name">_grounding</span></span>
+            </label>
+          </div>
         </div>
         <div class="field-group">
           <span class="field-label">Rows to process</span>
