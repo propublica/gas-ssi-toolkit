@@ -193,6 +193,9 @@ export function buildGroundingCellContent(response: GeminiResponse): CellContent
       const lang = code.language ? `(${code.language.toLowerCase()})` : "";
       sections.push(`Code ${lang}:\n${code.code}\n\nOutput:\n${result.output}`);
     });
+    // code_execution and google_search are mutually exclusive in practice.
+    // When code pairs are present, grounding sources/queries are omitted from the cell
+    // to keep the output focused — code results are the primary artifact.
     return { text: sections.join("\n\n"), ranges: [] };
   }
 

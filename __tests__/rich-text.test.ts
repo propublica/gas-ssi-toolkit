@@ -237,6 +237,25 @@ describe("buildGroundingCellContent", () => {
     expect(links[1].url).toBe("https://www.google.com/search?q=query%20two");
   });
 
+  it("handles retrievedContext chunks (no web property)", () => {
+    const response = makeResponse({
+      groundingMetadata: {
+        groundingChunks: [
+          { retrievedContext: { uri: "https://docs.example.com/page", title: "Docs Page" } },
+        ],
+        groundingSupports: [],
+        webSearchQueries: [],
+      },
+    });
+    const result = buildGroundingCellContent(response)!;
+    expect(result.text).toContain("Docs Page");
+    const link = result.ranges.find((r) => r.url === "https://docs.example.com/page");
+    expect(link).toBeDefined();
+    const idx = result.text.indexOf("Docs Page");
+    expect(link?.startIndex).toBe(idx);
+    expect(link?.endIndex).toBe(idx + "Docs Page".length);
+  });
+
   it("returns only code section — no search/source sections — when codePairs present", () => {
     const response = makeResponse({
       groundingMetadata: {
