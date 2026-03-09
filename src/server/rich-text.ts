@@ -205,7 +205,7 @@ function getCitations(response: GeminiResponse): CitationRange[] {
   const supports = response.groundingMetadata?.groundingSupports ?? [];
   const chunks = response.groundingMetadata?.groundingChunks ?? [];
   return supports.map((s: GeminiGroundingSupport) => ({
-    startIndex: s.segment.startIndex,
+    startIndex: s.segment.startIndex ?? 0, // Gemini omits startIndex when it is 0 (proto3 default)
     endIndex: s.segment.endIndex,
     sources: s.groundingChunkIndices
       .map((idx) => {

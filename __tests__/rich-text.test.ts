@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import type { GeminiResponse } from "../src/server/types";
+import type { GeminiGroundingSupport, GeminiResponse } from "../src/server/types";
 import { buildInferenceCellContent, buildGroundingCellContent } from "../src/server/rich-text";
 
 // ---- helpers ----
@@ -373,5 +373,29 @@ describe("buildInferenceCellContent markdown edge cases", () => {
     expect(citation).toBeDefined();
     expect(citation!.startIndex).toBe(0);
     expect(citation!.endIndex).toBe(8); // "the docs" = 8 chars
+  });
+});
+
+describe("buildInferenceCellContent grounding — missing startIndex", () => {
+  it("treats absent startIndex as 0 (proto3 default omission)", () => {
+    const response = makeResponse({
+      text: "Paris is the capital.",
+      groundingMetadata: {
+        groundingChunks: [{ web: { uri: "https://example.com", title: "Example" } }],
+        groundingSupports: [
+          // startIndex intentionally omitted — simulates Gemini proto3 behaviour
+          {
+            segment: { endIndex: 5, text: "Paris" },
+            groundingChunkIndices: [0],
+          } as unknown as GeminiGroundingSupport,
+        ],
+        webSearchQueries: [],
+      },
+    });
+    const result = buildInferenceCellContent(response);
+    const citation = result.ranges.find((r) => r.url === "https://example.com");
+    expect(citation).toBeDefined();
+    expect(citation!.startIndex).toBe(0);
+    expect(citation!.endIndex).toBe(5);
   });
 });
