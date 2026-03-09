@@ -29,6 +29,14 @@ export interface RunConfig {
   tools?: ToolId[];
   /** When true, runBatchAI writes a {outputCol}_grounding column with source attribution. */
   includeGrounding?: boolean;
+  /**
+   * When true, runBatchAI writes result.text directly via setValue, skipping all markdown
+   * parsing and rich text formatting. The grounding column is unaffected.
+   *
+   * Future: recipes could pre-set this via PrepRecipeParams/PrepRecipeResult —
+   * follow the tools echo pattern if needed.
+   */
+  rawOutput?: boolean;
 }
 
 // ── Recipes ─────────────────────────────────────────────────────
