@@ -35,15 +35,15 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
 
     const preset: Partial<RunConfig> = savedState
       ? {
-        userPromptCols: savedState.userPromptCols,
-        driveFileCols: savedState.driveFileCols.length ? savedState.driveFileCols : undefined,
-        systemPromptCol: savedState.systemPromptCol || undefined,
-        outputCol: savedState.outputCol || undefined,
-        rowRange: savedState.rowRange,
-        tools: savedState.tools,
-        includeGrounding: savedState.includeGrounding,
-        applyMarkdown: savedState.applyMarkdown,
-      }
+          userPromptCols: savedState.userPromptCols,
+          driveFileCols: savedState.driveFileCols.length ? savedState.driveFileCols : undefined,
+          systemPromptCol: savedState.systemPromptCol || undefined,
+          outputCol: savedState.outputCol || undefined,
+          rowRange: savedState.rowRange,
+          tools: savedState.tools,
+          includeGrounding: savedState.includeGrounding,
+          applyMarkdown: savedState.applyMarkdown,
+        }
       : (params ?? {});
 
     this.toolsList = new TagList(
