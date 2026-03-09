@@ -32,11 +32,19 @@ import type { RunConfig, PrepRecipeParams, PrepRecipeResult } from "../shared/ty
 // 🚀 MENU & INITIALIZATION
 // ==========================================
 
-export function onOpen(): void {
+export function onOpen(e?: GoogleAppsScript.Events.SheetsOnOpen): void {
   SpreadsheetApp.getUi()
     .createMenu("⚡ SSI Toolkit")
     .addItem("🚀 Open SSI Sidebar", "showSidebar")
     .addToUi();
+}
+
+/**
+ * Ensures the menu appears immediately after the user installs the add-on
+ * from the marketplace, without requiring a refresh.
+ */
+export function onInstall(e: GoogleAppsScript.Events.AddonOnInstall): void {
+  onOpen();
 }
 
 // ==========================================
