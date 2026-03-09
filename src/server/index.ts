@@ -350,25 +350,25 @@ export function runBatchAI(config: RunConfig): void {
     const result = runInference(userPrompts, driveLinks, systemPrompt, config.tools);
     if (result === null) continue;
 
-    if (config.rawOutput) {
-      sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
-    } else {
+    if (config.applyMarkdown) {
       try {
         sheet
           .getRange(realRowIndex, outputIdx + 1)
           .setRichTextValue(toCellValue(buildInferenceCellContent(result)));
-
-        if (config.includeGrounding && groundingIdx >= 0) {
-          const groundingContent = buildGroundingCellContent(result);
-          if (groundingContent !== null) {
-            sheet
-              .getRange(realRowIndex, groundingIdx + 1)
-              .setRichTextValue(toCellValue(groundingContent));
-          }
-        }
       } catch (_e) {
         // Fall back to plain text if rich text rendering fails for this row.
         sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
+      }
+    } else {
+      sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
+    }
+
+    if (config.includeGrounding && groundingIdx >= 0) {
+      const groundingContent = buildGroundingCellContent(result);
+      if (groundingContent !== null) {
+        sheet
+          .getRange(realRowIndex, groundingIdx + 1)
+          .setRichTextValue(toCellValue(groundingContent));
       }
     }
 

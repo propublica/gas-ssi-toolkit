@@ -7,9 +7,9 @@ import { getSheetHeaders, runBatchAI } from "../services";
 import { TOOL_CATALOG } from "../tools";
 
 export type SavedState = Required<
-  Omit<RunConfig, "rowRange" | "tools" | "includeGrounding" | "rawOutput">
+  Omit<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown">
 > &
-  Pick<RunConfig, "rowRange" | "tools" | "includeGrounding" | "rawOutput">;
+  Pick<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown">;
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
   private userPromptList: TagList | null = null;
@@ -19,7 +19,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private rowRangeComp: RowRange | null = null;
   private toolsList: TagList | null = null;
   private includeGroundingCb: HTMLInputElement | null = null;
-  private rawOutputCb: HTMLInputElement | null = null;
+  private applyMarkdownCb: HTMLInputElement | null = null;
   private nav: NavigationContext | null = null;
 
   mount(
@@ -42,6 +42,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           rowRange: savedState.rowRange,
           tools: savedState.tools,
           includeGrounding: savedState.includeGrounding,
+          applyMarkdown: savedState.applyMarkdown,
         }
       : (params ?? {});
 
@@ -56,9 +57,9 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       this.includeGroundingCb.checked = true;
     }
 
-    this.rawOutputCb = container.querySelector<HTMLInputElement>("#raw-output-cb");
-    if (this.rawOutputCb && preset.rawOutput) {
-      this.rawOutputCb.checked = true;
+    this.applyMarkdownCb = container.querySelector<HTMLInputElement>("#apply-markdown-cb");
+    if (this.applyMarkdownCb && preset.applyMarkdown) {
+      this.applyMarkdownCb.checked = true;
     }
 
     const updateGroundingVisibility = (): void => {
@@ -134,7 +135,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       rowRange: this.rowRangeComp?.getValue(),
       tools: (this.toolsList?.getValue() ?? []) as ToolId[],
       includeGrounding: this.includeGroundingCb?.checked ?? false,
-      rawOutput: this.rawOutputCb?.checked ?? false,
+      applyMarkdown: this.applyMarkdownCb?.checked ?? false,
     };
   }
 
@@ -185,7 +186,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     const tools = (this.toolsList?.getValue() ?? []) as ToolId[];
 
     const includeGrounding = this.includeGroundingCb?.checked ?? false;
-    const rawOutput = this.rawOutputCb?.checked ?? false;
+    const applyMarkdown = this.applyMarkdownCb?.checked ?? false;
 
     return {
       userPromptCols,
@@ -195,7 +196,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       rowRange,
       tools: tools.length > 0 ? tools : undefined,
       includeGrounding: includeGrounding || undefined,
-      rawOutput: rawOutput || undefined,
+      applyMarkdown: applyMarkdown || undefined,
     };
   }
 
@@ -241,8 +242,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         </div>
         <div class="field-group">
           <label class="checkbox-option">
-            <input type="checkbox" id="raw-output-cb" />
-            <span>Raw output</span>
+            <input type="checkbox" id="apply-markdown-cb" />
+            <span>Apply markdown formatting</span>
           </label>
         </div>
         <div class="panel-buttons">
