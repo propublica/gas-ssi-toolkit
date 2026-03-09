@@ -3,9 +3,9 @@ set -e
 
 # The stable Marketplace deployment ID.
 # One-time setup: run `clasp list-deployments`, copy the non-@HEAD deployment ID, paste here.
-DEPLOYMENT_ID="<paste-deployment-id-here>"
+DEPLOYMENT_ID="AKfycbyHEzLuhBp8qVmSRgbhVJbAAeLfITuu-jybzHCR5AL9blr9mkTLO0YFSNlA7QifxGyacg"
 
-if [ "$DEPLOYMENT_ID" = "<paste-deployment-id-here>" ]; then
+if [ "$DEPLOYMENT_ID" = "AKfycbyHEzLuhBp8qVmSRgbhVJbAAeLfITuu-jybzHCR5AL9blr9mkTLO0YFSNlA7QifxGyacg" ]; then
   echo "Error: DEPLOYMENT_ID not set. Run 'clasp list-deployments', copy the deployment ID, and update this script."
   exit 1
 fi
