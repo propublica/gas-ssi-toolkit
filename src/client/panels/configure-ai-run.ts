@@ -225,6 +225,10 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <div class="field-group">
           <span class="field-label">Output column <span class="required">*</span></span>
           <div id="output-col" class="tag-list"></div>
+          <label class="checkbox-option">
+            <input type="checkbox" id="apply-markdown-cb" />
+            <span>Apply markdown formatting</span>
+          </label>
         </div>
         <div class="field-group">
           <span class="field-label">Tools <span class="optional">(optional)</span></span>
@@ -239,12 +243,6 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <div class="field-group">
           <span class="field-label">Rows to process</span>
           <div id="row-range-container"></div>
-        </div>
-        <div class="field-group">
-          <label class="checkbox-option">
-            <input type="checkbox" id="apply-markdown-cb" />
-            <span>Apply markdown formatting</span>
-          </label>
         </div>
         <div class="panel-buttons">
           <button id="run-btn" class="btn-run">Run AI</button>
