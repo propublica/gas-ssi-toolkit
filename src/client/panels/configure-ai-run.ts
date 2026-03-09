@@ -35,15 +35,15 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
 
     const preset: Partial<RunConfig> = savedState
       ? {
-          userPromptCols: savedState.userPromptCols,
-          driveFileCols: savedState.driveFileCols.length ? savedState.driveFileCols : undefined,
-          systemPromptCol: savedState.systemPromptCol || undefined,
-          outputCol: savedState.outputCol || undefined,
-          rowRange: savedState.rowRange,
-          tools: savedState.tools,
-          includeGrounding: savedState.includeGrounding,
-          applyMarkdown: savedState.applyMarkdown,
-        }
+        userPromptCols: savedState.userPromptCols,
+        driveFileCols: savedState.driveFileCols.length ? savedState.driveFileCols : undefined,
+        systemPromptCol: savedState.systemPromptCol || undefined,
+        outputCol: savedState.outputCol || undefined,
+        rowRange: savedState.rowRange,
+        tools: savedState.tools,
+        includeGrounding: savedState.includeGrounding,
+        applyMarkdown: savedState.applyMarkdown,
+      }
       : (params ?? {});
 
     this.toolsList = new TagList(
@@ -236,7 +236,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           <div id="include-grounding-group" style="display:none">
             <label class="checkbox-option">
               <input type="checkbox" id="include-grounding-cb" />
-              <span>Include sources column <span class="grounding-col-badge" id="grounding-col-name">_grounding</span></span>
+              <span>Include grounding column <span class="grounding-col-badge" id="grounding-col-name">_grounding</span></span>
             </label>
           </div>
         </div>
