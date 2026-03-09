@@ -6,7 +6,7 @@ Google Apps Script add-on built with TypeScript, bundled by Rollup, and deployed
 
 - Node.js 22+
 - Apps Script API enabled at [script.google.com/home/usersettings](https://script.google.com/home/usersettings)
-- A Google Sheet with an attached Apps Script project (script ID from Extensions → Apps Script → Project Settings)
+- The SSI Toolkit Apps Script add-on project (script ID in `.clasp.json`)
 - A Gemini API key (required for the Run AI tool)
 
 ## Setup
@@ -16,11 +16,10 @@ npm install
 npm run clasp:login          # authenticate with Google
 ```
 
-Edit `.clasp.dev.json` or `.clasp.prod.json` with your script ID, set `GEMINI_API_KEY` as a Script Property in Apps Script > Project Settings > Script Properties, then deploy:
+Set `GEMINI_API_KEY` as a Script Property in Apps Script > Project Settings > Script Properties, then deploy:
 
 ```bash
-npm run deploy:dev           # push to dev script
-npm run deploy:prod          # push to prod script
+npm run deploy               # build and push to HEAD
 ```
 
 ## Key Commands
@@ -31,9 +30,8 @@ npm run build               # clean build to dist/
 npm run build:watch         # rebuild on file changes
 
 # Deploy
-npm run deploy:dev          # build + push to dev script
-npm run deploy:prod         # build + push to prod script
-npm run deploy:watch:dev    # continuous build + push (dev)
+npm run deploy              # build + push to HEAD (development)
+npm run deploy:watch        # continuous build + push watch
 
 # Test
 npm test                    # run all tests
@@ -52,6 +50,21 @@ npm run clasp:logs          # tail execution logs
 
 Run a single test file: `npx jest __tests__/api.test.ts`
 Run a single test by name: `npx jest -t "extractId"`
+
+## Code Lifecycle
+
+SSI Toolkit uses a single Apps Script project with two deployment states:
+
+**HEAD** is the active development surface. `npm run deploy` pushes your local build here. You can test at HEAD using Apps Script's built-in test deployments (Deploy → Test deployments in the script editor) without affecting anyone who has the add-on installed.
+
+**Versioned deployment** is what Marketplace-installed users run. It is a pinned snapshot that only changes when a human explicitly runs `scripts/release.sh`. That script builds and pushes to HEAD, snapshots it as a new immutable version, then repoints the Marketplace deployment to that version.
+
+```
+npm run deploy        → updates HEAD only (safe, non-destructive)
+./scripts/release.sh  → promotes HEAD to Marketplace (human-only)
+```
+
+**One-time release setup:** after your first deploy, run `clasp list-deployments` to get the stable Marketplace deployment ID and paste it into `scripts/release.sh`. After that, `./scripts/release.sh` handles the full release flow automatically.
 
 ## Build Pipeline
 
