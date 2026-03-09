@@ -302,4 +302,76 @@ describe("buildInferenceCellContent markdown edge cases", () => {
     expect(bold[0]).toEqual({ startIndex: 0, endIndex: 1, bold: true });
     expect(bold[1]).toEqual({ startIndex: 6, endIndex: 7, bold: true });
   });
+
+  it("strips '* ' bullet prefix and replaces with bullet character", () => {
+    const result = buildInferenceCellContent(makeResponse({ text: "* item one\n* item two" }));
+    expect(result.text).toBe("• item one\n• item two");
+    expect(result.ranges.filter((r) => r.italic)).toHaveLength(0);
+  });
+
+  it("strips '- ' bullet prefix and replaces with bullet character", () => {
+    const result = buildInferenceCellContent(makeResponse({ text: "- item one" }));
+    expect(result.text).toBe("• item one");
+    expect(result.ranges.filter((r) => r.italic)).toHaveLength(0);
+  });
+
+  it("handles bullet with bold label: '* **Key:** description'", () => {
+    const result = buildInferenceCellContent(
+      makeResponse({ text: "* **Standardization:** A universal format." }),
+    );
+    expect(result.text).toBe("• Standardization: A universal format.");
+    const bold = result.ranges.find((r) => r.bold);
+    expect(bold).toBeDefined();
+    expect(result.text.slice(bold!.startIndex, bold!.endIndex)).toBe("Standardization:");
+  });
+
+  it("parses [text](url) inline link — strips syntax, keeps text, adds url range", () => {
+    const result = buildInferenceCellContent(
+      makeResponse({ text: "See [the docs](https://example.com/docs) for more." }),
+    );
+    expect(result.text).toBe("See the docs for more.");
+    const link = result.ranges.find((r) => r.url === "https://example.com/docs");
+    expect(link).toBeDefined();
+    const idx = result.text.indexOf("the docs");
+    expect(link!.startIndex).toBe(idx);
+    expect(link!.endIndex).toBe(idx + "the docs".length);
+  });
+
+  it("parses multiple [text](url) links in a line", () => {
+    const result = buildInferenceCellContent(
+      makeResponse({ text: "[A](https://a.com) and [B](https://b.com)" }),
+    );
+    expect(result.text).toBe("A and B");
+    const links = result.ranges.filter((r) => r.url);
+    expect(links).toHaveLength(2);
+    expect(links[0].url).toBe("https://a.com");
+    expect(links[1].url).toBe("https://b.com");
+  });
+
+  it("citation remapping still works when inline links are present", () => {
+    // "[the docs](https://example.com/docs) is good"
+    // cleanText = "the docs is good" (len 16)
+    // grounding support segment covers the entire "[the docs](https://example.com/docs)" span (0..36)
+    // after stripping, that maps to clean indices 0..8 ("the docs")
+    const response = makeResponse({
+      text: "[the docs](https://example.com/docs) is good",
+      groundingMetadata: {
+        groundingChunks: [{ web: { uri: "https://citation.com", title: "Citation" } }],
+        groundingSupports: [
+          {
+            segment: { startIndex: 0, endIndex: 36, text: "[the docs](https://example.com/docs)" },
+            groundingChunkIndices: [0],
+          },
+        ],
+        webSearchQueries: [],
+      },
+    });
+    const result = buildInferenceCellContent(response);
+    const inlineLink = result.ranges.find((r) => r.url === "https://example.com/docs");
+    expect(inlineLink).toBeDefined();
+    const citation = result.ranges.find((r) => r.url === "https://citation.com");
+    expect(citation).toBeDefined();
+    expect(citation!.startIndex).toBe(0);
+    expect(citation!.endIndex).toBe(8); // "the docs" = 8 chars
+  });
 });
