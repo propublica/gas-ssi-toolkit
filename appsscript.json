@@ -10,6 +10,7 @@
     ]
   },
   "exceptionLogging": "STACKDRIVER",
+  "logging": {"defaultLevel": "INFO"},
   "runtimeVersion": "V8",
   "oauthScopes": [
     "https://www.googleapis.com/auth/spreadsheets.currentonly",
