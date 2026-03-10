@@ -7,7 +7,7 @@ DEPLOYMENT_ID="AKfycbyHEzLuhBp8qVmSRgbhVJbAAeLfITuu-jybzHCR5AL9blr9mkTLO0YFSNlA7
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 if [ "$CURRENT_BRANCH" != "main" ]; then
   echo "Error: release.sh must be run from main (currently on '$CURRENT_BRANCH')."
-  echo "Merge your changes to main first, then run this script."
+  echo "Merge your changes to main first, checkout that branch, then run this script."
   echo "See the Code Lifecycle section of README.md for the full release process."
   exit 1
 fi
