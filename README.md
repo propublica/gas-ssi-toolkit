@@ -55,7 +55,7 @@ Run a single test by name: `npx jest -t "extractId"`
 
 SSI Toolkit uses a single Apps Script project with two deployment states:
 
-**HEAD** is the active development surface. `npm run deploy` pushes your local build here. You can test at HEAD using Apps Script's built-in test deployments (Deploy → Test deployments in the script editor) without affecting anyone who has the add-on installed.
+**HEAD** is the active development surface. `npm run deploy` pushes your local build here. You can test at HEAD using Apps Script's built-in test deployments (Deploy → Test deployments in the script editor) without affecting anyone who has the add-on installed. The "SSI Toolkit (dev)" Document is pre-populated with useful test data.
 
 **Versioned deployment** is what Marketplace-installed users run. It is a pinned snapshot that only changes when a human explicitly runs `scripts/release.sh` from `main`.
 
@@ -82,7 +82,7 @@ The build produces two outputs from a single `rollup.config.js` array:
 **Server** — `src/server/index.ts` → `dist/index.js` (IIFE format). Apps Script has no module system and only discovers top-level global functions. The Rollup `footer` field appends plain stubs that delegate into the IIFE:
 
 ```js
-function onOpen(e) { _GASEntry.onOpen(e); }
+function onOpen() { _GASEntry.onOpen(); }
 ```
 
 To expose a new function to Apps Script, you must both `export` it from `index.ts` and add a matching stub in the `rollup.config.js` footer. Skipping the stub means Apps Script can't find it.
