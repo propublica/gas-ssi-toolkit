@@ -69,7 +69,7 @@ main                       (run ./scripts/release.sh to publish)
 
 Feature work happens on branches, merged to `develop` via PR. When ready to ship, `develop` is merged to `main` via a PR containing manual QA instructions — that merge is the release gate. Only then is `scripts/release.sh` run from `main`, which builds and pushes to HEAD, snapshots it as a new immutable version, and repoints the Marketplace deployment.
 
-```
+```zsh
 ./scripts/release.sh  → builds, pushes to HEAD, and promotes to Marketplace (human-only, main only)
 ```
 
