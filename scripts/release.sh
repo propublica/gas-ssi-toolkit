@@ -4,6 +4,13 @@ set -e
 # Stable Marketplace deployment ID (from `clasp list-deployments`).
 DEPLOYMENT_ID="AKfycbyHEzLuhBp8qVmSRgbhVJbAAeLfITuu-jybzHCR5AL9blr9mkTLO0YFSNlA7QifxGyacg"
 
+echo "⚠️  This will update the SSI Toolkit for everyone who has it installed."
+read -p "Are you sure you want to release? (y/N) " CONFIRM
+if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]; then
+  echo "Release cancelled."
+  exit 0
+fi
+
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 if [ "$CURRENT_BRANCH" != "main" ]; then
   echo "Error: release.sh must be run from main (currently on '$CURRENT_BRANCH')."
