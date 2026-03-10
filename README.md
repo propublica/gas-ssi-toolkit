@@ -75,6 +75,8 @@ Feature work happens on branches, merged to `develop` via PR. When ready to ship
 
 `scripts/release.sh` enforces the `main` requirement — it will exit with an error if run from any other branch.
 
+> **Note for future contributors:** This pipeline assumes a single developer. `npm run deploy` pushes to a shared HEAD — concurrent development will cause conflicts. This should be revisited before a second developer joins the project.
+
 ## Build Pipeline
 
 The build produces two outputs from a single `rollup.config.js` array:
