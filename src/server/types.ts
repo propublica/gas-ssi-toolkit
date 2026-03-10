@@ -14,6 +14,7 @@ export interface AppConfig {
   API_KEY_PROPERTY: string;
   MODEL_NAME: string;
   MAX_FILE_SIZE_BYTES: number;
+  MAX_OUTPUT_TOKENS: number;
 }
 
 export interface GeminiInlineData {
