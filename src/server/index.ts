@@ -39,6 +39,14 @@ export function onOpen(): void {
     .addToUi();
 }
 
+/**
+ * Ensures the menu appears immediately after the user installs the add-on
+ * from the marketplace, without requiring a refresh.
+ */
+export function onInstall(): void {
+  onOpen();
+}
+
 // ==========================================
 // 🖥️ UI HANDLERS
 // ==========================================

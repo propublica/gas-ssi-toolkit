@@ -25,14 +25,14 @@ npm run lint:fix            # ESLint with auto-fix
 npm run format              # Prettier on src/ (rewrites files)
 npm run format:check        # Check Prettier formatting without modifying files
 npm run typecheck           # TypeScript type check without building (server + client tsconfigs)
-npm run deploy:dev          # Build + clasp push to dev script
-npm run deploy:prod         # Build + clasp push to prod script
-npm run deploy:watch:dev    # Continuous build + clasp push watch (dev)
-npm run deploy:watch:prod   # Continuous build + clasp push watch (prod)
+npm run deploy              # Build + clasp push to HEAD (development)
+npm run deploy:watch        # Continuous build + push watch
 npm run clasp:open          # Open the Apps Script editor in browser
 npm run clasp:logs          # Tail execution logs from Apps Script
 npm run clasp:login         # Authenticate clasp (required before first deploy)
 ```
+
+> **Note for Claude:** `scripts/release.sh` is a human-only operation and must never be invoked by Claude. It is enforced via a deny rule in `.claude/settings.local.json`.
 
 Run a single test file: `npx jest __tests__/utils.test.ts`
 Run a single test by name: `npx jest -t "extractId"`
@@ -232,7 +232,7 @@ The Gemini API key must be set as a Script Property (`GEMINI_API_KEY`) in Apps S
 - `appsscript.json` must be in `dist/` for clasp push (the build script copies it)
 - Drive Advanced Service must be enabled in the Apps Script editor AND declared in `appsscript.json`
 - `PropertiesService.getScriptProperties()` is available in custom functions once the add-on has been authorized by the user (opening the menu triggers authorization)
-- `.clasp.json` is generated at deploy time by copying `.clasp.dev.json` or `.clasp.prod.json`
+- `.clasp.json` is committed to the repo and points to the single add-on script project
 
 ## GitHub
 
