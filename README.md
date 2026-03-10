@@ -57,14 +57,23 @@ SSI Toolkit uses a single Apps Script project with two deployment states:
 
 **HEAD** is the active development surface. `npm run deploy` pushes your local build here. You can test at HEAD using Apps Script's built-in test deployments (Deploy → Test deployments in the script editor) without affecting anyone who has the add-on installed.
 
-**Versioned deployment** is what Marketplace-installed users run. It is a pinned snapshot that only changes when a human explicitly runs `scripts/release.sh`. That script builds and pushes to HEAD, snapshots it as a new immutable version, then repoints the Marketplace deployment to that version.
+**Versioned deployment** is what Marketplace-installed users run. It is a pinned snapshot that only changes when a human explicitly runs `scripts/release.sh` from `main`.
+
+### Branch workflow
 
 ```
-npm run deploy        → updates HEAD only (safe, non-destructive)
-./scripts/release.sh  → promotes HEAD to Marketplace (human-only)
+feature-branch → develop   (PR + code review)
+develop        → main      (PR containing manual QA instructions = release gate)
+main                       (run ./scripts/release.sh to publish)
 ```
 
-**One-time release setup:** after your first deploy, run `clasp list-deployments` to get the stable Marketplace deployment ID and paste it into `scripts/release.sh`. After that, `./scripts/release.sh` handles the full release flow automatically.
+Feature work happens on branches, merged to `develop` via PR. When ready to ship, `develop` is merged to `main` via a PR containing manual QA instructions — that merge is the release gate. Only then is `scripts/release.sh` run from `main`, which builds and pushes to HEAD, snapshots it as a new immutable version, and repoints the Marketplace deployment.
+
+```
+./scripts/release.sh  → builds, pushes to HEAD, and promotes to Marketplace (human-only, main only)
+```
+
+`scripts/release.sh` enforces the `main` requirement — it will exit with an error if run from any other branch.
 
 ## Build Pipeline
 
