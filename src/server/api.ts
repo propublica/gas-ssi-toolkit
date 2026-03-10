@@ -31,9 +31,10 @@ export function buildGeminiPayload(req: GeminiRequest): Record<string, unknown> 
     contents: [{ role: "user", parts }],
   };
 
-  if (req.generationConfig) {
-    payload.generationConfig = req.generationConfig;
-  }
+  payload.generationConfig = {
+    maxOutputTokens: CONFIG.MAX_OUTPUT_TOKENS,
+    ...req.generationConfig,
+  };
 
   if (req.tools && req.tools.length > 0) {
     const entries = req.tools.map((id) => TOOL_REGISTRY[id]);
