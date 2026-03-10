@@ -15,11 +15,18 @@ fi
 echo "→ Deploying to HEAD..."
 npm run deploy
 
+TIMESTAMP=$(date +%Y-%m-%d\ %H:%M:%S)
+
 echo "→ Creating version snapshot..."
-VERSION=$(npx clasp create-version "$(date +%Y-%m-%d)" | grep -oE '[0-9]+' | tail -1)
-echo "  Created version $VERSION"
+VERSION_OUTPUT=$(npx clasp create-version "$TIMESTAMP" 2>&1)
+echo "  $VERSION_OUTPUT"
+VERSION=$(echo "$VERSION_OUTPUT" | grep -oE '[0-9]+' | tail -1)
+if [ -z "$VERSION" ]; then
+  echo "Error: could not parse version number from clasp output."
+  exit 1
+fi
 
 echo "→ Repointing Marketplace deployment..."
-npx clasp update-deployment "$DEPLOYMENT_ID" --versionNumber "$VERSION" --description "$(date +%Y-%m-%d)"
+npx clasp update-deployment "$DEPLOYMENT_ID" --versionNumber "$VERSION" --description "$TIMESTAMP"
 
 echo "✓ Released version $VERSION to deployment $DEPLOYMENT_ID"
