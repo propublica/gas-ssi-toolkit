@@ -2,7 +2,7 @@
 set -e
 
 # Stable Marketplace deployment ID (from `clasp list-deployments`).
-DEPLOYMENT_ID="AKfycbyHEzLuhBp8qVmSRgbhVJbAAeLfITuu-jybzHCR5AL9blr9mkTLO0YFSNlA7QifxGyacg"
+DEPLOYMENT_ID="AKfycbx1DUg1j_MW2KNDFsfqhHaW5D7ngPaweMr4GZ8LGkINJF_5HbugCrnaDNqZ7Xeg2KIDGA"
 
 echo "⚠️  This will update the SSI Toolkit for everyone who has it installed."
 read -p "Are you sure you want to release? (y/N) " CONFIRM
