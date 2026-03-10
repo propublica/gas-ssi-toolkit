@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2019",
+      "DOM"
+    ],
+    "types": [
+      "google-apps-script",
+      "jest"
+    ],
+    "rootDir": ".",
+    "noUnusedLocals": false
+  },
+  "include": [
+    "src/client/**/*.ts",
+    "src/shared/**/*.ts",
+    "__tests__/components/**/*.ts",
+    "__tests__/panels/**/*.ts",
+    "__tests__/router.test.ts",
+    "__tests__/services.test.ts"
+  ],
+  "exclude": []
+}

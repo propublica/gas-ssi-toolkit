@@ -13,9 +13,12 @@ import {
   getAllFilesRecursive,
   sampleRows,
   truncateText,
-  getAIContext,
+  flattenArg,
+  resolveColumns,
+  findOrCreateColumn,
+  writeColumn,
 } from "../src/server/utils";
-import type { ColumnMap, DriveFileInfo } from "../src/shared/types";
+import type { DriveFileInfo } from "../src/server/types";
 
 describe("extractId", () => {
   it("extracts ID from a standard Drive file URL", () => {
@@ -90,6 +93,13 @@ describe("createSeededRandom", () => {
       expect(val).toBeLessThan(1);
     }
   });
+
+  it("produces values in [0, 1) when called without a seed", () => {
+    const rng = createSeededRandom();
+    const val = rng();
+    expect(val).toBeGreaterThanOrEqual(0);
+    expect(val).toBeLessThan(1);
+  });
 });
 
 describe("sampleRows", () => {
@@ -132,60 +142,6 @@ describe("truncateText", () => {
     const text = "a".repeat(101);
     const result = truncateText(text, 100);
     expect(result).toBe("a".repeat(100) + "... [TRUNCATED]");
-  });
-});
-
-describe("getAIContext", () => {
-  const baseMap: ColumnMap = {
-    source_drive: 0,
-    source_text: 1,
-    sys_prompt: 2,
-    user_prompt: 3,
-    output: 4,
-  };
-
-  describe("TEXT mode", () => {
-    it("returns textContext when source text is valid", () => {
-      const row = [
-        "https://drive.google.com/file/d/abc",
-        "This is valid text for the AI",
-        "",
-        "",
-        "",
-      ];
-      expect(getAIContext(row, baseMap, "TEXT")).toEqual({
-        textContext: "This is valid text for the AI",
-      });
-    });
-
-    it("returns null when source text is too short (5 chars or fewer)", () => {
-      const row = ["", "hi", "", "", ""];
-      expect(getAIContext(row, baseMap, "TEXT")).toBeNull();
-    });
-
-    it("returns null when source text contains 'Error'", () => {
-      const row = ["", "[Error: something went wrong]", "", "", ""];
-      expect(getAIContext(row, baseMap, "TEXT")).toBeNull();
-    });
-
-    it("returns null when source_text column is missing (index -1)", () => {
-      const mapNoText = { ...baseMap, source_text: -1 };
-      const row = ["", "some text", "", "", ""];
-      expect(getAIContext(row, mapNoText, "TEXT")).toBeNull();
-    });
-  });
-
-  describe("FILE mode", () => {
-    it("returns fileId when a valid Drive link is present", () => {
-      const row = ["https://drive.google.com/file/d/abc123defgh456ijklm789nop", "", "", "", ""];
-      const result = getAIContext(row, baseMap, "FILE");
-      expect(result).toEqual({ fileId: "abc123defgh456ijklm789nop" });
-    });
-
-    it("returns null when Drive link is invalid", () => {
-      const row = ["not-a-drive-link", "", "", "", ""];
-      expect(getAIContext(row, baseMap, "FILE")).toBeNull();
-    });
   });
 });
 
@@ -236,5 +192,166 @@ describe("getAllFilesRecursive", () => {
     const result: DriveFileInfo[] = [];
     getAllFilesRecursive(folder as any, result);
     expect(result).toHaveLength(0);
+  });
+});
+
+describe("flattenArg", () => {
+  it("wraps a scalar string in an array", () => {
+    expect(flattenArg("hello")).toEqual(["hello"]);
+  });
+
+  it("flattens a vertical range (multiple rows, one column)", () => {
+    expect(flattenArg([["row1"], ["row2"], ["row3"]])).toEqual(["row1", "row2", "row3"]);
+  });
+
+  it("flattens a horizontal range (one row, multiple columns)", () => {
+    expect(flattenArg([["col1", "col2", "col3"]])).toEqual(["col1", "col2", "col3"]);
+  });
+
+  it("filters empty strings from ranges", () => {
+    expect(flattenArg([["text", "", "more"]])).toEqual(["text", "more"]);
+  });
+
+  it("filters null values from ranges", () => {
+    expect(flattenArg([["a", null, "b"]])).toEqual(["a", "b"]);
+  });
+
+  it("returns an empty array for null input", () => {
+    expect(flattenArg(null)).toEqual([]);
+  });
+
+  it("returns an empty array for an empty string scalar", () => {
+    expect(flattenArg("")).toEqual([]);
+  });
+
+  it("converts non-string scalars to strings", () => {
+    expect(flattenArg(42)).toEqual(["42"]);
+  });
+});
+
+describe("resolveColumns", () => {
+  it("returns indices for all found names", () => {
+    expect(resolveColumns(["a", "b", "c"], ["a", "c"])).toEqual([0, 2]);
+  });
+
+  it("returns -1 for names not in headers", () => {
+    expect(resolveColumns(["a", "b"], ["c"])).toEqual([-1]);
+  });
+
+  it("returns empty array for empty names list", () => {
+    expect(resolveColumns(["a", "b"], [])).toEqual([]);
+  });
+
+  it("returns -1 for all names when headers is empty", () => {
+    expect(resolveColumns([], ["a"])).toEqual([-1]);
+  });
+
+  it("preserves the order of the names argument", () => {
+    expect(resolveColumns(["x", "y", "z"], ["z", "x"])).toEqual([2, 0]);
+  });
+});
+
+// ── findOrCreateColumn ──────────────────────────────────────────
+
+describe("findOrCreateColumn", () => {
+  function makeSheet(headers: string[]): GoogleAppsScript.Spreadsheet.Sheet {
+    const values = [headers.slice()];
+    return {
+      getLastColumn: () => headers.length,
+      getRange: jest
+        .fn()
+        .mockImplementation((_row: number, _col: number, numRows?: number, numCols?: number) => {
+          if (numRows === 1 && numCols !== undefined) {
+            return { getValues: () => values };
+          }
+          return { setValue: jest.fn() };
+        }),
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+  }
+
+  it("returns 1-based index of existing column", () => {
+    const sheet = makeSheet(["Drive Link", "System Prompt", "Output"]);
+    expect(findOrCreateColumn(sheet, "System Prompt")).toBe(2);
+  });
+
+  it("appends new column and returns its 1-based index when not found", () => {
+    const sheet = makeSheet(["Drive Link"]);
+    const setValueMock = jest.fn();
+    (sheet.getRange as jest.Mock).mockImplementation(
+      (_row: number, _col: number, numRows?: number, numCols?: number) => {
+        if (numRows === 1 && numCols !== undefined) {
+          return { getValues: () => [["Drive Link"]] };
+        }
+        return { setValue: setValueMock };
+      },
+    );
+    const idx = findOrCreateColumn(sheet, "New Col");
+    expect(idx).toBe(2);
+    expect(setValueMock).toHaveBeenCalledWith("New Col");
+  });
+
+  it("appends to column 1 when sheet is empty", () => {
+    const setValueMock = jest.fn();
+    const sheet = {
+      getLastColumn: () => 0,
+      getRange: jest.fn().mockReturnValue({ setValue: setValueMock }),
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+    const idx = findOrCreateColumn(sheet, "My Col");
+    expect(idx).toBe(1);
+    expect(setValueMock).toHaveBeenCalledWith("My Col");
+  });
+
+  it("applies wrapStrategy to the new column range when provided", () => {
+    const setValueMock = jest.fn();
+    const setWrapStrategyMock = jest.fn();
+    const sheet = {
+      getLastColumn: () => 0,
+      getMaxRows: () => 100,
+      getRange: jest
+        .fn()
+        .mockImplementation((_row: number, _col: number, numRows?: number) =>
+          numRows !== undefined
+            ? { setWrapStrategy: setWrapStrategyMock }
+            : { setValue: setValueMock },
+        ),
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+    const wrapStrategy = "CLIP" as unknown as GoogleAppsScript.Spreadsheet.WrapStrategy;
+    findOrCreateColumn(sheet, "My Col", wrapStrategy);
+    expect(setWrapStrategyMock).toHaveBeenCalledWith(wrapStrategy);
+  });
+});
+
+// ── writeColumn ─────────────────────────────────────────────────
+
+describe("writeColumn", () => {
+  it("writes values starting at row 2 using a single setValues call", () => {
+    const setValuesMock = jest.fn();
+    const sheet = {
+      getRange: jest.fn().mockReturnValue({ setValues: setValuesMock }),
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+    writeColumn(sheet, 3, ["a", "b", "c"]);
+    expect(sheet.getRange).toHaveBeenCalledWith(2, 3, 3, 1);
+    expect(setValuesMock).toHaveBeenCalledWith([["a"], ["b"], ["c"]]);
+  });
+
+  it("does nothing when values array is empty", () => {
+    const sheet = {
+      getRange: jest.fn(),
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+    writeColumn(sheet, 1, []);
+    expect(sheet.getRange).not.toHaveBeenCalled();
+  });
+
+  it("applies wrapStrategy to the written range when provided", () => {
+    const setValuesMock = jest.fn();
+    const setWrapStrategyMock = jest.fn();
+    const sheet = {
+      getRange: jest
+        .fn()
+        .mockReturnValue({ setValues: setValuesMock, setWrapStrategy: setWrapStrategyMock }),
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+    const wrapStrategy = "CLIP" as unknown as GoogleAppsScript.Spreadsheet.WrapStrategy;
+    writeColumn(sheet, 3, ["a", "b"], wrapStrategy);
+    expect(setWrapStrategyMock).toHaveBeenCalledWith(wrapStrategy);
   });
 });

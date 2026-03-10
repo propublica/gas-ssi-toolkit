@@ -1,141 +1,132 @@
-# ⚡ SSI Drive & AI Tools
+# SSI Toolkit
 
-Google Apps Script toolkit for importing Drive files, extracting text, sampling data, and running multimodal AI inference — developed locally with TypeScript, Rollup, and Clasp.
-
-## Project Structure
-
-```
-gas-project/
-├── src/
-│   ├── server/
-│   │   ├── index.ts          # Entry point — menu, tools, global exposure
-│   │   ├── config.ts         # Central CONFIG object
-│   │   ├── api.ts            # Gemini API calls via UrlFetchApp
-│   │   ├── drive.ts          # Drive Advanced Service + text extraction
-│   │   ├── dialog.ts         # HTML template for AI source dialog
-│   │   └── utils.ts          # Pure helpers (extractId, seededRandom, etc.)
-│   └── shared/
-│       └── types.ts          # TypeScript interfaces
-├── __tests__/
-│   ├── utils.test.ts         # Tests for pure helpers
-│   ├── api.test.ts           # Tests for Gemini API with mocked globals
-│   ├── drive.test.ts         # Tests for Drive text extraction
-│   └── menu.test.ts          # Tests for onOpen / menu registration
-├── dist/                     # Build output (clasp pushes from here)
-├── appsscript.json           # Manifest: scopes, Drive Advanced Service
-├── .clasp.dev.json           # Dev script ID
-├── .clasp.prod.json          # Prod script ID
-├── rollup.config.js          # Bundler config
-├── tsconfig.json             # TypeScript config (ES2019/V8 target)
-├── jest.config.cjs           # Test runner
-├── .eslintrc.json            # Linting
-└── .prettierrc               # Formatting
-```
-
-### Module Breakdown
-
-| Module | What it does | Apps Script globals used |
-|--------|-------------|------------------------|
-| `config.ts` | Column names, model name, limits | None |
-| `api.ts` | `callGeminiAPI()` — text and multimodal | `UrlFetchApp`, `DriveApp`, `Utilities` |
-| `drive.ts` | `extractTextUniversal()`, OCR via Doc conversion | `DriveApp`, `Drive` (Advanced), `DocumentApp` |
-| `dialog.ts` | HTML string for the modal dialog | None |
-| `utils.ts` | ID extraction, link validation, seeded RNG, recursive file listing | `DriveApp` (only `getAllFilesRecursive`) |
-| `index.ts` | Menu creation, 4 tools, exports wired to footer stubs | `SpreadsheetApp`, `HtmlService`, `PropertiesService` |
+Google Apps Script add-on built with TypeScript, bundled by Rollup, and deployed via clasp. It exposes a spreadsheet inference toolkit to Google Sheets. All source lives locally — the build pipeline compiles and pushes to Apps Script. Avoid making changes in the online Apps Script editor; they'll be overwritten on the next deploy.
 
 ## Prerequisites
 
-- Node.js 18+ and npm
-- Apps Script API enabled: https://script.google.com/home/usersettings
-- Drive Advanced Service enabled in the Apps Script editor (Services > + > Drive API v3)
+- Node.js 22+
+- Apps Script API enabled at [script.google.com/home/usersettings](https://script.google.com/home/usersettings)
+- The SSI Toolkit Apps Script add-on project (script ID in `.clasp.json`)
+- A Gemini API key (required for the Run AI tool)
 
 ## Setup
 
 ```bash
-# 1. Install dependencies
 npm install
-
-# 2. Authenticate with Google
-npm run clasp:login
-
-# 3. Edit .clasp.dev.json with your script ID
-#    (from Extensions > Apps Script in your Google Sheet)
-
-# 4. Set your Gemini API key in Script Properties:
-#    Apps Script editor > Project Settings > Script Properties
-#    Key: GEMINI_API_KEY   Value: your-key-here
-
-# 5. Build and deploy
-npm run deploy:dev
+npm run clasp:login          # authenticate with Google
 ```
 
-## Development
+Set `GEMINI_API_KEY` as a Script Property in Apps Script > Project Settings > Script Properties, then deploy:
 
 ```bash
-npm run build              # Clean build to dist/
-npm run build:watch        # Continuous rebuild on file changes
-npm run deploy:dev         # Build + push to dev script
-npm run deploy:prod        # Build + push to prod script
-npm run deploy:watch:dev   # Continuous build + push watch (dev)
-npm run deploy:watch:prod  # Continuous build + push watch (prod)
-
-npm test                   # Run tests
-npm run test:watch         # Run tests in watch mode
-npm run test:coverage      # Run tests with coverage + enforce per-file thresholds
-
-npm run lint               # Lint TypeScript
-npm run lint:fix           # Lint with auto-fix
-npm run format             # Format with Prettier
-npm run format:check       # Check formatting without modifying files
-npm run typecheck          # Type-check without building
-
-npm run clasp:open         # Open the Apps Script editor in browser
-npm run clasp:logs         # Tail execution logs from Apps Script
+npm run deploy               # build and push to HEAD
 ```
 
-Run a single test file: `npx jest __tests__/utils.test.ts`
+## Key Commands
+
+```bash
+# Build
+npm run build               # clean build to dist/
+npm run build:watch         # rebuild on file changes
+
+# Deploy
+npm run deploy              # build + push to HEAD (development)
+npm run deploy:watch        # continuous build + push watch
+
+# Test
+npm test                    # run all tests
+npm run test:watch          # watch mode
+npm run test:coverage       # with per-file coverage thresholds
+
+# Quality
+npm run lint                # ESLint
+npm run typecheck           # type-check without building
+npm run format:check        # check Prettier formatting
+
+# Utilities
+npm run clasp:open          # open Apps Script editor in browser
+npm run clasp:logs          # tail execution logs
+```
+
+Run a single test file: `npx jest __tests__/api.test.ts`
 Run a single test by name: `npx jest -t "extractId"`
 
-## How the Build Works
+## Code Lifecycle
+
+SSI Toolkit uses a single Apps Script project with two deployment states:
+
+**HEAD** is the active development surface. `npm run deploy` pushes your local build here. You can test at HEAD using Apps Script's built-in test deployments (Deploy → Test deployments in the script editor) without affecting anyone who has the add-on installed. The "SSI Toolkit (dev)" Document is pre-populated with useful test data.
+
+**Versioned deployment** is what Marketplace-installed users run. It is a pinned snapshot that only changes when a human explicitly runs `scripts/release.sh` from `main`.
+
+### Branch workflow
 
 ```
-src/**/*.ts  →  Rollup (TS + node-resolve)  →  dist/index.js  →  clasp push  →  Apps Script
+feature-branch → develop   (PR + code review)
+develop        → main      (PR containing manual QA instructions = release gate)
+main                       (run ./scripts/release.sh to publish)
 ```
 
-Rollup bundles everything into a single IIFE assigned to `_GASEntry`. Apps Script has no module system and can only discover top-level functions in the global scope. The `footer` field in `rollup.config.js` bridges this gap by appending plain global stubs that delegate into the IIFE:
+Feature work happens on branches, merged to `develop` via PR. When ready to ship, `develop` is merged to `main` via a PR containing manual QA instructions — that merge is the release gate. Only then is `scripts/release.sh` run from `main`, which builds and pushes to HEAD, snapshots it as a new immutable version, and repoints the Marketplace deployment.
+
+```
+./scripts/release.sh  → builds, pushes to HEAD, and promotes to Marketplace (human-only, main only)
+```
+
+`scripts/release.sh` enforces the `main` requirement — it will exit with an error if run from any other branch.
+
+> **Note for future contributors:** This pipeline assumes a single developer. `npm run deploy` pushes to a shared HEAD — concurrent development will cause conflicts. This should be revisited before a second developer joins the project.
+
+## Build Pipeline
+
+The build produces two outputs from a single `rollup.config.js` array:
+
+**Server** — `src/server/index.ts` → `dist/index.js` (IIFE format). Apps Script has no module system and only discovers top-level global functions. The Rollup `footer` field appends plain stubs that delegate into the IIFE:
 
 ```js
-function onOpen(e) { _GASEntry.onOpen(e); }
-function showSourceDialog() { _GASEntry.showSourceDialog(); }
-// ... one stub per public entry point
+function onOpen() { _GASEntry.onOpen(); }
 ```
 
-**To expose a new function to Apps Script, you must do both:**
-1. `export` it from `src/server/index.ts`
-2. Add a matching global stub in the `footer` of `rollup.config.js`
+To expose a new function to Apps Script, you must both `export` it from `index.ts` and add a matching stub in the `rollup.config.js` footer. Skipping the stub means Apps Script can't find it.
 
-If you skip step 2, the function will exist in the bundle but Apps Script won't be able to discover or call it.
+**Client** — `src/client/sidebar-entry.ts` → `dist/Sidebar.html`. HtmlService only serves `.html` files, so all JS and CSS must be inlined at build time. A custom Rollup plugin handles this: it compiles the client bundle, reads `src/Sidebar.html` and `src/client/sidebar.css`, replaces `{{STYLES}}` and `{{SCRIPTS}}` placeholders, and emits the final HTML asset.
 
-## Tool 4 — Run AI: Required Columns
+`appsscript.json` is copied into `dist/` as part of the build — clasp needs the manifest alongside the bundled JS.
 
-`runBatchAI` maps columns by header name. The active sheet must contain these exact headers (case-sensitive):
+## Architecture
 
-| Column header | Purpose |
-|---|---|
-| `source_drive` | Drive file link (multimodal mode) |
-| `source_text` | Plain text input (text mode) |
-| `system_prompt` | System prompt for each row |
-| `user_prompt` | User prompt for each row |
-| `ai_inference` | Output column (written by the tool) |
+The codebase has two separate TypeScript environments with a hard boundary between them:
 
-The Gemini API key must be stored as a Script Property (`GEMINI_API_KEY`) in Apps Script > Project Settings > Script Properties before Tool 4 will run.
+**Server** (`src/server/`) runs on Google's infrastructure. `index.ts` is the only file that touches Apps Script UI globals (`SpreadsheetApp`, `HtmlService`, `PropertiesService`). Everything else — API calls, Drive operations, utilities — is written as pure functions with no GAS globals, which keeps them testable.
 
-## Key Notes
+**Client** (`src/client/`) runs in the browser inside the sidebar HtmlService iframe. `services.ts` is the connective tissue between server and client — it wraps every `google.script.run` call as a Promise so the rest of the client code never touches the GAS boundary directly.
 
-**Drive Advanced Service:** The `extractTextUniversal` function uses `Drive.Files.create()` and `Drive.Files.remove()` (v3 API) for PDF/image OCR. This is the Drive *Advanced Service*, not `DriveApp`. It must be enabled separately in the Apps Script editor AND is declared in `appsscript.json` under `enabledAdvancedServices`.
+`google.script.run` is injected by GAS's HtmlService at runtime and exposes whatever functions exist in the global scope of the deployed script — meaning the footer stubs from `rollup.config.js`. There are no built-in TypeScript types for it, so `src/client/google.d.ts` is a hand-maintained declaration file that tells the compiler what's available. It is not auto-generated: if you add a new server function and forget to update `google.d.ts`, the client will typecheck against stale declarations and only fail at runtime.
 
-**appsscript.json must be in dist/:** Clasp needs the manifest alongside the bundled JS. The build script handles this automatically — it runs `rimraf dist`, Rollup, then copies `appsscript.json` into `dist/`. No manual copy needed.
+The client uses a lightweight panel/router system: `Router` manages a navigation stack, and each `Panel` implementation handles its own render and state. `recipes.ts` holds the registry of named recipes that drive the `RecipePanel` generic panel.
 
-**Custom functions have limited permissions:** The `GEMINI()` custom function (if you add one) cannot access `PropertiesService`, so passing an API key to it requires a different pattern (hardcoded config, cache, or trigger-based pre-fetch).
+When adding new functionality, keep this layering intact — GAS globals in `index.ts`, `google.script.run` in `services.ts`, business logic in pure modules that can be unit tested.
 
-**Localhost during development:** `UrlFetchApp` runs on Google's servers. To hit localhost, you need a tunnel (ngrok, Cloudflare Tunnel) or a deployed staging endpoint.
+## Testing
+
+Jest with ts-jest. Tests live in `__tests__/`.
+
+**Mocking GAS globals:** Set properties on `globalThis` *before* importing the module under test, since imports execute immediately:
+
+```ts
+(globalThis as any).UrlFetchApp = { fetch: jest.fn() };
+const { callGeminiAPI } = await import("../src/server/api");
+```
+
+**Mocking `google.script.run`:** Capture the success/failure handlers registered by the function under test, then invoke them manually to simulate GAS callbacks:
+
+```ts
+let capturedSuccess: (v: unknown) => void;
+mockRun.withSuccessHandler.mockImplementation((fn) => {
+  capturedSuccess = fn;
+  return mockRun;
+});
+// later: capturedSuccess(mockValue)
+```
+
+Coverage is enforced per-file — run `npm run test:coverage` to check thresholds.

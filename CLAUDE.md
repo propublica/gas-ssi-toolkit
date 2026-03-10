@@ -24,15 +24,15 @@ npm run lint                # ESLint on src/
 npm run lint:fix            # ESLint with auto-fix
 npm run format              # Prettier on src/ (rewrites files)
 npm run format:check        # Check Prettier formatting without modifying files
-npm run typecheck           # TypeScript type check without building (tsc --noEmit)
-npm run deploy:dev          # Build + clasp push to dev script
-npm run deploy:prod         # Build + clasp push to prod script
-npm run deploy:watch:dev    # Continuous build + clasp push watch (dev)
-npm run deploy:watch:prod   # Continuous build + clasp push watch (prod)
+npm run typecheck           # TypeScript type check without building (server + client tsconfigs)
+npm run deploy              # Build + clasp push to HEAD (development)
+npm run deploy:watch        # Continuous build + push watch
 npm run clasp:open          # Open the Apps Script editor in browser
 npm run clasp:logs          # Tail execution logs from Apps Script
 npm run clasp:login         # Authenticate clasp (required before first deploy)
 ```
+
+> **Note for Claude:** `scripts/release.sh` is a human-only operation and must never be invoked by Claude. It is enforced via a deny rule in `.claude/settings.local.json`.
 
 Run a single test file: `npx jest __tests__/utils.test.ts`
 Run a single test by name: `npx jest -t "extractId"`
@@ -41,13 +41,17 @@ Run a single test by name: `npx jest -t "extractId"`
 
 ### Build Pipeline
 
+The build produces two outputs via a `rollup.config.js` array:
+
+**Config 1 — Server bundle:**
+
 `src/server/index.ts` → Rollup (IIFE format, assigned to `_GASEntry`) → `dist/index.js`
 
 Apps Script has no module system — it only sees top-level functions in the global scope. Rollup wraps everything in an IIFE assigned to `_GASEntry`, so exports from `index.ts` are not directly visible. The `footer` field in `rollup.config.js` bridges this gap by appending plain global function stubs that delegate into the IIFE:
 
 ```js
 function onOpen(e) { _GASEntry.onOpen(e); }
-function showSourceDialog() { _GASEntry.showSourceDialog(); }
+function showSidebar() { _GASEntry.showSidebar(); }
 // ... one stub per public entry point
 ```
 
@@ -57,21 +61,114 @@ function showSourceDialog() { _GASEntry.showSourceDialog(); }
 
 If you skip step 2, the function will exist in the bundle but Apps Script won't be able to discover or call it.
 
+**If the function is also called from the client, add a third step:**
+3. Add it to `src/client/google.d.ts`
+
+`google.d.ts` is hand-maintained — it is not auto-generated from server code. If you skip step 3, the client will typecheck against stale declarations and only fail at runtime.
+
+**Custom functions (callable from spreadsheet cells) require one extra step:**
+3. Add a JSDoc comment with `@customfunction` directly on the stub in `rollup.config.js`
+
+The TypeScript-level JSDoc is compiled away by Rollup and does not appear on the global stub. Google Sheets only registers a function as a custom function when `@customfunction` is present in a JSDoc comment on the **global** declaration — the one in the footer. Without it the function executes correctly when called explicitly but does not appear in autocomplete and is not recognized as a custom function by Sheets.
+
+**Config 2 — Client bundle → `dist/Sidebar.html`:**
+
+`src/client/sidebar-entry.ts` → Rollup (IIFE) → `inlineSidebarHtml` plugin → `dist/Sidebar.html`
+
+HtmlService can only serve `.html` files — all JavaScript and CSS must be inlined at build time. The custom `inlineSidebarHtml` Rollup plugin handles this:
+1. Compiles `sidebar-entry.ts` to an intermediate JS chunk
+2. Reads `src/Sidebar.html` (the template), `src/client/sidebar.css`
+3. Replaces `{{STYLES}}` with `<style>…css…</style>` and `{{SCRIPTS}}` with `<script>…js…</script>`
+4. Emits `dist/Sidebar.html` as an asset
+5. Deletes the intermediate `.js` chunk so clasp never pushes it as a `.gs` file
+
+The `src/Sidebar.html` template is also read at test time by `__tests__/helpers/sidebar-fixtures.ts` to keep DOM fixtures structurally in sync with the real template.
+
 ### Module Dependency Graph
 
+**Server:**
 ```
-src/server/index.ts   (entry point — menu, 4 tool orchestrators, UI handlers)
-├── src/server/config.ts   (CONFIG object: API key property name, model, column names, limits)
-├── src/server/api.ts      (callGeminiAPI — text or multimodal via UrlFetchApp + base64)
-├── src/server/drive.ts    (extractTextUniversal, checkDriveService — OCR via Drive Advanced Service)
-├── src/server/dialog.ts   (HTML_TEMPLATE string for AI mode selection modal)
-├── src/server/utils.ts    (extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive, sampleRows, truncateText, getAIContext)
-└── src/shared/types.ts    (shared interfaces: AppConfig, AIMode, ColumnMap, AIContext variants)
+src/server/index.ts          (entry point — menu, 4 tool orchestrators, UI handlers, re-exports custom functions)
+├── src/server/config.ts         (CONFIG object: API key property name, model, column names, limits)
+├── src/server/api.ts            (callGeminiAPI, buildGeminiPayload, invokeGemini — pure HTTP adapter via UrlFetchApp;
+│                                 buildGeminiPayload resolves ToolId[] via TOOL_REGISTRY, splits grounding vs function tools)
+├── src/server/inference.ts      (runInference — unified inference handler for menu-triggered AI calls; no SpreadsheetApp dep;
+│                                 returns string|null, null signals caller to skip the row)
+├── src/server/tools.ts          (TOOL_REGISTRY: Record<ToolId, GeminiTool> — exhaustive at compile time; adding a ToolId
+│                                 without a registry entry is a type error)
+├── src/server/types.ts          (server-only types: AppConfig, GeminiRequest, GeminiTool discriminated union,
+│                                 GeminiInlineData, GeminiFunctionDeclaration, DriveFileInfo; never imported by client)
+├── src/server/drive.ts          (extractTextUniversal, fetchAndEncodeFile, checkDriveService)
+├── src/server/dialog.ts         (HTML_TEMPLATE string for AI mode selection modal)
+├── src/server/customFunctions.ts  (SSI — Sheets custom function; calls invokeGemini directly; always returns string,
+│                                 uses "[SSI Error: ...]" format)
+├── src/server/utils.ts          (extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive, sampleRows,
+│                                 truncateText, findOrCreateColumn, writeColumn, flattenArg)
+└── src/shared/types.ts          (RPC boundary ONLY — ToolId union, RunConfig, PrepRecipeParams, PrepRecipeResult;
+                                  all with optional tools?: ToolId[])
 ```
+
+**Client:**
+```
+src/client/sidebar-entry.ts  (thin init — instantiates all panels, creates Router, calls router.start("tool-list"))
+└── src/client/router.ts         (Router class — push/pop navigation stack)
+└── src/client/services.ts       (GAS boundary — wraps google.script.run as Promises)
+└── src/client/types.ts          (PanelId, Panel<P,S>, NavigationContext, RecipeDefinition, RecipeParams,
+│                                 RecipeFieldConfig interfaces — client-only UI types)
+└── src/client/tools.ts          (TOOL_CATALOG: ToolCatalogEntry[] — display metadata for sidebar TagList;
+│                                 hardcoded at build time, no RPC needed)
+└── src/client/recipes.ts        (RECIPES registry — RecipeDefinition[] for all standard recipes)
+└── src/client/panels/
+│   ├── tool-list.ts             (ToolListPanel — entry screen, dispatches to tool or recipes)
+│   ├── configure-ai-run.ts      (ConfigureAIRunPanel — column mapping, row range, tool selection, AI run)
+│   ├── recipes-list.ts          (RecipesListPanel — browsable list of recipes)
+│   └── recipe.ts                (RecipePanel — generic panel driven by RecipeParams; prep → cook flow)
+└── src/client/components/       (reusable UI components)
+    ├── tag-list.ts              (TagList — multi-select tag chips; accepts string[] or {label,value}[] items)
+    ├── single-tag-list.ts       (SingleTagList — exclusive-select tag chips)
+    ├── row-range.ts             (RowRange — start/end row inputs)
+    ├── lockable-field.ts        (LockableField — value + lock/unlock toggle; optional onUnlock callback)
+    └── recipe-prep-cook.ts      (RecipePrepCook — 4-state machine: idle/prepping/prep-complete/cooking)
+    └── src/shared/types.ts
+
+src/client/google.d.ts       (compile-time type stub for google.script.run — uses declare global{} pattern)
+src/client/sidebar.css       (sidebar styles — inlined into dist/Sidebar.html at build time)
+src/Sidebar.html             (sidebar template — {{STYLES}} and {{SCRIPTS}} placeholders replaced at build time)
+```
+
+### Tool System
+
+The Gemini tool system spans three layers. `ToolId` (a string union in `shared/types.ts`) is the RPC boundary — it's the only tool concept that crosses `google.script.run`.
+
+**To add a new tool, touch exactly three files:**
+1. **`src/shared/types.ts`** — add the string literal to `ToolId`
+2. **`src/server/tools.ts`** — add a `GeminiTool` entry to `TOOL_REGISTRY` (`Record<ToolId, GeminiTool>` enforces exhaustiveness at compile time)
+3. **`src/client/tools.ts`** — add a `ToolCatalogEntry` to `TOOL_CATALOG` for sidebar display
+
+**`GeminiTool` discriminated union** (in `server/types.ts`):
+- `{ kind: "grounding"; id: ToolId }` — produces `{ [id]: {} }` in the Gemini REST payload (e.g. `google_search`, `url_context`, `code_execution`)
+- `{ kind: "function"; declaration: GeminiFunctionDeclaration }` — produces `{ function_declarations: [...] }` in the payload
+
+`buildGeminiPayload` in `api.ts` resolves `ToolId[]` via `TOOL_REGISTRY`, splits by `kind`, and assembles both shapes into the `tools` array of the REST request.
+
+**Propagation path:** `ConfigureAIRunPanel` (UI TagList) → `RunConfig.tools` → `runBatchAI` → `runInference(tools?)` → `invokeGemini` → `callGeminiAPI` → `buildGeminiPayload`. For recipes: `RecipePanel` → `PrepRecipeParams.tools` → server echoes back as `PrepRecipeResult.tools` → assembled into `preppedRunConfig`.
 
 Source files use relative imports (e.g. `../shared/types`). The `@server/*` and `@shared/*` aliases are **Jest-only** (mapped in `jest.config.cjs`) and are not available in TypeScript source.
 
-Only `index.ts` should reference Google Apps Script UI services (SpreadsheetApp, HtmlService, PropertiesService). Other modules use injected values or specific GAS globals documented in their headers.
+Only `index.ts` should reference Google Apps Script UI services (SpreadsheetApp, HtmlService, PropertiesService). On the client side, only `services.ts` calls `google.script.run` (wrapping each call as a Promise); `sidebar-entry.ts` is a thin init file that creates the Router and calls `router.start()`.
+
+### TypeScript Configuration
+
+Two tsconfigs for two build environments:
+
+- **`tsconfig.json`** — server build. Targets ES2019, no DOM lib, excludes `src/client/`.
+- **`tsconfig.client.json`** — client build and client tests. Extends base, adds `"lib": ["ES2019", "DOM"]`, sets `rootDir: "."` (covers both `src/` and `__tests__/`). Includes precise file patterns: `src/client/**/*.ts`, `src/shared/**/*.ts`, and the client-side test files.
+
+`npm run typecheck` runs both: `tsc --noEmit && tsc -p tsconfig.client.json --noEmit`.
+
+**Jest transform:** `jest.config.cjs` uses a single transform rule — `tsconfig.client.json` for all `.ts` files. This avoids a ts-jest static `_cachedConfigSets` bug where multiple transformer instances sharing one Jest worker (common on CI with few CPUs) would reuse the first-cached ConfigSet regardless of per-transform tsconfig options, causing client files to compile without DOM types. Server code compiles cleanly under `tsconfig.client.json` since it never references DOM globals.
+
+**Note on types:** `tsconfig.client.json` uses `"types": ["google-apps-script", "jest"]` — do **not** add `"node"` here, as it causes `MimeType` collisions with the google-apps-script types. When a file needs Node.js types (e.g. `readFileSync`), use a triple-slash directive at the top of that file: `/// <reference types="node" />`.
 
 ### Testing
 
@@ -79,7 +176,38 @@ Jest with ts-jest preset. Tests live in `__tests__/`. Path aliases `@server/*` a
 
 **Pattern for mocking GAS globals:** Declare mocks (UrlFetchApp, DriveApp, SpreadsheetApp, etc.) as `globalThis` properties **before** importing the module under test, since imports execute immediately.
 
-**Coverage:** Run `npm run test:coverage` to collect coverage and enforce per-file thresholds. Coverage is opt-in — the pre-commit hook runs `jest --bail` without `--coverage`. `src/server/index.ts` is excluded from coverage collection: `onOpen` and `openQuickstartDoc` are tested in `menu.test.ts`, but the four tool orchestrators are deeply coupled to SpreadsheetApp UI globals and are not unit-tested. See `docs/plans/2026-02-18-testing-coverage-design.md` for full rationale.
+**Client-side mock pattern:** For `google.script.run`, capture the success/failure handlers registered by the function under test:
+
+```ts
+const mockRun = {
+  withSuccessHandler: jest.fn().mockReturnThis(),
+  withFailureHandler: jest.fn().mockReturnThis(),
+  getSheetHeaders: jest.fn(),
+  // ...
+};
+(globalThis as unknown as { google: unknown }).google = { script: { run: mockRun } };
+
+let capturedSuccess: (v: unknown) => void;
+beforeEach(() => {
+  mockRun.withSuccessHandler.mockImplementation((fn) => { capturedSuccess = fn; return mockRun; });
+});
+// Then invoke capturedSuccess(...) / capturedFailure(...) to simulate GAS callbacks.
+```
+
+**Shared DOM fixtures:** `__tests__/helpers/sidebar-fixtures.ts` exports:
+- `FULL_SIDEBAR_HTML` — the sidebar HTML template read from `src/Sidebar.html` at test time (placeholders stripped), so tests stay structurally in sync with the real template without manual drift.
+- `setupConfigPanel(headers?)` — sets `document.body.innerHTML` and populates all tag containers.
+- `setupWithSelections(opts)` — calls `setupConfigPanel` then pre-selects values via `applyPreset`.
+
+The `__tests__/helpers/` directory is excluded from test discovery via `testPathIgnorePatterns` in `jest.config.cjs`.
+
+**Coverage:** Run `npm run test:coverage` to collect coverage and enforce per-file thresholds. Coverage is opt-in — the pre-commit hook runs `jest --bail` without `--coverage`.
+
+Two files are excluded from coverage collection entirely:
+- `src/server/index.ts` — the four tool orchestrators are deeply coupled to SpreadsheetApp UI globals and are not unit-tested.
+- `src/client/sidebar-entry.ts` — contains only `init()`, which is called immediately at module load time (before `beforeEach` can set up the DOM) and has no exports to test in isolation.
+
+See `docs/plans/2026-02-18-testing-coverage-design.md` for full rationale.
 
 **CI:** `.github/workflows/lint-typecheck-format-test.yml` runs on push to `main` and PRs targeting `main`: lint → typecheck → format check → test with coverage.
 
@@ -103,8 +231,30 @@ The Gemini API key must be set as a Script Property (`GEMINI_API_KEY`) in Apps S
 - **No Node.js built-ins** — everything runs on Google's servers
 - `appsscript.json` must be in `dist/` for clasp push (the build script copies it)
 - Drive Advanced Service must be enabled in the Apps Script editor AND declared in `appsscript.json`
-- `PropertiesService` is not available in custom functions (only in menu-triggered functions)
-- `.clasp.json` is generated at deploy time by copying `.clasp.dev.json` or `.clasp.prod.json`
+- `PropertiesService.getScriptProperties()` is available in custom functions once the add-on has been authorized by the user (opening the menu triggers authorization)
+- `.clasp.json` is committed to the repo and points to the single add-on script project
+
+## GitHub
+
+### Creating PRs
+
+The `gh` CLI may fail with a TLS certificate error (`OSStatus -26276`) on this machine. Use the GitHub API directly via curl instead:
+
+```bash
+TOKEN=$(gh auth token)
+curl -s -k -X POST \
+  -H "Authorization: token $TOKEN" \
+  -H "Accept: application/vnd.github.v3+json" \
+  https://api.github.com/repos/propublica/gas-ssi-toolkit/pulls \
+  -d "{
+    \"title\": \"your PR title\",
+    \"head\": \"your-branch-name\",
+    \"base\": \"develop\",
+    \"body\": \"your PR body\"
+  }" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('html_url') or d)"
+```
+
+PRs target `develop` by default; use `"base": "main"` for hotfixes. The `-k` flag skips TLS verification (safe for GitHub's well-known API).
 
 ## Code Style
 

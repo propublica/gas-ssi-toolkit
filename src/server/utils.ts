@@ -1,11 +1,12 @@
 /**
- * utils.ts — Small pure helpers.
+ * utils.ts — Small helpers with no dependency on Apps Script global singletons.
  *
- * These have no dependency on Apps Script globals, which makes them
- * trivially testable without mocking.
+ * Functions that accept GAS object parameters (Sheet, Folder) receive them
+ * as arguments, making them testable via duck-typed fakes without globalThis mocking.
+ * Functions that operate purely on plain values have no GAS dependency at all.
  */
 
-import type { AIContext, AIMode, ColumnMap, DriveFileInfo } from "../shared/types";
+import type { DriveFileInfo } from "./types";
 
 /**
  * Extract a Google Drive file/folder ID from a URL or raw ID string.
@@ -80,23 +81,64 @@ export function truncateText(text: string, maxLength: number): string {
 }
 
 /**
- * Determine the AI context for a row, or return null to skip it.
- * Pure function — no GAS dependencies.
+ * Normalize a custom function argument to a flat array of non-empty strings.
+ * GAS passes single-cell references as raw scalars and ranges as 2D arrays.
  */
-export function getAIContext(row: unknown[], map: ColumnMap, mode: AIMode): AIContext | null {
-  if (mode === "TEXT") {
-    const txt = map.source_text > -1 ? (row[map.source_text] as string) : "";
-    if (txt && txt.length > 5 && !txt.includes("Error")) {
-      return { textContext: txt };
-    }
-    return null;
+export function flattenArg(val: unknown): string[] {
+  if (!Array.isArray(val)) return val != null && String(val) !== "" ? [String(val)] : [];
+  return (val as unknown[][])
+    .flat()
+    .filter((v) => v !== "" && v != null)
+    .map(String);
+}
+
+/**
+ * Map an array of column header names to their zero-based indices.
+ * Returns -1 for any name not found in `headers`.
+ */
+export function resolveColumns(headers: string[], names: string[]): number[] {
+  return names.map((name) => headers.indexOf(name));
+}
+
+/**
+ * Find a column by header title in row 1, or append a new one.
+ * Returns the 1-based column index.
+ * Pass wrapStrategy to apply a wrap format to the entire new column on creation.
+ */
+export function findOrCreateColumn(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  title: string,
+  wrapStrategy?: GoogleAppsScript.Spreadsheet.WrapStrategy,
+): number {
+  const lastCol = sheet.getLastColumn();
+  if (lastCol > 0) {
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
+    const idx = headers.indexOf(title);
+    if (idx !== -1) return idx + 1;
   }
-  if (mode === "FILE") {
-    const link = row[map.source_drive] as string;
-    if (isValidDriveLink(link)) {
-      return { fileId: extractId(link) };
-    }
-    return null;
+  const newCol = lastCol + 1;
+  sheet.getRange(1, newCol).setValue(title);
+  if (wrapStrategy !== undefined) {
+    sheet.getRange(1, newCol, sheet.getMaxRows(), 1).setWrapStrategy(wrapStrategy);
   }
-  return null;
+  return newCol;
+}
+
+/**
+ * Write an array of string values to a column starting at row 2.
+ * Uses a single setValues() call for efficiency.
+ * Pass wrapStrategy to apply a wrap format to the written range.
+ */
+export function writeColumn(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  colIdx: number,
+  values: string[],
+  wrapStrategy?: GoogleAppsScript.Spreadsheet.WrapStrategy,
+): void {
+  if (values.length === 0) return;
+  const range = sheet.getRange(2, colIdx, values.length, 1);
+  range.setValues(values.map((v) => [v]));
+  if (wrapStrategy !== undefined) {
+    range.setWrapStrategy(wrapStrategy);
+  }
 }

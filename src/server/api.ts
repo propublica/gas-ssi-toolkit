@@ -1,69 +1,123 @@
 /**
  * api.ts — Gemini API interaction via UrlFetchApp.
  *
+ * Pure HTTP adapter. All preprocessing (Drive file fetching, base64 encoding,
+ * text assembly) is the caller's responsibility.
+ *
  * Requires oauth scope: https://www.googleapis.com/auth/script.external_request
  */
 
 import { CONFIG } from "./config";
-import type { AIContext } from "../shared/types";
+import { TOOL_REGISTRY } from "./tools";
+import type { GeminiInlineData, GeminiRequest, GeminiResponse, GeminiCodePair } from "./types";
+
+interface GeminiPart {
+  text?: string;
+  inline_data?: GeminiInlineData;
+}
 
 /**
- * Call the Gemini generateContent endpoint.
- *
- * Supports two context modes:
- * - textContext: appends text to the user prompt (fast, text-only)
- * - fileId: base64-encodes the Drive file as inline_data (multimodal)
+ * Assemble the Gemini generateContent request payload from a GeminiRequest.
+ * Pure function — no GAS globals. Independently testable.
  */
-export function callGeminiAPI(
-  apiKey: string,
-  systemPrompt: string,
-  userPrompt: string,
-  context: AIContext,
-): string {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.MODEL_NAME}:generateContent?key=${apiKey}`;
+export function buildGeminiPayload(req: GeminiRequest): Record<string, unknown> {
+  const parts: GeminiPart[] = req.userTexts.map((text) => ({ text }));
+  req.inlineData?.forEach((d) => parts.push({ inline_data: d }));
 
   const payload: Record<string, unknown> = {
     system_instruction: {
-      parts: [{ text: systemPrompt || "You are a helpful assistant." }],
+      parts: [{ text: req.systemPrompt || "You are a helpful assistant." }],
     },
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: userPrompt }],
-      },
-    ],
+    contents: [{ role: "user", parts }],
   };
 
-  // Branch on context type
-  const parts = (payload.contents as { parts: Record<string, unknown>[] }[])[0].parts;
-
-  if (context.textContext) {
-    // Append text context to the user prompt part
-    parts[parts.length - 1].text += `\n\n--- CONTEXT ---\n${context.textContext}`;
-  } else if (context.fileId) {
-    // Base64-encode the file and attach as inline_data
-    const file = DriveApp.getFileById(context.fileId);
-    if (file.getSize() > CONFIG.MAX_FILE_SIZE_BYTES) {
-      throw new Error("File too large (>25MB).");
-    }
-    parts.push({
-      inline_data: {
-        mime_type: file.getMimeType(),
-        data: Utilities.base64Encode(file.getBlob().getBytes()),
-      },
-    });
+  if (req.generationConfig) {
+    payload.generationConfig = req.generationConfig;
   }
+
+  if (req.tools && req.tools.length > 0) {
+    const entries = req.tools.map((id) => TOOL_REGISTRY[id]);
+
+    const groundingEntries = entries
+      .filter((t): t is Extract<typeof t, { kind: "grounding" }> => t.kind === "grounding")
+      .map((t) => ({ [t.id]: {} }));
+
+    const functionDeclarations = entries
+      .filter((t): t is Extract<typeof t, { kind: "function" }> => t.kind === "function")
+      .map((t) => t.declaration);
+
+    const toolsPayload = [
+      ...groundingEntries,
+      ...(functionDeclarations.length ? [{ function_declarations: functionDeclarations }] : []),
+    ];
+
+    payload.tools = toolsPayload;
+  }
+
+  return payload;
+}
+
+/**
+ * Call the Gemini generateContent endpoint and return the response as GeminiResponse.
+ */
+export function callGeminiAPI(req: GeminiRequest): GeminiResponse {
+  const modelName = req.modelName ?? CONFIG.MODEL_NAME;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${req.apiKey}`;
 
   const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
     method: "post",
     contentType: "application/json",
-    payload: JSON.stringify(payload),
+    payload: JSON.stringify(buildGeminiPayload(req)),
     muteHttpExceptions: true,
   };
 
   const response = UrlFetchApp.fetch(url, options);
-  const json = JSON.parse(response.getContentText());
+  const json = JSON.parse(response.getContentText()) as Record<string, unknown>;
 
-  if (json.error) throw new Error(json.error.message);
-  return json.candidates?.[0]?.content?.parts?.[0]?.text || "No response.";
+  if (json.error) throw new Error((json.error as { message: string }).message);
+
+  const candidate = (json.candidates as Array<Record<string, unknown>> | undefined)?.[0];
+  const parts =
+    (candidate?.content as { parts?: Array<Record<string, unknown>> } | undefined)?.parts ?? [];
+
+  // Assemble text from all text parts (may be interspersed with code execution parts)
+  const textParts = parts
+    .filter((p): p is { text: string } => typeof p["text"] === "string")
+    .map((p) => p.text);
+  const text = textParts.join("\n\n") || "No response.";
+
+  // Extract consecutive executableCode + codeExecutionResult pairs (camelCase REST JSON)
+  const codePairs: GeminiCodePair[] = [];
+  for (let i = 0; i < parts.length - 1; i++) {
+    const curr = parts[i];
+    const next = parts[i + 1];
+    if (curr["executableCode"] !== undefined && next["codeExecutionResult"] !== undefined) {
+      codePairs.push({
+        code: curr["executableCode"] as GeminiCodePair["code"],
+        result: next["codeExecutionResult"] as GeminiCodePair["result"],
+      });
+      i++; // skip the result part — already consumed
+    }
+  }
+
+  const groundingMetadata = candidate?.["groundingMetadata"] as
+    | GeminiResponse["groundingMetadata"]
+    | undefined;
+
+  return {
+    text,
+    ...(groundingMetadata !== undefined && { groundingMetadata }),
+    ...(codePairs.length > 0 && { codePairs }),
+  };
+}
+
+/**
+ * Resolve the Gemini API key from Script Properties and call callGeminiAPI.
+ * This is the preferred entry point for all production Gemini calls.
+ * Throws if the API key property is not set.
+ */
+export function invokeGemini(params: Omit<GeminiRequest, "apiKey">): GeminiResponse {
+  const apiKey = PropertiesService.getScriptProperties().getProperty(CONFIG.API_KEY_PROPERTY);
+  if (!apiKey) throw new Error(`${CONFIG.API_KEY_PROPERTY} script property not set`);
+  return callGeminiAPI({ apiKey, ...params });
 }

@@ -22,6 +22,10 @@ const mockUi = {
   openById: jest.fn(),
 };
 
+(globalThis as any).Utilities = {
+  base64Encode: jest.fn().mockReturnValue("base64data=="),
+};
+
 (globalThis as any).MimeType = {
   GOOGLE_DOCS: "application/vnd.google-apps.document",
   PDF: "application/pdf",
@@ -29,7 +33,7 @@ const mockUi = {
 
 // ── Import after mocks ─────────────────────────────────────────
 
-import { checkDriveService, extractTextUniversal } from "../src/server/drive";
+import { checkDriveService, extractTextUniversal, fetchAndEncodeFile } from "../src/server/drive";
 
 // ── Tests ──────────────────────────────────────────────────────
 
@@ -64,7 +68,7 @@ describe("extractTextUniversal", () => {
 
   it("reads text directly from a Google Doc", () => {
     (DriveApp.getFileById as jest.Mock).mockReturnValue({
-      getMimeType: () => MimeType.GOOGLE_DOCS,
+      getMimeType: () => "application/vnd.google-apps.document",
     });
     (DocumentApp.openById as jest.Mock).mockReturnValue({
       getBody: () => ({ getText: () => "doc body text" }),
@@ -76,7 +80,7 @@ describe("extractTextUniversal", () => {
   it("performs OCR and returns text for a PDF", () => {
     const mockBlob = {};
     (DriveApp.getFileById as jest.Mock).mockReturnValue({
-      getMimeType: () => MimeType.PDF,
+      getMimeType: () => "application/pdf",
       getName: () => "report.pdf",
       getBlob: () => mockBlob,
     });
@@ -129,5 +133,33 @@ describe("extractTextUniversal", () => {
 
     expect(extractTextUniversal("imgId123")).toBe("ocr text from image");
     expect((Drive.Files as any).remove).toHaveBeenCalledWith("tempImgDocId");
+  });
+});
+
+describe("fetchAndEncodeFile", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("returns mime_type and base64-encoded data for a valid file", () => {
+    const mockFile = {
+      getMimeType: () => "application/pdf",
+      getSize: () => 1024,
+      getBlob: () => ({ getBytes: () => [1, 2, 3] }),
+    };
+    (DriveApp.getFileById as jest.Mock).mockReturnValue(mockFile);
+
+    const result = fetchAndEncodeFile("file123");
+    expect(result.mime_type).toBe("application/pdf");
+    expect(result.data).toBe("base64data=="); // matches Utilities mock in this file
+  });
+
+  it("throws when file exceeds 25MB", () => {
+    const mockFile = {
+      getMimeType: () => "application/pdf",
+      getSize: () => 30 * 1024 * 1024,
+      getBlob: () => ({ getBytes: () => [] }),
+    };
+    (DriveApp.getFileById as jest.Mock).mockReturnValue(mockFile);
+
+    expect(() => fetchAndEncodeFile("bigfile")).toThrow("File too large");
   });
 });

@@ -6,6 +6,9 @@
  * editor (Services > + > Drive API v3) and declared in appsscript.json.
  */
 
+import { CONFIG } from "./config";
+import type { GeminiInlineData } from "./types";
+
 /**
  * Check that the Drive Advanced Service is available.
  * Returns truthy if available, false (and shows alert) if not.
@@ -60,4 +63,19 @@ export function extractTextUniversal(fileId: string): string {
   } catch (e) {
     return `[Error: ${(e as Error).message}]`;
   }
+}
+
+/**
+ * Fetch a Drive file by ID and return it as base64-encoded inline data
+ * ready for the Gemini API. Throws if the file exceeds the 25MB limit.
+ */
+export function fetchAndEncodeFile(fileId: string): GeminiInlineData {
+  const file = DriveApp.getFileById(fileId);
+  if (file.getSize() > CONFIG.MAX_FILE_SIZE_BYTES) {
+    throw new Error("File too large (>25MB).");
+  }
+  return {
+    mime_type: file.getMimeType(),
+    data: Utilities.base64Encode(file.getBlob().getBytes()),
+  };
 }
