@@ -256,6 +256,22 @@ describe("buildGroundingCellContent", () => {
     expect(link?.endIndex).toBe(idx + "Docs Page".length);
   });
 
+  it("assigns distinct positions to duplicate search queries", () => {
+    // The indexOf-based loop has no searchFrom advancement, so duplicate queries
+    // both resolve to the same startIndex. Position-tracking fixes this.
+    const response = makeResponse({
+      groundingMetadata: {
+        groundingChunks: [],
+        groundingSupports: [],
+        webSearchQueries: ["climate", "climate"],
+      },
+    });
+    const result = buildGroundingCellContent(response)!;
+    const links = result.ranges.filter((r) => r.url);
+    expect(links).toHaveLength(2);
+    expect(links[0].startIndex).not.toBe(links[1].startIndex);
+  });
+
   it("returns only code section — no search/source sections — when codePairs present", () => {
     const response = makeResponse({
       groundingMetadata: {

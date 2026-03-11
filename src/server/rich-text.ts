@@ -264,66 +264,44 @@ export function buildGroundingCellContent(response: GeminiResponse): CellContent
     return null;
   }
 
-  const sections: string[] = [];
-
   if (codePairs.length > 0) {
-    codePairs.forEach(({ code, result }) => {
+    const sections = codePairs.map(({ code, result }) => {
       const lang = code.language ? `(${code.language.toLowerCase()})` : "";
-      sections.push(`Code ${lang}:\n${code.code}\n\nOutput:\n${result.output}`);
+      return `Code ${lang}:\n${code.code}\n\nOutput:\n${result.output}`;
     });
     return { text: sections.join("\n\n"), ranges: [] };
   }
 
-  if (queries.length) {
-    sections.push(`Search queries: ${queries.map((q) => `"${q}"`).join(", ")}`);
-  }
-  if (sources.length) {
-    sections.push(
-      `Sources (${sources.length}):\n${sources.map((s) => `\u2022 ${s.title}`).join("\n")}`,
-    );
-  }
-
-  const fullText = sections.join("\n\n");
+  const parts: string[] = [];
   const ranges: TextRange[] = [];
+  let pos = 0;
+
+  function append(s: string): void {
+    parts.push(s);
+    pos += s.length;
+  }
 
   if (queries.length) {
-    const queriesHeader = "Search queries: ";
-    const queriesSectionStart = fullText.indexOf(queriesHeader);
-    if (queriesSectionStart >= 0) {
-      queries.forEach((q) => {
-        const quoted = `"${q}"`;
-        const idx = fullText.indexOf(quoted, queriesSectionStart);
-        if (idx !== -1) {
-          const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
-          ranges.push({ startIndex: idx, endIndex: idx + quoted.length, url });
-        }
-      });
-    }
+    append("Search queries: ");
+    queries.forEach((q, i) => {
+      if (i > 0) append(", ");
+      const quoted = `"${q}"`;
+      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+      ranges.push({ startIndex: pos, endIndex: pos + quoted.length, url });
+      append(quoted);
+    });
   }
 
   if (sources.length) {
-    const sourcesHeader = `Sources (${sources.length}):`;
-    const sourceSectionStart = fullText.indexOf(sourcesHeader);
-    const sourceSectionEnd =
-      sourceSectionStart >= 0
-        ? ((): number => {
-            const next = fullText.indexOf("\n\n", sourceSectionStart + sourcesHeader.length);
-            return next !== -1 ? next : fullText.length;
-          })()
-        : -1;
-
-    if (sourceSectionStart >= 0) {
-      let searchFrom = sourceSectionStart;
-      sources.forEach(({ uri, title }) => {
-        const bullet = `\u2022 ${title}`;
-        const idx = fullText.indexOf(bullet, searchFrom);
-        if (idx !== -1 && idx < sourceSectionEnd) {
-          ranges.push({ startIndex: idx + 2, endIndex: idx + 2 + title.length, url: uri });
-          searchFrom = idx + bullet.length;
-        }
-      });
-    }
+    if (parts.length > 0) append("\n\n");
+    append(`Sources (${sources.length}):\n`);
+    sources.forEach(({ uri, title }, i) => {
+      if (i > 0) append("\n");
+      append("\u2022 ");
+      ranges.push({ startIndex: pos, endIndex: pos + title.length, url: uri });
+      append(title);
+    });
   }
 
-  return { text: fullText, ranges };
+  return { text: parts.join(""), ranges };
 }
