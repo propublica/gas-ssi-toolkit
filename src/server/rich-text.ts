@@ -5,6 +5,11 @@
  * All helpers are private. No GAS globals — fully testable with Jest.
  *
  * GAS rendering (toCellValue) lives in index.ts which is excluded from coverage.
+ *
+ * Citation approach: Gemini groundingSupports are pre-processed into [text](url)
+ * markdown syntax before parsing. This lets the unified markdown parser handle
+ * all formatting (bold, italic, headings, links, citations) in a single pass
+ * without index remapping.
  */
 
 import type { GeminiResponse, GeminiGroundingSupport } from "./types";
@@ -26,58 +31,48 @@ export interface CellContent {
   ranges: TextRange[];
 }
 
-// ---- Private helpers ----
+// ---- Private types ----
 
-interface ParsedMarkdown {
-  cleanText: string;
-  ranges: TextRange[];
-  mapIndex: (originalIndex: number) => number;
+interface CitationRange {
+  startIndex: number;
+  endIndex: number;
+  sources: Array<{ uri: string; title: string }>;
 }
 
+// ---- Private helpers ----
+
 /**
- * processInline — applies **bold**, *italic*, and [text](url) patterns to one
- * segment of text (a single line after structural prefixes have been stripped).
+ * Process inline markdown patterns (**bold**, *italic*, [text](url)) within a
+ * segment of text. `offset` is the absolute position in the overall clean text
+ * where this segment begins — used so returned range indices are absolute.
  *
- * Mutates posMap and cleanParts in place. Returns the updated cleanLen.
- * origOffset is the absolute character position in the original full text where
- * `segment` begins — used so posMap entries land at the right indices.
+ * Returns the clean text with syntax stripped and ranges at absolute positions.
  */
-function processInline(
-  segment: string,
-  origOffset: number,
-  posMap: number[],
-  cleanParts: string[],
-  cleanLen: number,
-  ranges: TextRange[],
-): number {
+function processInline(segment: string, offset: number): { text: string; ranges: TextRange[] } {
+  const ranges: TextRange[] = [];
+  const parts: string[] = [];
+  let cleanLen = offset;
   let i = 0;
+
   while (i < segment.length) {
-    // [text](url) — inline link
+    // [text](url) — inline link (also used for injected citation links)
     if (segment[i] === "[") {
       const closeBracket = segment.indexOf("]", i + 1);
       if (closeBracket > i && segment[closeBracket + 1] === "(") {
-        // Find the matching close paren — use lastIndexOf from end of segment
-        // to handle URLs containing literal parentheses (e.g. Wikipedia links).
-        // We don't look past the next '[' to avoid eating into subsequent links.
+        // Use lastIndexOf to handle URLs containing literal parentheses.
+        // Don't search past the next '[' to avoid consuming subsequent links.
         const nextBracket = segment.indexOf("[", closeBracket + 2);
         const searchEnd = nextBracket === -1 ? segment.length - 1 : nextBracket - 1;
         const closeParen = segment.lastIndexOf(")", searchEnd);
         if (closeParen > closeBracket + 1) {
           const linkText = segment.slice(i + 1, closeBracket);
           const url = segment.slice(closeBracket + 2, closeParen);
-          // '[' stripped
-          posMap[origOffset + i] = cleanLen;
           const spanStart = cleanLen;
-          for (let j = 0; j < linkText.length; j++) {
-            posMap[origOffset + i + 1 + j] = cleanLen + j;
-            cleanParts.push(linkText[j]);
-          }
-          cleanLen += linkText.length;
-          // '](url)' stripped — map all those chars to current clean position
-          const syntaxTail = closeParen - closeBracket + 1; // '](' + url + ')'
-          for (let j = 0; j < syntaxTail; j++) {
-            posMap[origOffset + closeBracket + j] = cleanLen;
-          }
+          // Recursively process link text to handle bold/italic inside links.
+          const inner = processInline(linkText, cleanLen);
+          parts.push(inner.text);
+          cleanLen += inner.text.length;
+          ranges.push(...inner.ranges);
           if (cleanLen > spanStart) {
             ranges.push({ startIndex: spanStart, endIndex: cleanLen, url });
           }
@@ -87,21 +82,14 @@ function processInline(
       }
     }
 
-    // **bold** — must be checked before single *
+    // **bold** — must check before single *
     if (segment[i] === "*" && segment[i + 1] === "*") {
       const closeIdx = segment.indexOf("**", i + 2);
       if (closeIdx > i + 2) {
-        posMap[origOffset + i] = cleanLen;
-        posMap[origOffset + i + 1] = cleanLen;
         const spanStart = cleanLen;
         const content = segment.slice(i + 2, closeIdx);
-        for (let j = 0; j < content.length; j++) {
-          posMap[origOffset + i + 2 + j] = cleanLen + j;
-          cleanParts.push(content[j]);
-        }
+        parts.push(content);
         cleanLen += content.length;
-        posMap[origOffset + closeIdx] = cleanLen;
-        posMap[origOffset + closeIdx + 1] = cleanLen;
         ranges.push({ startIndex: spanStart, endIndex: cleanLen, bold: true });
         i = closeIdx + 2;
         continue;
@@ -112,15 +100,10 @@ function processInline(
     if (segment[i] === "*" && segment[i + 1] !== "*") {
       const closeIdx = segment.indexOf("*", i + 1);
       if (closeIdx > i + 1 && segment[closeIdx + 1] !== "*") {
-        posMap[origOffset + i] = cleanLen;
         const spanStart = cleanLen;
         const content = segment.slice(i + 1, closeIdx);
-        for (let j = 0; j < content.length; j++) {
-          posMap[origOffset + i + 1 + j] = cleanLen + j;
-          cleanParts.push(content[j]);
-        }
+        parts.push(content);
         cleanLen += content.length;
-        posMap[origOffset + closeIdx] = cleanLen;
         ranges.push({ startIndex: spanStart, endIndex: cleanLen, italic: true });
         i = closeIdx + 1;
         continue;
@@ -128,84 +111,67 @@ function processInline(
     }
 
     // Plain character
-    posMap[origOffset + i] = cleanLen;
-    cleanParts.push(segment[i]);
+    parts.push(segment[i]);
     cleanLen++;
     i++;
   }
-  return cleanLen;
+
+  return { text: parts.join(""), ranges };
 }
 
-function parseMarkdown(text: string): ParsedMarkdown {
+/**
+ * Parse markdown text into CellContent. Handles headings, bullets, bold, italic,
+ * and [text](url) links. No position remapping — tracks clean-text position directly.
+ */
+function parseMarkdown(text: string): CellContent {
   const ranges: TextRange[] = [];
-  const posMap = new Array<number>(text.length + 1).fill(0);
   const cleanParts: string[] = [];
   let cleanLen = 0;
 
   const lines = text.split("\n");
-  let origOffset = 0;
-
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx];
-    let lineContent = line;
-    let contentOrigOffset = origOffset;
-
-    // --- Structural prefix: heading (# Title) ---
-    const headingMatch = line.match(/^(#{1,6}) /);
+    let content = line;
     let isHeading = false;
+
+    // Structural prefix: heading (# Title → bold)
+    const headingMatch = line.match(/^(#{1,6}) /);
     if (headingMatch) {
-      const prefixLen = headingMatch[1].length + 1; // e.g. "## " = 3
-      for (let j = 0; j < prefixLen; j++) posMap[origOffset + j] = cleanLen;
-      lineContent = line.slice(prefixLen);
-      contentOrigOffset = origOffset + prefixLen;
+      content = line.slice(headingMatch[1].length + 1);
       isHeading = true;
     }
-    // --- Structural prefix: bullet (* item or - item) ---
+    // Structural prefix: bullet (* item or - item → • item)
     else if (/^\* /.test(line) || /^- /.test(line)) {
-      // Map the two stripped chars ('* ' or '- ') to the bullet char position
-      posMap[origOffset] = cleanLen;
-      posMap[origOffset + 1] = cleanLen + 1;
-      cleanParts.push("•", " ");
+      cleanParts.push("• ");
       cleanLen += 2;
-      lineContent = line.slice(2);
-      contentOrigOffset = origOffset + 2;
+      content = line.slice(2);
     }
 
-    // --- Inline processing ---
     const spanStart = cleanLen;
-    cleanLen = processInline(lineContent, contentOrigOffset, posMap, cleanParts, cleanLen, ranges);
+    const { text: inlineText, ranges: inlineRanges } = processInline(content, cleanLen);
+    cleanParts.push(inlineText);
+    cleanLen += inlineText.length;
+    ranges.push(...inlineRanges);
 
     if (isHeading) {
       ranges.push({ startIndex: spanStart, endIndex: cleanLen, bold: true });
     }
 
-    // Add newline between lines (not after the last one)
     if (lineIdx < lines.length - 1) {
-      posMap[origOffset + line.length] = cleanLen;
       cleanParts.push("\n");
       cleanLen++;
     }
-
-    origOffset += line.length + (lineIdx < lines.length - 1 ? 1 : 0);
   }
 
-  posMap[text.length] = cleanLen;
-  const cleanText = cleanParts.join("");
-  const mapIndex = (idx: number): number => posMap[Math.min(Math.max(0, idx), text.length)];
-  return { cleanText, ranges, mapIndex };
+  return { text: cleanParts.join(""), ranges };
 }
 
-interface CitationRange {
-  startIndex: number;
-  endIndex: number;
-  sources: Array<{ uri: string; title: string }>;
-}
-
+/** Extract citation ranges from groundingMetadata. Normalises absent startIndex to 0. */
 function getCitations(response: GeminiResponse): CitationRange[] {
   const supports = response.groundingMetadata?.groundingSupports ?? [];
   const chunks = response.groundingMetadata?.groundingChunks ?? [];
   return supports.map((s: GeminiGroundingSupport) => ({
-    startIndex: s.segment.startIndex ?? 0, // Gemini omits startIndex when it is 0 (proto3 default)
+    startIndex: s.segment.startIndex ?? 0,
     endIndex: s.segment.endIndex,
     sources: s.groundingChunkIndices
       .map((idx) => {
@@ -216,6 +182,58 @@ function getCitations(response: GeminiResponse): CitationRange[] {
   }));
 }
 
+/** Merge overlapping citation ranges (sorted by startIndex). Keeps first URI per merged span. */
+function mergeCitations(
+  sorted: CitationRange[],
+): Array<{ startIndex: number; endIndex: number; url: string }> {
+  const merged: Array<{ startIndex: number; endIndex: number; url: string }> = [];
+  for (const { startIndex, endIndex, sources } of sorted) {
+    if (!sources[0]) continue;
+    const last = merged[merged.length - 1];
+    if (last && startIndex < last.endIndex) {
+      last.endIndex = Math.max(last.endIndex, endIndex);
+    } else {
+      merged.push({ startIndex, endIndex, url: sources[0].uri });
+    }
+  }
+  return merged;
+}
+
+/** Return the character spans of all [text](url) patterns in raw text. */
+function findExistingLinkSpans(text: string): Array<{ start: number; end: number }> {
+  const spans: Array<{ start: number; end: number }> = [];
+  const linkRegex = /\[([^\]]*)\]\(([^)]*)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = linkRegex.exec(text)) !== null) {
+    spans.push({ start: match.index, end: match.index + match[0].length });
+  }
+  return spans;
+}
+
+/**
+ * Inject citation spans as [text](url) into raw text.
+ * Citations are processed right-to-left to avoid index shifting.
+ * Any citation that overlaps an existing [text](url) span is silently skipped —
+ * a Sheets range can only carry one URL, and the model-generated link takes precedence.
+ */
+function injectCitationLinks(
+  text: string,
+  citations: Array<{ startIndex: number; endIndex: number; url: string }>,
+  existingLinkSpans: Array<{ start: number; end: number }>,
+): string {
+  let result = text;
+  for (let i = citations.length - 1; i >= 0; i--) {
+    const { startIndex, endIndex, url } = citations[i];
+    const overlaps = existingLinkSpans.some(
+      (span) => startIndex < span.end && endIndex > span.start,
+    );
+    if (overlaps) continue;
+    const spanText = result.slice(startIndex, endIndex);
+    result = result.slice(0, startIndex) + `[${spanText}](${url})` + result.slice(endIndex);
+  }
+  return result;
+}
+
 function getAllSources(response: GeminiResponse): Array<{ uri: string; title: string }> {
   return (response.groundingMetadata?.groundingChunks ?? [])
     .map((chunk) => chunk.web ?? chunk.retrievedContext ?? null)
@@ -224,37 +242,20 @@ function getAllSources(response: GeminiResponse): Array<{ uri: string; title: st
 
 // ---- Public builders ----
 
-export function buildInferenceCellContent(response: GeminiResponse): CellContent {
-  const { cleanText, ranges: mdRanges, mapIndex } = parseMarkdown(response.text);
-
-  // Sort citations and merge overlapping ranges (Gemini can return overlapping supports).
-  // When ranges overlap we keep the first source URI — the first support is generally
-  // the highest-confidence citation for the merged span.
+export function buildRichInferenceCellContent(response: GeminiResponse): CellContent {
   const citations = getCitations(response).sort((a, b) => a.startIndex - b.startIndex);
-  const merged: Array<{ startIndex: number; endIndex: number; url: string }> = [];
-  for (const { startIndex, endIndex, sources } of citations) {
-    if (!sources[0]) continue;
-    const cleanStart = mapIndex(startIndex);
-    const cleanEnd = mapIndex(endIndex);
-    if (cleanStart >= cleanEnd) continue;
-    const last = merged[merged.length - 1];
-    if (last && cleanStart < last.endIndex) {
-      last.endIndex = Math.max(last.endIndex, cleanEnd);
-    } else {
-      merged.push({ startIndex: cleanStart, endIndex: cleanEnd, url: sources[0].uri });
-    }
+  const merged = mergeCitations(citations);
+
+  if (merged.length === 0) {
+    return parseMarkdown(response.text);
   }
 
-  const citationRanges: TextRange[] = merged.map(({ startIndex, endIndex, url }) => ({
-    startIndex,
-    endIndex,
-    url,
-  }));
-
-  return { text: cleanText, ranges: [...mdRanges, ...citationRanges] };
+  const existingLinkSpans = findExistingLinkSpans(response.text);
+  const preprocessed = injectCitationLinks(response.text, merged, existingLinkSpans);
+  return parseMarkdown(preprocessed);
 }
 
-export function buildGroundingCellContent(response: GeminiResponse): CellContent | null {
+export function buildRichGroundingCellContent(response: GeminiResponse): CellContent | null {
   const sources = getAllSources(response);
   const queries = response.groundingMetadata?.webSearchQueries ?? [];
   const codePairs = response.codePairs ?? [];
@@ -263,69 +264,44 @@ export function buildGroundingCellContent(response: GeminiResponse): CellContent
     return null;
   }
 
-  const sections: string[] = [];
-
   if (codePairs.length > 0) {
-    codePairs.forEach(({ code, result }) => {
+    const sections = codePairs.map(({ code, result }) => {
       const lang = code.language ? `(${code.language.toLowerCase()})` : "";
-      sections.push(`Code ${lang}:\n${code.code}\n\nOutput:\n${result.output}`);
+      return `Code ${lang}:\n${code.code}\n\nOutput:\n${result.output}`;
     });
-    // code_execution and google_search are mutually exclusive in practice.
-    // When code pairs are present, grounding sources/queries are omitted from the cell
-    // to keep the output focused — code results are the primary artifact.
     return { text: sections.join("\n\n"), ranges: [] };
   }
 
-  if (queries.length) {
-    sections.push(`Search queries: ${queries.map((q) => `"${q}"`).join(", ")}`);
-  }
-  if (sources.length) {
-    sections.push(
-      `Sources (${sources.length}):\n${sources.map((s) => `\u2022 ${s.title}`).join("\n")}`,
-    );
-  }
-
-  const fullText = sections.join("\n\n");
+  const parts: string[] = [];
   const ranges: TextRange[] = [];
+  let pos = 0;
+
+  function append(s: string): void {
+    parts.push(s);
+    pos += s.length;
+  }
 
   if (queries.length) {
-    const queriesHeader = "Search queries: ";
-    const queriesSectionStart = fullText.indexOf(queriesHeader);
-    if (queriesSectionStart >= 0) {
-      queries.forEach((q) => {
-        const quoted = `"${q}"`;
-        const idx = fullText.indexOf(quoted, queriesSectionStart);
-        if (idx !== -1) {
-          const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
-          ranges.push({ startIndex: idx, endIndex: idx + quoted.length, url });
-        }
-      });
-    }
+    append("Search queries: ");
+    queries.forEach((q, i) => {
+      if (i > 0) append(", ");
+      const quoted = `"${q}"`;
+      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+      ranges.push({ startIndex: pos, endIndex: pos + quoted.length, url });
+      append(quoted);
+    });
   }
 
   if (sources.length) {
-    const sourcesHeader = `Sources (${sources.length}):`;
-    const sourceSectionStart = fullText.indexOf(sourcesHeader);
-    const sourceSectionEnd =
-      sourceSectionStart >= 0
-        ? ((): number => {
-            const next = fullText.indexOf("\n\n", sourceSectionStart + sourcesHeader.length);
-            return next !== -1 ? next : fullText.length;
-          })()
-        : -1;
-
-    if (sourceSectionStart >= 0) {
-      let searchFrom = sourceSectionStart;
-      sources.forEach(({ uri, title }) => {
-        const bullet = `\u2022 ${title}`;
-        const idx = fullText.indexOf(bullet, searchFrom);
-        if (idx !== -1 && idx < sourceSectionEnd) {
-          ranges.push({ startIndex: idx + 2, endIndex: idx + 2 + title.length, url: uri });
-          searchFrom = idx + bullet.length; // advance past this occurrence
-        }
-      });
-    }
+    if (parts.length > 0) append("\n\n");
+    append(`Sources (${sources.length}):\n`);
+    sources.forEach(({ uri, title }, i) => {
+      if (i > 0) append("\n");
+      append("\u2022 ");
+      ranges.push({ startIndex: pos, endIndex: pos + title.length, url: uri });
+      append(title);
+    });
   }
 
-  return { text: fullText, ranges };
+  return { text: parts.join(""), ranges };
 }
