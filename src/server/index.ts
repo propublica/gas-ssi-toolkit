@@ -11,8 +11,8 @@
 export { SSI } from "./customFunctions";
 import { runInference } from "./inference";
 import {
-  buildInferenceCellContent,
-  buildGroundingCellContent,
+  buildRichInferenceCellContent,
+  buildRichGroundingCellContent,
   type CellContent,
 } from "./rich-text";
 import { checkDriveService, extractTextUniversal } from "./drive";
@@ -362,7 +362,7 @@ export function runBatchAI(config: RunConfig): void {
       try {
         sheet
           .getRange(realRowIndex, outputIdx + 1)
-          .setRichTextValue(toCellValue(buildInferenceCellContent(result)));
+          .setRichTextValue(toCellValue(buildRichInferenceCellContent(result)));
       } catch (_e) {
         // Fall back to plain text if rich text rendering fails for this row.
         sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
@@ -372,7 +372,7 @@ export function runBatchAI(config: RunConfig): void {
     }
 
     if (config.includeGrounding && groundingIdx >= 0) {
-      const groundingContent = buildGroundingCellContent(result);
+      const groundingContent = buildRichGroundingCellContent(result);
       if (groundingContent !== null) {
         sheet
           .getRange(realRowIndex, groundingIdx + 1)

@@ -242,7 +242,7 @@ function getAllSources(response: GeminiResponse): Array<{ uri: string; title: st
 
 // ---- Public builders ----
 
-export function buildInferenceCellContent(response: GeminiResponse): CellContent {
+export function buildRichInferenceCellContent(response: GeminiResponse): CellContent {
   const citations = getCitations(response).sort((a, b) => a.startIndex - b.startIndex);
   const merged = mergeCitations(citations);
 
@@ -255,7 +255,7 @@ export function buildInferenceCellContent(response: GeminiResponse): CellContent
   return parseMarkdown(preprocessed);
 }
 
-export function buildGroundingCellContent(response: GeminiResponse): CellContent | null {
+export function buildRichGroundingCellContent(response: GeminiResponse): CellContent | null {
   const sources = getAllSources(response);
   const queries = response.groundingMetadata?.webSearchQueries ?? [];
   const codePairs = response.codePairs ?? [];

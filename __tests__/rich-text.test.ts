@@ -1,6 +1,9 @@
 /// <reference types="node" />
 import type { GeminiGroundingSupport, GeminiResponse } from "../src/server/types";
-import { buildInferenceCellContent, buildGroundingCellContent } from "../src/server/rich-text";
+import {
+  buildRichInferenceCellContent,
+  buildRichGroundingCellContent,
+} from "../src/server/rich-text";
 
 // ---- helpers ----
 
@@ -26,32 +29,32 @@ function makeGroundedResponse(overrides: Partial<GeminiResponse> = {}): GeminiRe
 }
 
 // ============================================================
-// buildInferenceCellContent
+// buildRichInferenceCellContent
 // ============================================================
 
-describe("buildInferenceCellContent", () => {
+describe("buildRichInferenceCellContent", () => {
   it("returns plain text with no ranges for a simple response", () => {
-    const result = buildInferenceCellContent(makeResponse({ text: "Hello world." }));
+    const result = buildRichInferenceCellContent(makeResponse({ text: "Hello world." }));
     expect(result.text).toBe("Hello world.");
     expect(result.ranges).toHaveLength(0);
   });
 
   it("strips **bold** markers and produces a bold range", () => {
-    const result = buildInferenceCellContent(makeResponse({ text: "The **sky** is blue." }));
+    const result = buildRichInferenceCellContent(makeResponse({ text: "The **sky** is blue." }));
     expect(result.text).toBe("The sky is blue.");
     const bold = result.ranges.find((r) => r.bold);
     expect(bold).toEqual({ startIndex: 4, endIndex: 7, bold: true });
   });
 
   it("strips *italic* markers and produces an italic range", () => {
-    const result = buildInferenceCellContent(makeResponse({ text: "A *quick* test." }));
+    const result = buildRichInferenceCellContent(makeResponse({ text: "A *quick* test." }));
     expect(result.text).toBe("A quick test.");
     const italic = result.ranges.find((r) => r.italic);
     expect(italic).toEqual({ startIndex: 2, endIndex: 7, italic: true });
   });
 
   it("strips ## heading prefix and produces a bold range", () => {
-    const result = buildInferenceCellContent(
+    const result = buildRichInferenceCellContent(
       makeResponse({ text: "## Section Title\nBody text." }),
     );
     expect(result.text).toBe("Section Title\nBody text.");
@@ -75,7 +78,7 @@ describe("buildInferenceCellContent", () => {
         webSearchQueries: [],
       },
     });
-    const result = buildInferenceCellContent(response);
+    const result = buildRichInferenceCellContent(response);
     const link = result.ranges.find((r) => r.url);
     expect(link).toBeDefined();
     expect(link?.url).toBe("https://example.com");
@@ -99,7 +102,7 @@ describe("buildInferenceCellContent", () => {
         webSearchQueries: [],
       },
     });
-    const result = buildInferenceCellContent(response);
+    const result = buildRichInferenceCellContent(response);
     const links = result.ranges.filter((r) => r.url);
     expect(links).toHaveLength(1);
     expect(links[0].startIndex).toBe(0);
@@ -118,35 +121,35 @@ describe("buildInferenceCellContent", () => {
         webSearchQueries: [],
       },
     });
-    const result = buildInferenceCellContent(response);
+    const result = buildRichInferenceCellContent(response);
     expect(result.ranges.filter((r) => r.url)).toHaveLength(0);
   });
 
   it("returns text with no ranges when groundingMetadata is absent", () => {
-    const result = buildInferenceCellContent(makeResponse({ text: "Plain text." }));
+    const result = buildRichInferenceCellContent(makeResponse({ text: "Plain text." }));
     expect(result.ranges.filter((r) => r.url)).toHaveLength(0);
   });
 });
 
 // ============================================================
-// buildGroundingCellContent
+// buildRichGroundingCellContent
 // ============================================================
 
-describe("buildGroundingCellContent", () => {
+describe("buildRichGroundingCellContent", () => {
   it("returns null when response has no grounding data", () => {
-    expect(buildGroundingCellContent(makeResponse())).toBeNull();
+    expect(buildRichGroundingCellContent(makeResponse())).toBeNull();
   });
 
   it("returns null when groundingMetadata has empty arrays", () => {
     const response = makeResponse({
       groundingMetadata: { groundingChunks: [], groundingSupports: [], webSearchQueries: [] },
     });
-    expect(buildGroundingCellContent(response)).toBeNull();
+    expect(buildRichGroundingCellContent(response)).toBeNull();
   });
 
   it("includes search query text and a Google Search url range", () => {
     const response = makeGroundedResponse();
-    const result = buildGroundingCellContent(response)!;
+    const result = buildRichGroundingCellContent(response)!;
     expect(result.text).toContain('"capital of France"');
     const queryLink = result.ranges.find((r) => r.url?.startsWith("https://www.google.com/search"));
     expect(queryLink).toBeDefined();
@@ -160,7 +163,7 @@ describe("buildGroundingCellContent", () => {
 
   it("includes source title text and a url range pointing to the source URI", () => {
     const response = makeGroundedResponse();
-    const result = buildGroundingCellContent(response)!;
+    const result = buildRichGroundingCellContent(response)!;
     expect(result.text).toContain("Paris - Wikipedia");
     const sourceLink = result.ranges.find((r) => r.url?.startsWith("https://example.com/paris"));
     expect(sourceLink).toBeDefined();
@@ -172,7 +175,7 @@ describe("buildGroundingCellContent", () => {
 
   it("does not include an Unverified section", () => {
     const response = makeGroundedResponse();
-    const result = buildGroundingCellContent(response)!;
+    const result = buildRichGroundingCellContent(response)!;
     expect(result.text).not.toContain("Unverified");
   });
 
@@ -185,7 +188,7 @@ describe("buildGroundingCellContent", () => {
         },
       ],
     });
-    const result = buildGroundingCellContent(response)!;
+    const result = buildRichGroundingCellContent(response)!;
     expect(result.text).toContain("Code (python):");
     expect(result.text).toContain("print(1+1)");
     expect(result.text).toContain("Output:");
@@ -205,7 +208,7 @@ describe("buildGroundingCellContent", () => {
         webSearchQueries: [],
       },
     });
-    const result = buildGroundingCellContent(response)!;
+    const result = buildRichGroundingCellContent(response)!;
     const links = result.ranges.filter((r) => r.url);
     expect(links).toHaveLength(2);
 
@@ -230,7 +233,7 @@ describe("buildGroundingCellContent", () => {
         webSearchQueries: ["query one", "query two"],
       },
     });
-    const result = buildGroundingCellContent(response)!;
+    const result = buildRichGroundingCellContent(response)!;
     const links = result.ranges.filter((r) => r.url?.includes("google.com"));
     expect(links).toHaveLength(2);
     expect(links[0].url).toBe("https://www.google.com/search?q=query%20one");
@@ -247,7 +250,7 @@ describe("buildGroundingCellContent", () => {
         webSearchQueries: [],
       },
     });
-    const result = buildGroundingCellContent(response)!;
+    const result = buildRichGroundingCellContent(response)!;
     expect(result.text).toContain("Docs Page");
     const link = result.ranges.find((r) => r.url === "https://docs.example.com/page");
     expect(link).toBeDefined();
@@ -266,7 +269,7 @@ describe("buildGroundingCellContent", () => {
         webSearchQueries: ["climate", "climate"],
       },
     });
-    const result = buildGroundingCellContent(response)!;
+    const result = buildRichGroundingCellContent(response)!;
     const links = result.ranges.filter((r) => r.url);
     expect(links).toHaveLength(2);
     expect(links[0].startIndex).not.toBe(links[1].startIndex);
@@ -286,7 +289,7 @@ describe("buildGroundingCellContent", () => {
         },
       ],
     });
-    const result = buildGroundingCellContent(response)!;
+    const result = buildRichGroundingCellContent(response)!;
     expect(result.text).not.toContain("Search queries");
     expect(result.text).not.toContain("Sources");
     expect(result.text).toContain("Code");
@@ -294,24 +297,24 @@ describe("buildGroundingCellContent", () => {
 });
 
 // ============================================================
-// parseMarkdown edge cases (via buildInferenceCellContent)
+// parseMarkdown edge cases (via buildRichInferenceCellContent)
 // ============================================================
 
-describe("buildInferenceCellContent markdown edge cases", () => {
+describe("buildRichInferenceCellContent markdown edge cases", () => {
   it("does not treat unmatched * as italic", () => {
-    const result = buildInferenceCellContent(makeResponse({ text: "Price: $5 * tax" }));
+    const result = buildRichInferenceCellContent(makeResponse({ text: "Price: $5 * tax" }));
     expect(result.text).toBe("Price: $5 * tax");
     expect(result.ranges.filter((r) => r.italic)).toHaveLength(0);
   });
 
   it("handles # heading at the very start", () => {
-    const result = buildInferenceCellContent(makeResponse({ text: "# Title" }));
+    const result = buildRichInferenceCellContent(makeResponse({ text: "# Title" }));
     expect(result.text).toBe("Title");
     expect(result.ranges[0]).toEqual({ startIndex: 0, endIndex: 5, bold: true });
   });
 
   it("handles multiple bold spans", () => {
-    const result = buildInferenceCellContent(makeResponse({ text: "**A** and **B**" }));
+    const result = buildRichInferenceCellContent(makeResponse({ text: "**A** and **B**" }));
     expect(result.text).toBe("A and B");
     const bold = result.ranges.filter((r) => r.bold);
     expect(bold).toHaveLength(2);
@@ -320,19 +323,19 @@ describe("buildInferenceCellContent markdown edge cases", () => {
   });
 
   it("strips '* ' bullet prefix and replaces with bullet character", () => {
-    const result = buildInferenceCellContent(makeResponse({ text: "* item one\n* item two" }));
+    const result = buildRichInferenceCellContent(makeResponse({ text: "* item one\n* item two" }));
     expect(result.text).toBe("• item one\n• item two");
     expect(result.ranges.filter((r) => r.italic)).toHaveLength(0);
   });
 
   it("strips '- ' bullet prefix and replaces with bullet character", () => {
-    const result = buildInferenceCellContent(makeResponse({ text: "- item one" }));
+    const result = buildRichInferenceCellContent(makeResponse({ text: "- item one" }));
     expect(result.text).toBe("• item one");
     expect(result.ranges.filter((r) => r.italic)).toHaveLength(0);
   });
 
   it("handles bullet with bold label: '* **Key:** description'", () => {
-    const result = buildInferenceCellContent(
+    const result = buildRichInferenceCellContent(
       makeResponse({ text: "* **Standardization:** A universal format." }),
     );
     expect(result.text).toBe("• Standardization: A universal format.");
@@ -342,7 +345,7 @@ describe("buildInferenceCellContent markdown edge cases", () => {
   });
 
   it("parses [text](url) inline link — strips syntax, keeps text, adds url range", () => {
-    const result = buildInferenceCellContent(
+    const result = buildRichInferenceCellContent(
       makeResponse({ text: "See [the docs](https://example.com/docs) for more." }),
     );
     expect(result.text).toBe("See the docs for more.");
@@ -354,7 +357,7 @@ describe("buildInferenceCellContent markdown edge cases", () => {
   });
 
   it("parses multiple [text](url) links in a line", () => {
-    const result = buildInferenceCellContent(
+    const result = buildRichInferenceCellContent(
       makeResponse({ text: "[A](https://a.com) and [B](https://b.com)" }),
     );
     expect(result.text).toBe("A and B");
@@ -381,7 +384,7 @@ describe("buildInferenceCellContent markdown edge cases", () => {
         webSearchQueries: [],
       },
     });
-    const result = buildInferenceCellContent(response);
+    const result = buildRichInferenceCellContent(response);
     // The inline link is preserved.
     const inlineLink = result.ranges.find((r) => r.url === "https://example.com/docs");
     expect(inlineLink).toBeDefined();
@@ -392,7 +395,7 @@ describe("buildInferenceCellContent markdown edge cases", () => {
   });
 });
 
-describe("buildInferenceCellContent grounding — missing startIndex", () => {
+describe("buildRichInferenceCellContent grounding — missing startIndex", () => {
   it("treats absent startIndex as 0 (proto3 default omission)", () => {
     const response = makeResponse({
       text: "Paris is the capital.",
@@ -408,7 +411,7 @@ describe("buildInferenceCellContent grounding — missing startIndex", () => {
         webSearchQueries: [],
       },
     });
-    const result = buildInferenceCellContent(response);
+    const result = buildRichInferenceCellContent(response);
     const citation = result.ranges.find((r) => r.url === "https://example.com");
     expect(citation).toBeDefined();
     expect(citation!.startIndex).toBe(0);
@@ -420,7 +423,7 @@ describe("buildInferenceCellContent grounding — missing startIndex", () => {
 // Citation injection (pre-processing step)
 // ============================================================
 
-describe("buildInferenceCellContent — citation injection", () => {
+describe("buildRichInferenceCellContent — citation injection", () => {
   it("injects a citation as a url range when there is no existing link overlap", () => {
     // Citation covers "Paris" (0..5). No existing [text](url) in raw text.
     // Injection: "[Paris](url) is the capital."
@@ -435,7 +438,7 @@ describe("buildInferenceCellContent — citation injection", () => {
         webSearchQueries: [],
       },
     });
-    const result = buildInferenceCellContent(response);
+    const result = buildRichInferenceCellContent(response);
     const link = result.ranges.find((r) => r.url === "https://example.com");
     expect(link).toBeDefined();
     expect(link!.startIndex).toBe(0);
@@ -459,7 +462,7 @@ describe("buildInferenceCellContent — citation injection", () => {
         webSearchQueries: [],
       },
     });
-    const result = buildInferenceCellContent(response);
+    const result = buildRichInferenceCellContent(response);
     expect(result.text).toBe("The sky is blue.");
     const link = result.ranges.find((r) => r.url === "https://example.com");
     expect(link).toBeDefined();
@@ -485,7 +488,7 @@ describe("buildInferenceCellContent — citation injection", () => {
         webSearchQueries: [],
       },
     });
-    const result = buildInferenceCellContent(response);
+    const result = buildRichInferenceCellContent(response);
     const links = result.ranges.filter((r) => r.url);
     expect(links).toHaveLength(1);
     expect(links[0].startIndex).toBe(0);
@@ -509,7 +512,7 @@ describe("buildInferenceCellContent — citation injection", () => {
         webSearchQueries: [],
       },
     });
-    const result = buildInferenceCellContent(response);
+    const result = buildRichInferenceCellContent(response);
     // Both the inline link and the adjacent citation should be present.
     const inlineLink = result.ranges.find((r) => r.url === "https://example.com/docs");
     const citation = result.ranges.find((r) => r.url === "https://citation.com");
