@@ -399,3 +399,105 @@ describe("buildInferenceCellContent grounding — missing startIndex", () => {
     expect(citation!.endIndex).toBe(5);
   });
 });
+
+// ============================================================
+// Citation injection (pre-processing step)
+// ============================================================
+
+describe("buildInferenceCellContent — citation injection", () => {
+  it("injects a citation as a url range when there is no existing link overlap", () => {
+    // Citation covers "Paris" (0..5). No existing [text](url) in raw text.
+    // Injection: "[Paris](url) is the capital."
+    // After parsing: text="Paris is the capital.", ranges=[{0,5,url}]
+    const response = makeResponse({
+      text: "Paris is the capital.",
+      groundingMetadata: {
+        groundingChunks: [{ web: { uri: "https://example.com", title: "Paris" } }],
+        groundingSupports: [
+          { segment: { startIndex: 0, endIndex: 5, text: "Paris" }, groundingChunkIndices: [0] },
+        ],
+        webSearchQueries: [],
+      },
+    });
+    const result = buildInferenceCellContent(response);
+    const link = result.ranges.find((r) => r.url === "https://example.com");
+    expect(link).toBeDefined();
+    expect(link!.startIndex).toBe(0);
+    expect(link!.endIndex).toBe(5);
+  });
+
+  it("citation spanning bold markdown maps to the correct clean-text range", () => {
+    // Text: "The **sky** is blue." — citation at 0..15 covers "The **sky** is "
+    // Injection: "[The **sky** is ](url) blue."
+    // After parsing: text="The sky is blue.", citation range 0..11, bold range 4..7
+    const response = makeResponse({
+      text: "The **sky** is blue.",
+      groundingMetadata: {
+        groundingChunks: [{ web: { uri: "https://example.com", title: "Example" } }],
+        groundingSupports: [
+          {
+            segment: { startIndex: 0, endIndex: 15, text: "The **sky** is" },
+            groundingChunkIndices: [0],
+          },
+        ],
+        webSearchQueries: [],
+      },
+    });
+    const result = buildInferenceCellContent(response);
+    expect(result.text).toBe("The sky is blue.");
+    const link = result.ranges.find((r) => r.url === "https://example.com");
+    expect(link).toBeDefined();
+    expect(link!.startIndex).toBe(0);
+    expect(link!.endIndex).toBe(11); // "The sky is " = 11 chars
+    const bold = result.ranges.find((r) => r.bold);
+    expect(bold).toEqual({ startIndex: 4, endIndex: 7, bold: true });
+  });
+
+  it("merges overlapping citations before injection", () => {
+    // Two overlapping citations (0..8) and (5..12) merge into (0..12).
+    const response = makeResponse({
+      text: "Hello world.",
+      groundingMetadata: {
+        groundingChunks: [
+          { web: { uri: "https://a.com", title: "A" } },
+          { web: { uri: "https://b.com", title: "B" } },
+        ],
+        groundingSupports: [
+          { segment: { startIndex: 0, endIndex: 8, text: "Hello wo" }, groundingChunkIndices: [0] },
+          { segment: { startIndex: 5, endIndex: 12, text: "world." }, groundingChunkIndices: [1] },
+        ],
+        webSearchQueries: [],
+      },
+    });
+    const result = buildInferenceCellContent(response);
+    const links = result.ranges.filter((r) => r.url);
+    expect(links).toHaveLength(1);
+    expect(links[0].startIndex).toBe(0);
+    expect(links[0].endIndex).toBe(12);
+    expect(links[0].url).toBe("https://a.com"); // first URI wins
+  });
+
+  it("handles non-overlapping citation adjacent to an existing link", () => {
+    // Existing link: chars 0..36 "[the docs](https://example.com/docs)"
+    // Citation: chars 37..44 " is good" — does NOT overlap the existing link
+    const response = makeResponse({
+      text: "[the docs](https://example.com/docs) is good",
+      groundingMetadata: {
+        groundingChunks: [{ web: { uri: "https://citation.com", title: "Citation" } }],
+        groundingSupports: [
+          {
+            segment: { startIndex: 37, endIndex: 44, text: "is good" },
+            groundingChunkIndices: [0],
+          },
+        ],
+        webSearchQueries: [],
+      },
+    });
+    const result = buildInferenceCellContent(response);
+    // Both the inline link and the adjacent citation should be present.
+    const inlineLink = result.ranges.find((r) => r.url === "https://example.com/docs");
+    const citation = result.ranges.find((r) => r.url === "https://citation.com");
+    expect(inlineLink).toBeDefined();
+    expect(citation).toBeDefined();
+  });
+});
