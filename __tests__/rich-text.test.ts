@@ -348,11 +348,10 @@ describe("buildInferenceCellContent markdown edge cases", () => {
     expect(links[1].url).toBe("https://b.com");
   });
 
-  it("citation remapping still works when inline links are present", () => {
-    // "[the docs](https://example.com/docs) is good"
-    // cleanText = "the docs is good" (len 16)
-    // grounding support segment covers the entire "[the docs](https://example.com/docs)" span (0..36)
-    // after stripping, that maps to clean indices 0..8 ("the docs")
+  it("skips citation injection when the span overlaps an existing [text](url) link", () => {
+    // The entire model-generated link "[the docs](...)" spans chars 0-36.
+    // The grounding citation also targets chars 0-36 — direct overlap.
+    // Option A: skip the citation rather than produce nested/malformed markup.
     const response = makeResponse({
       text: "[the docs](https://example.com/docs) is good",
       groundingMetadata: {
@@ -367,12 +366,13 @@ describe("buildInferenceCellContent markdown edge cases", () => {
       },
     });
     const result = buildInferenceCellContent(response);
+    // The inline link is preserved.
     const inlineLink = result.ranges.find((r) => r.url === "https://example.com/docs");
     expect(inlineLink).toBeDefined();
+    // The citation is skipped — only one URL range present.
     const citation = result.ranges.find((r) => r.url === "https://citation.com");
-    expect(citation).toBeDefined();
-    expect(citation!.startIndex).toBe(0);
-    expect(citation!.endIndex).toBe(8); // "the docs" = 8 chars
+    expect(citation).toBeUndefined();
+    expect(result.ranges.filter((r) => r.url)).toHaveLength(1);
   });
 });
 
