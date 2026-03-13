@@ -11,7 +11,7 @@ The Apps Script web IDE source (`updated_code.gs` + `updated_sidebar.html`) has 
 
 | Before | After |
 |--------|-------|
-| `⚡ SSI Tools` menu with 5 items (Quickstart, 4 tools) | `⚡ SSI Toolkit` menu with 1 item: `🚀 Open SSI Sidebar` |
+| `⚡ SSI Tools` menu with 5 items (Quickstart, 4 tools) | `⚡ SSI Toolkit` menu with 1 item: `🚀 Open SSI Toolkit` |
 | Quickstart opens a redirect modal | User Guide link lives in sidebar as a plain `<a>` tag |
 | Tools triggered from menu items | Tools triggered from sidebar buttons with loading state |
 | No persistent UI panel | Sidebar stays open while user works |
@@ -21,16 +21,18 @@ The Apps Script web IDE source (`updated_code.gs` + `updated_sidebar.html`) has 
 ### `src/server/index.ts`
 
 **`onOpen()`** — rewritten to a single menu item:
+
 ```typescript
 SpreadsheetApp.getUi()
   .createMenu("⚡ SSI Toolkit")
-  .addItem("🚀 Open SSI Sidebar", "showSidebar")
+  .addItem("🚀 Open SSI Toolkit", "showSidebar")
   .addToUi();
 ```
 
 **`openQuickstartDoc()`** — removed. The user guide URL is a plain anchor in the sidebar HTML; no server round-trip needed.
 
 **`showSidebar()`** — new function:
+
 ```typescript
 export function showSidebar(): void {
   const html = HtmlService.createTemplateFromFile("Sidebar");
@@ -40,6 +42,7 @@ export function showSidebar(): void {
 ```
 
 **`runTool()`** — new dispatcher used by sidebar buttons:
+
 ```typescript
 const TOOLS: Record<string, () => void> = {
   importDriveLinks,
@@ -60,6 +63,7 @@ export function runTool(functionName: string): void {
 Standalone HTML file for the sidebar UI. Must be a separate file (not an inlined string) because `HtmlService.createTemplateFromFile('Sidebar')` resolves by filename in the deployed Apps Script project.
 
 Sections:
+
 - User Guide link card (direct `<a href>` — no server call)
 - Main Tools: Import Drive Links, Run AI Inference
 - Extras: Sample Rows, Extract Text
@@ -69,12 +73,14 @@ Sections:
 ### `rollup.config.js`
 
 Footer stubs delta:
+
 - Add: `function showSidebar()`, `function runTool(fn)`
 - Remove: `function openQuickstartDoc()`
 
 ### Build scripts (`package.json`)
 
 Extend `build` and `build:watch` to copy `src/Sidebar.html` to `dist/` alongside `appsscript.json`:
+
 ```
 "build": "rimraf dist && rollup -c && cp appsscript.json dist/ && cp src/Sidebar.html dist/"
 "build:watch": "mkdir -p dist && cp appsscript.json dist/ && cp src/Sidebar.html dist/ && rollup -c --watch"

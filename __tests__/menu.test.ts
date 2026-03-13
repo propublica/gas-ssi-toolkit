@@ -84,7 +84,7 @@ describe("onOpen", () => {
   it("adds a single item that opens the sidebar", () => {
     onOpen();
     expect(mockAddItem).toHaveBeenCalledTimes(1);
-    expect(mockAddItem).toHaveBeenCalledWith("🚀 Open SSI Sidebar", "showSidebar");
+    expect(mockAddItem).toHaveBeenCalledWith("🚀 Open SSI Toolkit", "showSidebar");
   });
 
   it("adds the menu to the UI", () => {

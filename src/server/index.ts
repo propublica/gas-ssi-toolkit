@@ -35,7 +35,7 @@ import type { RunConfig, PrepRecipeParams, PrepRecipeResult } from "../shared/ty
 export function onOpen(): void {
   SpreadsheetApp.getUi()
     .createMenu("⚡ SSI Toolkit")
-    .addItem("🚀 Open SSI Sidebar", "showSidebar")
+    .addItem("🚀 Open SSI Toolkit", "showSidebar")
     .addToUi();
 }
 
