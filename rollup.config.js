@@ -81,8 +81,8 @@ function showSidebar() { _GASEntry.showSidebar(); }
 function runTool(fn, jobId) { _GASEntry.runTool(fn, jobId); }
 function getSheetHeaders() { return _GASEntry.getSheetHeaders(); }
 function runBatchAI(config, jobId) { _GASEntry.runBatchAI(config, jobId); }
-function importDriveLinks() { _GASEntry.importDriveLinks(); }
-function extractTextFromSelection() { _GASEntry.extractTextFromSelection(); }
+function importDriveLinks(jobId) { _GASEntry.importDriveLinks(jobId); }
+function extractTextFromSelection(jobId) { _GASEntry.extractTextFromSelection(jobId); }
 function sampleRowsToEvaluation() { _GASEntry.sampleRowsToEvaluation(); }
 /**
  * Call the Gemini API from a spreadsheet cell.
