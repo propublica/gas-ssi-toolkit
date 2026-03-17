@@ -82,10 +82,9 @@ function exportAndEncodeFile(
   const mimeType = file.getMimeType();
 
   if (mimeType === MimeType.GOOGLE_DOCS) {
-    const pdfBlob = Drive.Files.export(
-      fileId,
-      "application/pdf",
-    ) as unknown as GoogleAppsScript.Base.Blob;
+    // file.getAs() handles the Drive export correctly (includes alt=media internally).
+    // Drive.Files.export() alone returns metadata, not content.
+    const pdfBlob = file.getAs("application/pdf");
     return [
       {
         mime_type: "application/pdf",
@@ -175,7 +174,7 @@ export function prepareDriveAttachments(fileIds: string[]): GeminiInlineData[] {
           `File too large: "${file.getName()}" (~${Math.round(file.getSize() / 1024 / 1024)}MB raw). ` +
             `PDFs must be under ~${Math.round(CONFIG.INLINE_MAX_PDF_BYTES / CONFIG.INLINE_PREFLIGHT_FACTOR / 1024 / 1024)}MB raw ` +
             `(${Math.round(CONFIG.INLINE_MAX_PDF_BYTES / 1024 / 1024)}MB encoded). ` +
-            `Consider the Gemini Files API for large payloads: https://ai.google.dev/api/files`,
+            `consider breaking up the file into smaller components`,
         );
       }
       if (mimeType !== MimeType.PDF && estimatedEncodedSize > CONFIG.INLINE_MAX_TOTAL_BYTES) {
@@ -183,7 +182,7 @@ export function prepareDriveAttachments(fileIds: string[]): GeminiInlineData[] {
           `File too large: "${file.getName()}" (~${Math.round(file.getSize() / 1024 / 1024)}MB raw). ` +
             `Estimated encoded size (~${Math.round(estimatedEncodedSize / 1024 / 1024)}MB) exceeds the ` +
             `${Math.round(CONFIG.INLINE_MAX_TOTAL_BYTES / 1024 / 1024)}MB inline total limit. ` +
-            `Consider the Gemini Files API for large payloads: https://ai.google.dev/api/files`,
+            `consider breaking up the file into smaller components`,
         );
       }
     }
@@ -197,7 +196,7 @@ export function prepareDriveAttachments(fileIds: string[]): GeminiInlineData[] {
       throw new Error(
         `PDF too large after encoding (~${Math.round(part.data.length / 1024 / 1024)}MB encoded, ` +
           `limit ${Math.round(CONFIG.INLINE_MAX_PDF_BYTES / 1024 / 1024)}MB). ` +
-          `Consider the Gemini Files API for large payloads: https://ai.google.dev/api/files`,
+          `consider breaking up the file into smaller components`,
       );
     }
   }
@@ -208,7 +207,7 @@ export function prepareDriveAttachments(fileIds: string[]): GeminiInlineData[] {
     throw new Error(
       `Attachments too large: combined encoded size is ~${Math.round(totalEncodedBytes / 1024 / 1024)}MB, ` +
         `exceeds ${Math.round(CONFIG.INLINE_MAX_TOTAL_BYTES / 1024 / 1024)}MB inline limit. ` +
-        `Consider the Gemini Files API for large payloads: https://ai.google.dev/api/files`,
+        `consider breaking up the file into smaller components`,
     );
   }
 

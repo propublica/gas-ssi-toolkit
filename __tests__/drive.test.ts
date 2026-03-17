@@ -215,18 +215,17 @@ describe("prepareDriveAttachments", () => {
   });
 
   it("exports a Google Doc as PDF", () => {
+    const mockGetAs = jest.fn().mockReturnValue({ getBytes: () => [1, 2, 3] });
     (DriveApp.getFileById as jest.Mock).mockReturnValue({
       getMimeType: () => "application/vnd.google-apps.document",
       getName: () => "doc.gdoc",
-    });
-    (Drive.Files.export as jest.Mock).mockReturnValue({
-      getBytes: () => [1, 2, 3],
+      getAs: mockGetAs,
     });
 
     const result = prepareDriveAttachments(["docId"]);
     expect(result).toHaveLength(1);
     expect(result[0].mime_type).toBe("application/pdf");
-    expect(Drive.Files.export).toHaveBeenCalledWith("docId", "application/pdf");
+    expect(mockGetAs).toHaveBeenCalledWith("application/pdf");
   });
 
   it("exports each sheet of a Google Sheets file as a separate CSV part", () => {
@@ -321,7 +320,7 @@ describe("prepareDriveAttachments", () => {
       getName: () => "big.pdf",
     });
 
-    expect(() => prepareDriveAttachments(["bigPdfId"])).toThrow(/Files API/i);
+    expect(() => prepareDriveAttachments(["bigPdfId"])).toThrow(/breaking up/i);
   });
 
   it("returns combined parts from multiple files of different types", () => {
