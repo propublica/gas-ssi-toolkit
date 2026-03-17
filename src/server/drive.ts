@@ -101,9 +101,12 @@ function exportAndEncodeFile(
     const ss = SpreadsheetApp.openById(fileId);
     return ss.getSheets().map((sheet) => {
       const values = sheet.getDataRange().getValues();
-      const csv = values
-        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-        .join("\n");
+      const csv = [
+        `Sheet: ${sheet.getName()}`,
+        ...values.map((row) =>
+          row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
+        ),
+      ].join("\n");
       return {
         mime_type: "text/csv",
         data: Utilities.base64Encode(csv, Utilities.Charset.UTF_8),

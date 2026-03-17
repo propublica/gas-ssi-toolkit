@@ -295,8 +295,8 @@ describe("prepareDriveAttachments", () => {
     prepareDriveAttachments(["sheetId"]);
 
     expect(encoded).toHaveLength(2);
-    expect(encoded[0]).toBe('"name","age"\n"Alice","30"');
-    expect(encoded[1]).toBe('"city"\n"Boston"');
+    expect(encoded[0]).toBe('Sheet: Sheet1\n"name","age"\n"Alice","30"');
+    expect(encoded[1]).toBe('Sheet: Sheet2\n"city"\n"Boston"');
   });
 
   it("escapes double quotes in CSV cell values", () => {
@@ -321,7 +321,7 @@ describe("prepareDriveAttachments", () => {
 
     prepareDriveAttachments(["sheetId"]);
 
-    expect(encoded[0]).toBe('"He said ""hello""","normal"');
+    expect(encoded[0]).toBe('Sheet: Sheet1\n"He said ""hello""","normal"');
   });
 
   it("throws a descriptive error for unsupported file types", () => {
