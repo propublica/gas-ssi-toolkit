@@ -2,7 +2,6 @@ import type { NavigationContext, Panel, RecipeDefinition } from "../types";
 import type { RecipeParams } from "../types";
 import type { PrepRecipeParams, PrepRecipeResult, RunConfig } from "../../shared/types";
 import { LockableField } from "../components/lockable-field";
-import { PanelLoader } from "../components/panel-loader";
 import { RecipePrepCook } from "../components/recipe-prep-cook";
 import { prepRecipe } from "../services";
 
@@ -139,22 +138,15 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
   private mountPrepCook(
     container: HTMLElement,
     prepComplete: boolean,
-    panelContainer: HTMLElement,
+    _panelContainer: HTMLElement,
   ): void {
     this.prepCook = new RecipePrepCook(container.querySelector("#prep-cook-container")!, {
       onPrep: async (): Promise<void> => {
         const params = this.buildPrepParams();
         if (!params) throw null; // validation alert already shown; bail silently
 
-        const loader = new PanelLoader(panelContainer);
-        loader.setState({ status: "loading", message: "Scanning Drive folder..." });
-
-        try {
-          const result = await prepRecipe(params);
-          this.preppedRunConfig = this.buildRunConfig(result);
-        } finally {
-          loader.setState({ status: "idle" });
-        }
+        const result = await prepRecipe(params);
+        this.preppedRunConfig = this.buildRunConfig(result);
       },
       onCook: (): void => {
         if (this.preppedRunConfig) {
@@ -220,13 +212,6 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
       <div class="panel-header">
         <button id="back-btn" class="back-btn">← Back</button>
         <span class="panel-title">${title}</span>
-      </div>
-      <div id="panel-loader" class="panel-loader" hidden>
-        <div class="panel-loader__bar-wrap" hidden>
-          <div class="panel-loader__bar-fill"></div>
-        </div>
-        <div class="panel-loader__spinner" hidden></div>
-        <p class="panel-loader__message"></p>
       </div>
       ${
         params.driveFolder

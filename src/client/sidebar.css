@@ -480,11 +480,15 @@
 
         .job-strip {
           background: #f1f3f4;
-          border-bottom: 1px solid #dadce0;
+          border-top: 1px solid #dadce0;
           padding: 6px 12px;
           display: flex;
           flex-direction: column;
           gap: 4px;
+        }
+
+        .job-strip[hidden] {
+          display: none;
         }
 
         .job-strip__item {
