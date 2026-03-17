@@ -83,7 +83,7 @@ function getSheetHeaders() { return _GASEntry.getSheetHeaders(); }
 function runBatchAI(config, jobId) { _GASEntry.runBatchAI(config, jobId); }
 function importDriveLinks(jobId) { _GASEntry.importDriveLinks(jobId); }
 function extractTextFromSelection(jobId) { _GASEntry.extractTextFromSelection(jobId); }
-function sampleRowsToEvaluation() { _GASEntry.sampleRowsToEvaluation(); }
+function sampleRowsToEvaluation(jobId) { _GASEntry.sampleRowsToEvaluation(jobId); }
 /**
  * Call the Gemini API from a spreadsheet cell.
  * @param {string|Array} userTexts One or more text parts for the user message.

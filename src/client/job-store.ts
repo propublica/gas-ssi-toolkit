@@ -67,6 +67,8 @@ export class JobStore {
     this.stopPolling(id);
     const job = this.jobs.get(id);
     if (!job) return;
+    // Jobs are retained in memory for the session lifetime so listeners can query
+    // final state. The Map is small (typically <10 entries per session).
     this.jobs.set(id, { ...job, state: { status: "complete" }, completedAt: Date.now() });
     this.notify();
   }

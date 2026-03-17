@@ -180,7 +180,7 @@ export function extractTextFromSelection(jobId?: string): void {
 // 🎲 TOOL 3: DYNAMIC SAMPLING
 // ==========================================
 
-export function sampleRowsToEvaluation(): void {
+export function sampleRowsToEvaluation(_jobId?: string): void {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const ui = SpreadsheetApp.getUi();
   const sourceSheet = ss.getActiveSheet();
