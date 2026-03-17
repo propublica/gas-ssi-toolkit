@@ -9,12 +9,12 @@ export function getSheetHeaders(): Promise<string[]> {
   });
 }
 
-export function runBatchAI(config: RunConfig): Promise<void> {
+export function runBatchAI(config: RunConfig, jobId?: string): Promise<void> {
   return new Promise((resolve, reject) => {
     google.script.run
       .withSuccessHandler(() => resolve())
       .withFailureHandler((err: Error) => reject(err))
-      .runBatchAI(config);
+      .runBatchAI(config, jobId);
   });
 }
 

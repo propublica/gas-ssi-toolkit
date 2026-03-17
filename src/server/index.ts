@@ -25,6 +25,7 @@ import {
   resolveColumns,
   findOrCreateColumn,
   writeColumn,
+  writeJobProgress,
 } from "./utils";
 import type { RunConfig, PrepRecipeParams, PrepRecipeResult } from "../shared/types";
 
@@ -252,7 +253,7 @@ function toCellValue(content: CellContent): GoogleAppsScript.Spreadsheet.RichTex
   return builder.build();
 }
 
-export function runBatchAI(config: RunConfig): void {
+export function runBatchAI(config: RunConfig, jobId?: string): void {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getActiveSheet();
   const ui = SpreadsheetApp.getUi();
@@ -342,14 +343,20 @@ export function runBatchAI(config: RunConfig): void {
 
   const dataValues = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues();
 
-  SpreadsheetApp.getActive().toast(`Starting AI Batch...`, "AI Agent", -1);
+  const totalRows = dataValues.length;
   let processed = 0;
 
   for (let i = 0; i < dataValues.length; i++) {
     const row = dataValues[i];
     const realRowIndex = startRow + i;
 
-    SpreadsheetApp.getActive().toast(`Processing Row ${realRowIndex}...`, "AI Agent", -1);
+    if (jobId) {
+      writeJobProgress(CacheService.getUserCache(), jobId, {
+        message: `Processing row ${i + 1} of ${totalRows}`,
+        current: i + 1,
+        total: totalRows,
+      });
+    }
 
     const userPrompts = userPromptIdxs.map((idx) => row[idx]);
     const driveLinks = driveFileIdxs.length > 0 ? driveFileIdxs.map((idx) => row[idx]) : undefined;

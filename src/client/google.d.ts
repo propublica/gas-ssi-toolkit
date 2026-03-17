@@ -6,7 +6,7 @@ declare global {
     withFailureHandler(fn: (error: Error) => void): this;
     runTool(functionName: string): void;
     getSheetHeaders(): void;
-    runBatchAI(config: RunConfig): void;
+    runBatchAI(config: RunConfig, jobId?: string): void;
     prepRecipe(params: PrepRecipeParams): void;
     getJobProgress(jobId: string): void;
   }

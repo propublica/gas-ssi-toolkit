@@ -69,7 +69,7 @@ describe("runBatchAI", () => {
     const promise = services.runBatchAI(config as import("../src/shared/types").RunConfig);
     handlers.resolve(undefined);
     await expect(promise).resolves.toBeUndefined();
-    expect(mockRun.runBatchAI).toHaveBeenCalledWith(config);
+    expect(mockRun.runBatchAI).toHaveBeenCalledWith(config, undefined);
   });
 
   it("rejects on failure", async () => {

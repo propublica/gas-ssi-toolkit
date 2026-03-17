@@ -80,7 +80,7 @@ function onOpen(e) { _GASEntry.onOpen(e); }
 function showSidebar() { _GASEntry.showSidebar(); }
 function runTool(fn) { _GASEntry.runTool(fn); }
 function getSheetHeaders() { return _GASEntry.getSheetHeaders(); }
-function runBatchAI(config) { _GASEntry.runBatchAI(config); }
+function runBatchAI(config, jobId) { _GASEntry.runBatchAI(config, jobId); }
 function importDriveLinks() { _GASEntry.importDriveLinks(); }
 function extractTextFromSelection() { _GASEntry.extractTextFromSelection(); }
 function sampleRowsToEvaluation() { _GASEntry.sampleRowsToEvaluation(); }
