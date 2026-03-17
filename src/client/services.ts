@@ -35,3 +35,16 @@ export function prepRecipe(params: PrepRecipeParams): Promise<PrepRecipeResult> 
       .prepRecipe(params);
   });
 }
+
+export function getJobProgress(
+  jobId: string,
+): Promise<{ message?: string; current?: number; total?: number } | null> {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler((result: unknown) =>
+        resolve(result as { message?: string; current?: number; total?: number } | null),
+      )
+      .withFailureHandler((err: Error) => reject(err))
+      .getJobProgress(jobId);
+  });
+}

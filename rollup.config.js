@@ -95,6 +95,7 @@ function sampleRowsToEvaluation() { _GASEntry.sampleRowsToEvaluation(); }
  */
 function SSI(userTexts, systemPrompt, toolNames) { return _GASEntry.SSI(userTexts, systemPrompt, toolNames); }
 function prepRecipe(params) { return _GASEntry.prepRecipe(params); }
+function getJobProgress(jobId) { return _GASEntry.getJobProgress(jobId); }
 `,
     },
     plugins: [

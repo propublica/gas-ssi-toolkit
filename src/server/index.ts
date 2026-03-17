@@ -474,3 +474,15 @@ export function prepRecipe(params: PrepRecipeParams): PrepRecipeResult {
     tools: params.tools,
   };
 }
+
+// ==========================================
+// JOB PROGRESS
+// ==========================================
+
+export function getJobProgress(
+  jobId: string,
+): { message?: string; current?: number; total?: number } | null {
+  const raw = CacheService.getUserCache().get(jobId);
+  if (!raw) return null;
+  return JSON.parse(raw) as { message?: string; current?: number; total?: number };
+}

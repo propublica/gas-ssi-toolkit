@@ -8,6 +8,7 @@ declare global {
     getSheetHeaders(): void;
     runBatchAI(config: RunConfig): void;
     prepRecipe(params: PrepRecipeParams): void;
+    getJobProgress(jobId: string): void;
   }
 
   const google: {
