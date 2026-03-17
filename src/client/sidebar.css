@@ -6,12 +6,23 @@
             --text-secondary: #5f6368;
         }
 
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+
         body {
             padding: 0;
-            margin: 0;
+            display: flex;
+            flex-direction: column;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             background-color: #ffffff;
             color: var(--text-main);
+        }
+
+        #app {
+            flex: 1;
+            overflow-y: auto;
         }
 
         .container { padding: 16px; }
