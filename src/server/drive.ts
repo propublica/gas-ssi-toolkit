@@ -95,6 +95,10 @@ function exportAndEncodeFile(
   }
 
   if (mimeType === MimeType.GOOGLE_SHEETS) {
+    // SpreadsheetApp is used here intentionally: Drive.Files.export only exports the
+    // first sheet as CSV. Per-sheet export requires SpreadsheetApp to enumerate sheets
+    // and get each sheet's values directly. This is a data-access use of SpreadsheetApp,
+    // not a UI concern, so the index.ts-only rule does not apply here.
     const ss = SpreadsheetApp.openById(fileId);
     return ss.getSheets().map((sheet) => {
       const values = sheet.getDataRange().getValues();
@@ -133,11 +137,12 @@ function exportAndEncodeFile(
  *
  * Fetches and encodes each file, then enforces two size validation tiers:
  *
- * Tier 1 — Per-PDF pre-flight (checked before blob download):
- *   Raw file size × INLINE_PREFLIGHT_FACTOR must not exceed INLINE_MAX_PDF_BYTES.
- *   Skipped for Workspace exports (exported size is unknown before export).
+ * Tier 1 — Pre-flight (checked before blob download, binary types only):
+ *   - PDF: estimated encoded size must not exceed INLINE_MAX_PDF_BYTES.
+ *   - image/video/audio: estimated encoded size must not exceed INLINE_MAX_TOTAL_BYTES.
+ *   - Workspace files (Docs/Sheets) are skipped here — exported size is unknown pre-export.
  *
- * Tier 1 post-encode — Per-PDF ceiling:
+ * Tier 1 post-encode — Per-PDF ceiling (covers native PDFs and Docs exported as PDF):
  *   Each encoded PDF part must not exceed INLINE_MAX_PDF_BYTES.
  *
  * Tier 2 — Total request check (checked after all files are encoded):
@@ -170,6 +175,14 @@ export function prepareDriveAttachments(fileIds: string[]): GeminiInlineData[] {
           `File too large: "${file.getName()}" (~${Math.round(file.getSize() / 1024 / 1024)}MB raw). ` +
             `PDFs must be under ~${Math.round(CONFIG.INLINE_MAX_PDF_BYTES / CONFIG.INLINE_PREFLIGHT_FACTOR / 1024 / 1024)}MB raw ` +
             `(${Math.round(CONFIG.INLINE_MAX_PDF_BYTES / 1024 / 1024)}MB encoded). ` +
+            `Consider the Gemini Files API for large payloads: https://ai.google.dev/api/files`,
+        );
+      }
+      if (mimeType !== MimeType.PDF && estimatedEncodedSize > CONFIG.INLINE_MAX_TOTAL_BYTES) {
+        throw new Error(
+          `File too large: "${file.getName()}" (~${Math.round(file.getSize() / 1024 / 1024)}MB raw). ` +
+            `Estimated encoded size (~${Math.round(estimatedEncodedSize / 1024 / 1024)}MB) exceeds the ` +
+            `${Math.round(CONFIG.INLINE_MAX_TOTAL_BYTES / 1024 / 1024)}MB inline total limit. ` +
             `Consider the Gemini Files API for large payloads: https://ai.google.dev/api/files`,
         );
       }
