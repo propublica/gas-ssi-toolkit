@@ -3,7 +3,9 @@ import type { RunConfig, ToolId } from "../../shared/types";
 import { TagList } from "../components/tag-list";
 import { SingleTagList } from "../components/single-tag-list";
 import { RowRange } from "../components/row-range";
+import { PanelLoader } from "../components/panel-loader";
 import { getSheetHeaders, runBatchAI } from "../services";
+import { jobStore } from "../job-store";
 import { TOOL_CATALOG } from "../tools";
 
 export type SavedState = Required<
@@ -73,7 +75,9 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     updateGroundingVisibility();
     container.querySelector("#tools-list")?.addEventListener("click", updateGroundingVisibility);
 
-    this.loadHeaders(container, preset);
+    const loader = new PanelLoader(container);
+    loader.setState({ status: "loading", message: "Loading columns..." });
+    this.loadHeaders(container, preset).finally(() => loader.setState({ status: "idle" }));
   }
 
   private loadHeaders(container: HTMLElement, preset: Partial<RunConfig>): Promise<void> {
@@ -178,25 +182,12 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     const config = this.assembleRunConfig();
     if (!config) return;
 
-    const btn = container.querySelector<HTMLButtonElement>("#run-btn")!;
-    btn.disabled = true;
-    btn.textContent = "Running...";
+    const jobId = `batch-ai-${Date.now()}`;
+    jobStore.dispatch(jobId, "Batch AI Run", runBatchAI(config, jobId)).catch((err: Error) => {
+      globalThis.alert("Error: " + err.message);
+    });
 
-    runBatchAI(config).then(
-      () => {
-        btn.textContent = "Done!";
-        setTimeout(() => {
-          btn.disabled = false;
-          btn.textContent = "Run AI";
-        }, 1500);
-        this.loadHeaders(container, this.currentPreset());
-      },
-      (err: Error) => {
-        globalThis.alert("Error: " + err.message);
-        btn.disabled = false;
-        btn.textContent = "Run AI";
-      },
-    );
+    this.loadHeaders(container, this.currentPreset());
   }
 
   private assembleRunConfig(): RunConfig | null {
@@ -240,6 +231,13 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <button id="back-btn" class="back-btn">← Back</button>
         <span class="panel-title">▶️ Run AI Inference</span>
         <button id="refresh-btn" class="refresh-btn" title="Refresh columns">↻</button>
+      </div>
+      <div id="panel-loader" class="panel-loader" hidden>
+        <div class="panel-loader__bar-wrap" hidden>
+          <div class="panel-loader__bar-fill"></div>
+        </div>
+        <div class="panel-loader__spinner" hidden></div>
+        <p class="panel-loader__message"></p>
       </div>
       <div id="no-headers-msg" class="no-headers-msg" style="display:none">
         No columns found — add headers to your sheet first.
