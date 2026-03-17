@@ -262,6 +262,68 @@ describe("prepareDriveAttachments", () => {
     expect(Utilities.base64Encode).toHaveBeenCalledTimes(2);
   });
 
+  it("encodes correct CSV content for each sheet independently", () => {
+    (DriveApp.getFileById as jest.Mock).mockReturnValue({
+      getMimeType: () => "application/vnd.google-apps.spreadsheet",
+      getName: () => "data.gsheet",
+    });
+    (SpreadsheetApp.openById as jest.Mock).mockReturnValue({
+      getSheets: () => [
+        {
+          getName: () => "Sheet1",
+          getDataRange: () => ({
+            getValues: () => [
+              ["name", "age"],
+              ["Alice", 30],
+            ],
+          }),
+        },
+        {
+          getName: () => "Sheet2",
+          getDataRange: () => ({ getValues: () => [["city"], ["Boston"]] }),
+        },
+      ],
+    });
+
+    // Capture actual CSV strings passed to base64Encode
+    const encoded: string[] = [];
+    (Utilities.base64Encode as jest.Mock).mockImplementation((csv: string) => {
+      encoded.push(csv);
+      return "base64data==";
+    });
+
+    prepareDriveAttachments(["sheetId"]);
+
+    expect(encoded).toHaveLength(2);
+    expect(encoded[0]).toBe('"name","age"\n"Alice","30"');
+    expect(encoded[1]).toBe('"city"\n"Boston"');
+  });
+
+  it("escapes double quotes in CSV cell values", () => {
+    (DriveApp.getFileById as jest.Mock).mockReturnValue({
+      getMimeType: () => "application/vnd.google-apps.spreadsheet",
+      getName: () => "data.gsheet",
+    });
+    (SpreadsheetApp.openById as jest.Mock).mockReturnValue({
+      getSheets: () => [
+        {
+          getName: () => "Sheet1",
+          getDataRange: () => ({ getValues: () => [['He said "hello"', "normal"]] }),
+        },
+      ],
+    });
+
+    const encoded: string[] = [];
+    (Utilities.base64Encode as jest.Mock).mockImplementation((csv: string) => {
+      encoded.push(csv);
+      return "base64data==";
+    });
+
+    prepareDriveAttachments(["sheetId"]);
+
+    expect(encoded[0]).toBe('"He said ""hello""","normal"');
+  });
+
   it("throws a descriptive error for unsupported file types", () => {
     (DriveApp.getFileById as jest.Mock).mockReturnValue({
       getMimeType: () => "application/zip",
