@@ -151,6 +151,7 @@ describe("extractTextUniversal", () => {
 describe("prepareDriveAttachments", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (Utilities.base64Encode as jest.Mock).mockReturnValue("base64data==");
     (globalThis as any).Drive = {
       Files: { export: jest.fn() },
     };
