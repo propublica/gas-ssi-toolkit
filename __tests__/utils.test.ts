@@ -17,6 +17,7 @@ import {
   resolveColumns,
   findOrCreateColumn,
   writeColumn,
+  writeJobProgress,
 } from "../src/server/utils";
 import type { DriveFileInfo } from "../src/server/types";
 
@@ -322,6 +323,34 @@ describe("findOrCreateColumn", () => {
 });
 
 // ── writeColumn ─────────────────────────────────────────────────
+
+describe("writeJobProgress", () => {
+  it("writes serialized progress to cache with 5-minute TTL", () => {
+    const mockPut = jest.fn();
+    const mockCache = { put: mockPut } as unknown as GoogleAppsScript.Cache.Cache;
+
+    writeJobProgress(mockCache, "job-123", { message: "Processing row 3 of 10", current: 3, total: 10 });
+
+    expect(mockPut).toHaveBeenCalledWith(
+      "job-123",
+      JSON.stringify({ message: "Processing row 3 of 10", current: 3, total: 10 }),
+      300,
+    );
+  });
+
+  it("writes message-only progress (no current/total)", () => {
+    const mockPut = jest.fn();
+    const mockCache = { put: mockPut } as unknown as GoogleAppsScript.Cache.Cache;
+
+    writeJobProgress(mockCache, "job-456", { message: "Scanning folder..." });
+
+    expect(mockPut).toHaveBeenCalledWith(
+      "job-456",
+      JSON.stringify({ message: "Scanning folder..." }),
+      300,
+    );
+  });
+});
 
 describe("writeColumn", () => {
   it("writes values starting at row 2 using a single setValues call", () => {
