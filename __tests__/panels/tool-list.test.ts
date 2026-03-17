@@ -6,8 +6,13 @@ jest.mock("../../src/client/services", () => ({
   runTool: jest.fn(),
 }));
 
+jest.mock("../../src/client/job-store", () => ({
+  jobStore: { dispatch: jest.fn().mockResolvedValue(undefined) },
+}));
+
 import { ToolListPanel } from "../../src/client/panels/tool-list";
 import * as services from "../../src/client/services";
+import * as jobStoreModule from "../../src/client/job-store";
 import type { NavigationContext } from "../../src/client/types";
 
 const mockNav: NavigationContext = {
@@ -26,6 +31,7 @@ function mountPanel(): HTMLElement {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  (jobStoreModule.jobStore.dispatch as jest.Mock).mockResolvedValue(undefined);
 });
 
 describe("ToolListPanel", () => {
@@ -41,67 +47,61 @@ describe("ToolListPanel", () => {
     expect(mockNav.navigate).toHaveBeenCalledWith("recipes-list");
   });
 
-  it("clicking a tool button calls runTool with the correct function name", async () => {
+  it("clicking a tool button calls runTool with the function name and a jobId", () => {
     (services.runTool as jest.Mock).mockResolvedValue(undefined);
     const c = mountPanel();
     c.querySelector<HTMLButtonElement>("#btn-import-drive-links")!.click();
-    expect(services.runTool).toHaveBeenCalledWith("importDriveLinks");
+    expect(services.runTool).toHaveBeenCalledWith(
+      "importDriveLinks",
+      expect.stringMatching(/^importDriveLinks-\d+$/),
+    );
   });
 
-  it("clicking Sample Rows calls runTool with 'sampleRowsToEvaluation'", async () => {
+  it("clicking Sample Rows calls runTool with 'sampleRowsToEvaluation' and a jobId", () => {
     (services.runTool as jest.Mock).mockResolvedValue(undefined);
     const c = mountPanel();
     c.querySelector<HTMLButtonElement>("#btn-sample-rows")!.click();
-    expect(services.runTool).toHaveBeenCalledWith("sampleRowsToEvaluation");
+    expect(services.runTool).toHaveBeenCalledWith(
+      "sampleRowsToEvaluation",
+      expect.stringMatching(/^sampleRowsToEvaluation-\d+$/),
+    );
   });
 
-  it("clicking Extract Text calls runTool with 'extractTextFromSelection'", async () => {
+  it("clicking Extract Text calls runTool with 'extractTextFromSelection' and a jobId", () => {
     (services.runTool as jest.Mock).mockResolvedValue(undefined);
     const c = mountPanel();
     c.querySelector<HTMLButtonElement>("#btn-extract-text")!.click();
-    expect(services.runTool).toHaveBeenCalledWith("extractTextFromSelection");
+    expect(services.runTool).toHaveBeenCalledWith(
+      "extractTextFromSelection",
+      expect.stringMatching(/^extractTextFromSelection-\d+$/),
+    );
   });
 
-  it("tool button shows loading state while runTool is in flight", () => {
-    let resolveRunTool!: () => void;
-    (services.runTool as jest.Mock).mockReturnValue(
-      new Promise<void>((r) => {
-        resolveRunTool = r;
-      }),
+  it("clicking a tool button dispatches to jobStore with matching jobId, label, and promise", () => {
+    const promise = Promise.resolve();
+    (services.runTool as jest.Mock).mockReturnValue(promise);
+    const c = mountPanel();
+    const btn = c.querySelector<HTMLButtonElement>("#btn-import-drive-links")!;
+    btn.click();
+    expect(jobStoreModule.jobStore.dispatch).toHaveBeenCalledWith(
+      expect.stringMatching(/^importDriveLinks-\d+$/),
+      expect.any(String),
+      promise,
+    );
+  });
+
+  it("on runTool failure: alerts with error message", async () => {
+    globalThis.alert = jest.fn();
+    const err = new Error("Drive error");
+    (services.runTool as jest.Mock).mockResolvedValue(undefined);
+    // Use mockImplementation so the rejection is created at call time (handlers attach before rejection fires)
+    (jobStoreModule.jobStore.dispatch as jest.Mock).mockImplementation(() =>
+      Promise.reject(err),
     );
     const c = mountPanel();
-    const btn = c.querySelector<HTMLButtonElement>("#btn-import-drive-links")!;
-    btn.click();
-    expect(btn.classList.contains("loading")).toBe(true);
-    expect(btn.disabled).toBe(true);
-    expect(btn.textContent).toContain("Working...");
-    resolveRunTool();
-  });
-
-  it("on runTool success: removes loading class and restores button text", async () => {
-    (services.runTool as jest.Mock).mockResolvedValue(undefined);
-    const c = mountPanel();
-    const btn = c.querySelector<HTMLButtonElement>("#btn-import-drive-links")!;
-    const orig = btn.innerHTML;
-    btn.click();
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(btn.classList.contains("loading")).toBe(false);
-    expect(btn.innerHTML).toBe(orig);
-  });
-
-  it("on runTool failure: alerts, removes loading class, restores button text", async () => {
-    globalThis.alert = jest.fn();
-    (services.runTool as jest.Mock).mockRejectedValue(new Error("Drive error"));
-    const c = mountPanel();
-    const btn = c.querySelector<HTMLButtonElement>("#btn-import-drive-links")!;
-    const orig = btn.innerHTML;
-    btn.click();
-    await Promise.resolve();
-    await Promise.resolve();
+    c.querySelector<HTMLButtonElement>("#btn-import-drive-links")!.click();
+    await new Promise((r) => setTimeout(r, 0));
     expect(globalThis.alert).toHaveBeenCalledWith("Error: Drive error");
-    expect(btn.classList.contains("loading")).toBe(false);
-    expect(btn.innerHTML).toBe(orig);
   });
 
   it("unmount() returns undefined", () => {
