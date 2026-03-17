@@ -135,7 +135,7 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     );
   });
 
-  it("calls nav.back() on success and restores button", async () => {
+  it("stays on panel after success, shows Done!, and refetches headers", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
     const { container } = await mountAndLoad({
       userPromptCols: ["col_a"],
@@ -143,10 +143,10 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     });
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     await Promise.resolve();
-    expect(mockNav.back).toHaveBeenCalled();
+    expect(mockNav.back).not.toHaveBeenCalled();
     const btn = container.querySelector<HTMLButtonElement>("#run-btn")!;
-    expect(btn.disabled).toBe(false);
-    expect(btn.textContent).toBe("Run AI");
+    expect(btn.textContent).toBe("Done!");
+    expect(services.getSheetHeaders).toHaveBeenCalledTimes(2); // initial load + refresh
   });
 
   it("alerts and re-enables button on failure", async () => {
@@ -169,6 +169,20 @@ describe("ConfigureAIRunPanel — back", () => {
     const { container } = await mountAndLoad();
     container.querySelector<HTMLButtonElement>("#back-btn")!.click();
     expect(mockNav.back).toHaveBeenCalled();
+  });
+});
+
+describe("ConfigureAIRunPanel — refresh", () => {
+  it("refresh-btn refetches headers preserving current selections", async () => {
+    (services.getSheetHeaders as jest.Mock).mockResolvedValue(["col_a", "col_b"]);
+    const { container } = await mountAndLoad({ userPromptCols: ["col_a"], outputCol: "col_b" });
+    expect(services.getSheetHeaders).toHaveBeenCalledTimes(1);
+    container.querySelector<HTMLButtonElement>("#refresh-btn")!.click();
+    await Promise.resolve();
+    expect(services.getSheetHeaders).toHaveBeenCalledTimes(2);
+    // selections preserved after refresh
+    const tags = container.querySelectorAll("#user-prompt-cols .tag.selected");
+    expect(tags.length).toBeGreaterThan(0);
   });
 });
 
