@@ -462,3 +462,42 @@
             border-color: var(--primary-blue);
             color: var(--primary-blue);
         }
+
+        /* ── Job Strip (sidebar chrome) ──────────────────────────────────────────── */
+
+        .job-strip {
+          background: #f1f3f4;
+          border-bottom: 1px solid #dadce0;
+          padding: 6px 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .job-strip__item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          color: #5f6368;
+        }
+
+        .job-strip__item--error {
+          color: #c5221f;
+        }
+
+        .job-strip__spinner {
+          width: 10px;
+          height: 10px;
+          border: 2px solid #dadce0;
+          border-top-color: #1a73e8;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+          flex-shrink: 0;
+        }
+
+        .job-strip__label {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
