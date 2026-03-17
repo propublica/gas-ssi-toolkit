@@ -26,6 +26,20 @@
   base64Encode: jest.fn().mockReturnValue("encoded=="),
 };
 
+(globalThis as any).Drive = {
+  Files: { export: jest.fn() },
+};
+
+(globalThis as any).SpreadsheetApp = {
+  openById: jest.fn(),
+};
+
+(globalThis as any).MimeType = {
+  GOOGLE_DOCS: "application/vnd.google-apps.document",
+  GOOGLE_SHEETS: "application/vnd.google-apps.spreadsheet",
+  PDF: "application/pdf",
+};
+
 // ── Import after mocks ─────────────────────────────────────────
 
 import { runInference } from "../src/server/inference";
