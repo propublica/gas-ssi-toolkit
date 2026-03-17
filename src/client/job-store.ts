@@ -44,8 +44,9 @@ export class JobStore {
 
     return fn.then(
       () => this.complete(id),
-      (err: Error) => {
-        this.fail(id, err.message);
+      (err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        this.fail(id, message);
         throw err;
       },
     );

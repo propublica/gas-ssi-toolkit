@@ -60,10 +60,12 @@ describe("JobStore", () => {
     const listener = jest.fn();
     store.subscribe(listener);
 
-    await store.dispatch("job-4", "Test Job", Promise.reject(new Error("boom"))).catch(() => {});
+    const rejected = Promise.reject(new Error("boom"));
+    rejected.catch(() => {}); // suppress unhandled rejection before dispatch attaches handler
 
-    const errorCalls = listener.mock.calls;
-    const lastCall = errorCalls[errorCalls.length - 1][0] as Array<{ id: string; state: { status: string; message?: string } }>;
+    await store.dispatch("job-4", "Test Job", rejected).catch(() => {});
+
+    const lastCall = listener.mock.calls[listener.mock.calls.length - 1][0] as Array<{ id: string; state: { status: string; message?: string } }>;
     const job = lastCall.find((j) => j.id === "job-4");
     expect(job?.state.status).toBe("error");
     expect(job?.state.message).toBe("boom");
