@@ -9,7 +9,7 @@
 import { invokeGemini } from "./api";
 import { prepareDriveAttachments } from "./drive";
 import { flattenArg, isValidDriveLink, extractId } from "./utils";
-import type { GeminiInlineData, GeminiResponse } from "./types";
+import type { GeminiResponse } from "./types";
 import type { ToolId } from "../shared/types";
 
 /**
@@ -35,7 +35,7 @@ export function runInference(
   if (userTexts.length === 0) return null;
 
   try {
-    const inlineData: GeminiInlineData[] =
+    const inlineData =
       driveLinks !== undefined
         ? prepareDriveAttachments(flattenArg(driveLinks).filter(isValidDriveLink).map(extractId))
         : [];
