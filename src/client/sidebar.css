@@ -138,13 +138,26 @@
             gap: 12px;
         }
 
+        .panel-loader[hidden] { display: none; }
+
+        /* ── Spinner (shared) ───────────────────────────────────────────────────── */
+
+        .panel-loader__spinner,
+        .job-strip__spinner,
+        .btn-spinner {
+          display: inline-block;
+          border-style: solid;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+          flex-shrink: 0;
+        }
+
         .panel-loader__spinner {
             width: 24px;
             height: 24px;
-            border: 3px solid #e0e0e0;
+            border-width: 3px;
+            border-color: #e0e0e0;
             border-top-color: #1a73e8;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
         }
 
         .panel-loader__bar-wrap {
@@ -489,11 +502,19 @@
         .job-strip__spinner {
           width: 10px;
           height: 10px;
-          border: 2px solid #dadce0;
+          border-width: 2px;
+          border-color: #dadce0;
           border-top-color: #1a73e8;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-          flex-shrink: 0;
+        }
+
+        .btn-spinner {
+          width: 12px;
+          height: 12px;
+          border-width: 2px;
+          border-color: rgba(255, 255, 255, 0.4);
+          border-top-color: white;
+          vertical-align: middle;
+          margin-right: 5px;
         }
 
         .job-strip__label {
