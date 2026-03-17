@@ -101,6 +101,19 @@ describe("JobStore", () => {
     await op;
   });
 
+  it("removes completed job from store after 5 seconds", async () => {
+    const listener = jest.fn();
+    store.subscribe(listener);
+
+    await store.dispatch("job-auto-remove", "Test", Promise.resolve());
+    listener.mockClear();
+
+    jest.advanceTimersByTime(5000);
+
+    const lastCall = listener.mock.calls[listener.mock.calls.length - 1][0] as Array<{ id: string }>;
+    expect(lastCall.find((j) => j.id === "job-auto-remove")).toBeUndefined();
+  });
+
   it("stops polling after job completes", async () => {
     mockGetJobProgress.mockResolvedValue(null);
 
