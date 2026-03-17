@@ -89,7 +89,7 @@ describe("runTool", () => {
     const promise = services.runTool("importDriveLinks");
     handlers.resolve(undefined);
     await expect(promise).resolves.toBeUndefined();
-    expect(mockRun.runTool).toHaveBeenCalledWith("importDriveLinks");
+    expect(mockRun.runTool).toHaveBeenCalledWith("importDriveLinks", undefined);
   });
 
   it("rejects on failure", async () => {

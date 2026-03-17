@@ -18,12 +18,12 @@ export function runBatchAI(config: RunConfig, jobId?: string): Promise<void> {
   });
 }
 
-export function runTool(fn: string): Promise<void> {
+export function runTool(fn: string, jobId?: string): Promise<void> {
   return new Promise((resolve, reject) => {
     google.script.run
       .withSuccessHandler(() => resolve())
       .withFailureHandler((err: Error) => reject(err))
-      .runTool(fn);
+      .runTool(fn, jobId);
   });
 }
 

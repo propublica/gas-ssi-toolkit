@@ -78,7 +78,7 @@ export default [
  */
 function onOpen(e) { _GASEntry.onOpen(e); }
 function showSidebar() { _GASEntry.showSidebar(); }
-function runTool(fn) { _GASEntry.runTool(fn); }
+function runTool(fn, jobId) { _GASEntry.runTool(fn, jobId); }
 function getSheetHeaders() { return _GASEntry.getSheetHeaders(); }
 function runBatchAI(config, jobId) { _GASEntry.runBatchAI(config, jobId); }
 function importDriveLinks() { _GASEntry.importDriveLinks(); }

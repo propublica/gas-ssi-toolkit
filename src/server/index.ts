@@ -69,7 +69,7 @@ export function showSidebar(): void {
 // 📂 TOOL 1: IMPORT DRIVE LINKS
 // ==========================================
 
-export function importDriveLinks(): void {
+export function importDriveLinks(jobId?: string): void {
   const ui = SpreadsheetApp.getUi();
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
 
@@ -96,7 +96,9 @@ export function importDriveLinks(): void {
     const parentFolder = DriveApp.getFolderById(folderId);
     const targetRange = sheet.getRange(startCell);
 
-    SpreadsheetApp.getActive().toast("Scanning folder...", "Listing", -1);
+    if (jobId) {
+      writeJobProgress(CacheService.getUserCache(), jobId, { message: "Scanning folder..." });
+    }
 
     const allFiles: { url: string }[] = [];
     getAllFilesRecursive(parentFolder, allFiles);
@@ -106,7 +108,11 @@ export function importDriveLinks(): void {
       sheet
         .getRange(targetRange.getRow(), targetRange.getColumn(), output.length, 1)
         .setValues(output);
-      ui.alert(`Success! Imported ${output.length} links starting at ${startCell}`);
+      SpreadsheetApp.getActive().toast(
+        `Imported ${output.length} links starting at ${startCell}`,
+        "Complete",
+        5,
+      );
     } else {
       ui.alert("No files found in that folder.");
     }
@@ -123,7 +129,7 @@ export function importDriveLinks(): void {
 // 📝 TOOL 2: EXTRACT TEXT
 // ==========================================
 
-export function extractTextFromSelection(): void {
+export function extractTextFromSelection(jobId?: string): void {
   const ui = SpreadsheetApp.getUi();
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
 
@@ -144,7 +150,6 @@ export function extractTextFromSelection(): void {
     if (confirm !== ui.Button.YES) return;
   }
 
-  SpreadsheetApp.getActive().toast("Starting extraction...", "Init", -1);
   let processedCount = 0;
 
   for (let i = 0; i < totalRows; i++) {
@@ -152,7 +157,14 @@ export function extractTextFromSelection(): void {
 
     if (isValidDriveLink(cellValue)) {
       const fileId = extractId(cellValue);
-      SpreadsheetApp.getActive().toast(`Extracting (${i + 1}/${totalRows})`, "Processing", -1);
+
+      if (jobId) {
+        writeJobProgress(CacheService.getUserCache(), jobId, {
+          message: `Extracting ${i + 1} of ${totalRows}`,
+          current: i + 1,
+          total: totalRows,
+        });
+      }
 
       const text = truncateText(extractTextUniversal(fileId), 49000);
 
@@ -398,16 +410,13 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 // 🔀 SIDEBAR DISPATCHER
 // ==========================================
 
-const TOOLS: Record<string, () => void> = {
-  importDriveLinks,
-  sampleRowsToEvaluation,
-  extractTextFromSelection,
-};
-
-export function runTool(functionName: string): void {
-  const fn = TOOLS[functionName];
-  if (!fn) throw new Error("Function not found: " + functionName);
-  fn();
+export function runTool(functionName: string, jobId?: string): void {
+  const TOOLS: Record<string, (jobId?: string) => void> = {
+    importDriveLinks,
+    extractTextFromSelection,
+    sampleRowsToEvaluation,
+  };
+  TOOLS[functionName]?.(jobId);
 }
 
 // ==========================================
