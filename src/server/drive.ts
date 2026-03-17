@@ -66,16 +66,153 @@ export function extractTextUniversal(fileId: string): string {
 }
 
 /**
- * Fetch a Drive file by ID and return it as base64-encoded inline data
- * ready for the Gemini API. Throws if the file exceeds the 25MB limit.
+ * Route a single Drive file by MIME type, export or fetch its content,
+ * and return base64-encoded inline data parts ready for Gemini.
+ *
+ * Returns an array because Google Sheets files produce one part per sheet.
+ * All other types return a single-element array.
+ *
+ * Does NOT perform size validation — that is the responsibility of
+ * prepareDriveAttachments, which sees the full set of files for a row.
  */
-export function fetchAndEncodeFile(fileId: string): GeminiInlineData {
-  const file = DriveApp.getFileById(fileId);
-  if (file.getSize() > CONFIG.MAX_FILE_SIZE_BYTES) {
-    throw new Error("File too large (>25MB).");
+function exportAndEncodeFile(
+  fileId: string,
+  file: GoogleAppsScript.Drive.File,
+): GeminiInlineData[] {
+  const mimeType = file.getMimeType();
+
+  if (mimeType === MimeType.GOOGLE_DOCS) {
+    // file.getAs() handles the Drive export correctly (includes alt=media internally).
+    // Drive.Files.export() alone returns metadata, not content.
+    const pdfBlob = file.getAs("application/pdf");
+    return [
+      {
+        mime_type: "application/pdf",
+        data: Utilities.base64Encode(pdfBlob.getBytes()),
+      },
+    ];
   }
-  return {
-    mime_type: file.getMimeType(),
-    data: Utilities.base64Encode(file.getBlob().getBytes()),
-  };
+
+  if (mimeType === MimeType.GOOGLE_SHEETS) {
+    // SpreadsheetApp is used here intentionally: Drive.Files.export only exports the
+    // first sheet as CSV. Per-sheet export requires SpreadsheetApp to enumerate sheets
+    // and get each sheet's values directly. This is a data-access use of SpreadsheetApp,
+    // not a UI concern, so the index.ts-only rule does not apply here.
+    const ss = SpreadsheetApp.openById(fileId);
+    return ss.getSheets().map((sheet) => {
+      const values = sheet.getDataRange().getValues();
+      const csv = [
+        `Sheet: ${sheet.getName()}`,
+        ...values.map((row) =>
+          row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
+        ),
+      ].join("\n");
+      return {
+        mime_type: "text/csv",
+        data: Utilities.base64Encode(csv, Utilities.Charset.UTF_8),
+      };
+    });
+  }
+
+  if (
+    mimeType === MimeType.PDF ||
+    mimeType.startsWith("image/") ||
+    mimeType.startsWith("video/") ||
+    mimeType.startsWith("audio/")
+  ) {
+    return [
+      {
+        mime_type: mimeType,
+        data: Utilities.base64Encode(file.getBlob().getBytes()),
+      },
+    ];
+  }
+
+  throw new Error(
+    `Unsupported file type: ${mimeType} (${file.getName()}). ` +
+      `Supported types: Google Docs, Google Sheets, PDF, image/*, video/*, audio/*.`,
+  );
+}
+
+/**
+ * Prepare all Drive file attachments for a single Gemini inference call.
+ *
+ * Fetches and encodes each file, then enforces two size validation tiers:
+ *
+ * Tier 1 — Pre-flight (checked before blob download, binary types only):
+ *   - PDF: estimated encoded size must not exceed INLINE_MAX_PDF_BYTES.
+ *   - image/video/audio: estimated encoded size must not exceed INLINE_MAX_TOTAL_BYTES.
+ *   - Workspace files (Docs/Sheets) are skipped here — exported size is unknown pre-export.
+ *
+ * Tier 1 post-encode — Per-PDF ceiling (covers native PDFs and Docs exported as PDF):
+ *   Each encoded PDF part must not exceed INLINE_MAX_PDF_BYTES.
+ *
+ * Tier 2 — Total request check (checked after all files are encoded):
+ *   Sum of all encoded part lengths must not exceed INLINE_MAX_TOTAL_BYTES.
+ *
+ * For files exceeding inline limits, consider the Gemini Files API (up to 2GB,
+ * no base64 overhead): https://ai.google.dev/api/files
+ * TODO: implement uploadToFilesAPI() and route oversized files here instead of throwing.
+ */
+export function prepareDriveAttachments(fileIds: string[]): GeminiInlineData[] {
+  if (fileIds.length === 0) return [];
+
+  const parts: GeminiInlineData[] = [];
+
+  for (const fileId of fileIds) {
+    const file = DriveApp.getFileById(fileId);
+    const mimeType = file.getMimeType();
+
+    // Tier 1 pre-flight: check raw size for binary file types before downloading blob.
+    // Workspace exports (Docs/Sheets) are skipped — exported size is unknown pre-export.
+    if (
+      mimeType === MimeType.PDF ||
+      mimeType.startsWith("image/") ||
+      mimeType.startsWith("video/") ||
+      mimeType.startsWith("audio/")
+    ) {
+      const estimatedEncodedSize = file.getSize() * CONFIG.INLINE_PREFLIGHT_FACTOR;
+      if (mimeType === MimeType.PDF && estimatedEncodedSize > CONFIG.INLINE_MAX_PDF_BYTES) {
+        throw new Error(
+          `File too large: "${file.getName()}" (~${Math.round(file.getSize() / 1024 / 1024)}MB raw). ` +
+            `PDFs must be under ~${Math.round(CONFIG.INLINE_MAX_PDF_BYTES / CONFIG.INLINE_PREFLIGHT_FACTOR / 1024 / 1024)}MB raw ` +
+            `(${Math.round(CONFIG.INLINE_MAX_PDF_BYTES / 1024 / 1024)}MB encoded). ` +
+            `consider breaking up the file into smaller components`,
+        );
+      }
+      if (mimeType !== MimeType.PDF && estimatedEncodedSize > CONFIG.INLINE_MAX_TOTAL_BYTES) {
+        throw new Error(
+          `File too large: "${file.getName()}" (~${Math.round(file.getSize() / 1024 / 1024)}MB raw). ` +
+            `Estimated encoded size (~${Math.round(estimatedEncodedSize / 1024 / 1024)}MB) exceeds the ` +
+            `${Math.round(CONFIG.INLINE_MAX_TOTAL_BYTES / 1024 / 1024)}MB inline total limit. ` +
+            `consider breaking up the file into smaller components`,
+        );
+      }
+    }
+
+    parts.push(...exportAndEncodeFile(fileId, file));
+  }
+
+  // Tier 1 post-encode: verify each individual PDF part is within its per-file limit.
+  for (const part of parts) {
+    if (part.mime_type === "application/pdf" && part.data.length > CONFIG.INLINE_MAX_PDF_BYTES) {
+      throw new Error(
+        `PDF too large after encoding (~${Math.round(part.data.length / 1024 / 1024)}MB encoded, ` +
+          `limit ${Math.round(CONFIG.INLINE_MAX_PDF_BYTES / 1024 / 1024)}MB). ` +
+          `consider breaking up the file into smaller components`,
+      );
+    }
+  }
+
+  // Tier 2: verify total combined encoded size across all parts.
+  const totalEncodedBytes = parts.reduce((sum, part) => sum + part.data.length, 0);
+  if (totalEncodedBytes > CONFIG.INLINE_MAX_TOTAL_BYTES) {
+    throw new Error(
+      `Attachments too large: combined encoded size is ~${Math.round(totalEncodedBytes / 1024 / 1024)}MB, ` +
+        `exceeds ${Math.round(CONFIG.INLINE_MAX_TOTAL_BYTES / 1024 / 1024)}MB inline limit. ` +
+        `consider breaking up the file into smaller components`,
+    );
+  }
+
+  return parts;
 }
