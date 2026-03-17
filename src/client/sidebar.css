@@ -23,6 +23,7 @@
         #app {
             flex: 1;
             overflow-y: auto;
+            padding-bottom: 16px;
         }
 
         .container { padding: 16px; }
