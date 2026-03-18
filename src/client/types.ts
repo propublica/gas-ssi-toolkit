@@ -1,3 +1,22 @@
+// ── Loading / Progress types ─────────────────────────────────────────────────
+
+export type LoadingStatus = "idle" | "loading" | "progress" | "complete" | "error";
+
+export interface LoadingState {
+  status: LoadingStatus;
+  message?: string;
+  current?: number;
+  total?: number;
+}
+
+export interface Job {
+  id: string;
+  label: string;
+  state: LoadingState;
+  startedAt: number;
+  completedAt?: number;
+}
+
 // ── Recipe UI types ─────────────────────────────────────────────
 // These are client-only — they define sidebar form structure, not RPC payloads.
 

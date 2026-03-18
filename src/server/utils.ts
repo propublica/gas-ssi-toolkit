@@ -125,6 +125,18 @@ export function findOrCreateColumn(
 }
 
 /**
+ * Writes job progress to CacheService so the sidebar can poll it.
+ * TTL is 300s (5 minutes) — long enough for any single operation.
+ */
+export function writeJobProgress(
+  cache: GoogleAppsScript.Cache.Cache,
+  jobId: string,
+  state: { message?: string; current?: number; total?: number },
+): void {
+  cache.put(jobId, JSON.stringify(state), 300);
+}
+
+/**
  * Write an array of string values to a column starting at row 2.
  * Uses a single setValues() call for efficiency.
  * Pass wrapStrategy to apply a wrap format to the written range.

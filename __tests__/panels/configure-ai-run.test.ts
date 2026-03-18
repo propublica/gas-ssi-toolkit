@@ -5,11 +5,19 @@
 jest.mock("../../src/client/services", () => ({
   getSheetHeaders: jest.fn(),
   runBatchAI: jest.fn(),
+  getJobProgress: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock("../../src/client/job-store", () => ({
+  jobStore: {
+    dispatch: jest.fn().mockImplementation((_id, _label, fn: Promise<void>) => fn),
+  },
 }));
 
 import { ConfigureAIRunPanel } from "../../src/client/panels/configure-ai-run";
 import type { SavedState } from "../../src/client/panels/configure-ai-run";
 import * as services from "../../src/client/services";
+import { jobStore } from "../../src/client/job-store";
 import type { NavigationContext } from "../../src/client/types";
 import type { RunConfig } from "../../src/shared/types";
 
@@ -110,19 +118,26 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     expect(globalThis.alert).toHaveBeenCalledWith("Please select an output column.");
   });
 
-  it("disables run-btn and sets 'Running...' while in flight", async () => {
-    (services.runBatchAI as jest.Mock).mockReturnValue(new Promise(() => {}));
-    const { container } = await mountAndLoad({
-      userPromptCols: ["col_a"],
-      outputCol: "ai_inference",
-    });
-    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    const btn = container.querySelector<HTMLButtonElement>("#run-btn")!;
-    expect(btn.disabled).toBe(true);
-    expect(btn.textContent).toBe("Running...");
+  it("shows PanelLoader while headers are loading", async () => {
+    let resolveHeaders!: (headers: string[]) => void;
+    (services.getSheetHeaders as jest.Mock).mockReturnValue(
+      new Promise<string[]>((res) => {
+        resolveHeaders = res;
+      }),
+    );
+    const container = makeContainer();
+    const panel = new ConfigureAIRunPanel();
+    panel.mount(container, mockNav);
+    // Before headers resolve, the panel-loader should be visible
+    expect(container.querySelector<HTMLElement>("#panel-loader")!.hidden).toBe(false);
+    // After headers resolve, the panel-loader should be hidden
+    resolveHeaders(DEFAULT_HEADERS);
+    await Promise.resolve();
+    await Promise.resolve(); // flush finally()
+    expect(container.querySelector<HTMLElement>("#panel-loader")!.hidden).toBe(true);
   });
 
-  it("calls runBatchAI with correctly assembled RunConfig", async () => {
+  it("calls runBatchAI with correctly assembled RunConfig and a jobId", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
     const { container } = await mountAndLoad({
       userPromptCols: ["col_a"],
@@ -132,10 +147,11 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     await Promise.resolve();
     expect(services.runBatchAI).toHaveBeenCalledWith(
       expect.objectContaining({ userPromptCols: ["col_a"], outputCol: "ai_inference" }),
+      expect.stringMatching(/^batch-ai-\d+$/),
     );
   });
 
-  it("stays on panel after success, shows Done!, and refetches headers", async () => {
+  it("stays on panel after run is dispatched and refetches headers", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
     const { container } = await mountAndLoad({
       userPromptCols: ["col_a"],
@@ -144,12 +160,10 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     await Promise.resolve();
     expect(mockNav.back).not.toHaveBeenCalled();
-    const btn = container.querySelector<HTMLButtonElement>("#run-btn")!;
-    expect(btn.textContent).toBe("Done!");
     expect(services.getSheetHeaders).toHaveBeenCalledTimes(2); // initial load + refresh
   });
 
-  it("alerts and re-enables button on failure", async () => {
+  it("alerts on failure via jobStore catch handler", async () => {
     (services.runBatchAI as jest.Mock).mockRejectedValue(new Error("API error"));
     const { container } = await mountAndLoad({
       userPromptCols: ["col_a"],
@@ -157,10 +171,8 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     });
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     await Promise.resolve();
+    await Promise.resolve(); // flush rejection
     expect(globalThis.alert).toHaveBeenCalledWith("Error: API error");
-    const btn = container.querySelector<HTMLButtonElement>("#run-btn")!;
-    expect(btn.disabled).toBe(false);
-    expect(btn.textContent).toBe("Run AI");
   });
 });
 
@@ -218,6 +230,7 @@ describe("ConfigureAIRunPanel — tools TagList", () => {
     await Promise.resolve();
     expect(services.runBatchAI).toHaveBeenCalledWith(
       expect.objectContaining({ tools: ["google_search"] }),
+      expect.stringMatching(/^batch-ai-\d+$/),
     );
   });
 });

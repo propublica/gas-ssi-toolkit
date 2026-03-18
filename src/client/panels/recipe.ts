@@ -49,7 +49,7 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
     container.querySelector("#back-btn")?.addEventListener("click", () => nav.back());
 
     this.mountFields(container, this.params, savedState);
-    this.mountPrepCook(container, savedState?.prepComplete ?? false);
+    this.mountPrepCook(container, savedState?.prepComplete ?? false, container);
   }
 
   unmount(): SavedState {
@@ -135,14 +135,18 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
     }
   }
 
-  private mountPrepCook(container: HTMLElement, prepComplete: boolean): void {
+  private mountPrepCook(
+    container: HTMLElement,
+    prepComplete: boolean,
+    _panelContainer: HTMLElement,
+  ): void {
     this.prepCook = new RecipePrepCook(container.querySelector("#prep-cook-container")!, {
-      onPrep: (): Promise<void> => {
+      onPrep: async (): Promise<void> => {
         const params = this.buildPrepParams();
-        if (!params) return Promise.reject(null); // validation alert already shown; bail silently
-        return prepRecipe(params).then((result: PrepRecipeResult) => {
-          this.preppedRunConfig = this.buildRunConfig(result);
-        });
+        if (!params) throw null; // validation alert already shown; bail silently
+
+        const result = await prepRecipe(params);
+        this.preppedRunConfig = this.buildRunConfig(result);
       },
       onCook: (): void => {
         if (this.preppedRunConfig) {

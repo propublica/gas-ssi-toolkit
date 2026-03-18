@@ -18,7 +18,8 @@
     "__tests__/components/**/*.ts",
     "__tests__/panels/**/*.ts",
     "__tests__/router.test.ts",
-    "__tests__/services.test.ts"
+    "__tests__/services.test.ts",
+    "__tests__/job-store.test.ts"
   ],
   "exclude": []
 }

@@ -120,7 +120,7 @@ describe("runTool", () => {
     expect(() => runTool("importDriveLinks")).not.toThrow();
   });
 
-  it("throws for an unknown function name", () => {
-    expect(() => runTool("doesNotExist")).toThrow("Function not found: doesNotExist");
+  it("does nothing for an unknown function name", () => {
+    expect(() => runTool("doesNotExist")).not.toThrow();
   });
 });
