@@ -14,6 +14,15 @@ Rebuild the "Import Drive Links" tool as a first-class sidebar panel, replacing 
 - Delete the old `importDriveLinks` server function and its `runTool` dispatcher entry
 - Lay down patterns that support future Extra tool panels (Sample Rows, Extract Text)
 
+## Migration Pattern
+
+This is the first of three "Extra tool → dedicated panel" migrations. Sample Rows and Extract Text will follow the same steps. Key conventions to carry forward:
+
+- Each tool gets its own config interface in `src/shared/types.ts` (e.g. `SampleRowsConfig`, `ExtractTextConfig`)
+- Each migration removes that tool's entry from the `runTool` TOOLS dispatcher in `index.ts`
+- Once all three tools are migrated, `runTool` becomes dead code — delete the function, its GAS stub in `rollup.config.js`, and its declaration in `google.d.ts`
+- `__tests__/panels/import-drive-links.test.ts` is the reference test pattern for the subsequent panel test files
+
 ## Architecture
 
 ### New files
