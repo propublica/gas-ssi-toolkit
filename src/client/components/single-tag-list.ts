@@ -53,8 +53,8 @@ export class SingleTagList {
       this.newInput = document.createElement("input");
       this.newInput.type = "text";
       this.newInput.className = "text-input";
-      this.newInput.placeholder = opts.newPlaceholder ?? "ai_column_name";
-      this.newInput.value = opts.newDefault ?? "ai_";
+      this.newInput.placeholder = opts.newPlaceholder ?? "column_name";
+      this.newInput.value = opts.newDefault ?? "";
       this.newInput.style.display = "none";
 
       if (selectedIsCustom) {
