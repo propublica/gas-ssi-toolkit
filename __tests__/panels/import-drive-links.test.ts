@@ -133,6 +133,34 @@ describe("ImportDriveLinksPanel", () => {
     expect(globalThis.alert).toHaveBeenCalledWith(expect.stringContaining("output column"));
   });
 
+  it("refresh button re-fetches headers", async () => {
+    (services.getSheetHeaders as jest.Mock).mockResolvedValue(["source_drive"]);
+    const c = mountPanel();
+    await Promise.resolve();
+    expect(services.getSheetHeaders).toHaveBeenCalledTimes(1);
+    c.querySelector<HTMLButtonElement>("#refresh-btn")!.click();
+    await Promise.resolve();
+    expect(services.getSheetHeaders).toHaveBeenCalledTimes(2);
+  });
+
+  it("refresh button disables during load and re-enables after", async () => {
+    let resolveHeaders!: (v: string[]) => void;
+    (services.getSheetHeaders as jest.Mock)
+      .mockResolvedValueOnce(["source_drive"])
+      .mockReturnValueOnce(new Promise((r) => (resolveHeaders = r)));
+    const c = mountPanel();
+    await Promise.resolve();
+    const btn = c.querySelector<HTMLButtonElement>("#refresh-btn")!;
+    btn.click();
+    expect(btn.disabled).toBe(true);
+    expect(btn.classList.contains("spinning")).toBe(true);
+    resolveHeaders(["source_drive", "new_col"]);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(btn.disabled).toBe(false);
+    expect(btn.classList.contains("spinning")).toBe(false);
+  });
+
   it("alerts on jobStore dispatch failure", async () => {
     globalThis.alert = jest.fn();
     (services.getSheetHeaders as jest.Mock).mockResolvedValue(["source_drive"]);
