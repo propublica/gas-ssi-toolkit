@@ -106,6 +106,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         this.outputColList = new SingleTagList(container.querySelector("#output-col")!, headers, {
           includeNew: true,
           selected: preset.outputCol,
+          newPlaceholder: "ai_column_name",
+          newDefault: "ai_",
         });
         this.rowRangeComp = new RowRange(
           container.querySelector("#row-range-container")!,

@@ -44,6 +44,7 @@ const mockSpreadsheetApp = {
     toast: jest.fn(),
   }),
   getActive: jest.fn().mockReturnValue({ toast: jest.fn() }),
+  WrapStrategy: { CLIP: "CLIP", WRAP: "WRAP", OVERFLOW: "OVERFLOW" },
 };
 
 const mockEvaluate = jest.fn().mockReturnValue({
@@ -67,7 +68,7 @@ const mockHtmlService = {
 
 // ── Import after mocks ─────────────────────────────────────────
 
-import { onOpen, showSidebar, runTool } from "../src/server/index";
+import { onOpen, showSidebar, runTool, importDriveLinks } from "../src/server/index";
 
 // ── Tests ──────────────────────────────────────────────────────
 
@@ -115,12 +116,55 @@ describe("runTool", () => {
     jest.clearAllMocks();
   });
 
-  it("dispatches 'importDriveLinks' without throwing", () => {
-    // importDriveLinks calls ui.prompt() which is mocked to return CANCEL (early exit)
-    expect(() => runTool("importDriveLinks")).not.toThrow();
-  });
-
   it("does nothing for an unknown function name", () => {
     expect(() => runTool("doesNotExist")).not.toThrow();
+  });
+});
+
+const mockSetValues = jest.fn();
+
+describe("importDriveLinks", () => {
+  function makeFileIterator(files: { getUrl: () => string; getMimeType: () => string }[]) {
+    let i = 0;
+    return { hasNext: () => i < files.length, next: () => files[i++] };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockActiveSheet.getRange.mockReturnValue({ setValues: mockSetValues });
+    mockActiveSheet.getLastColumn.mockReturnValue(1);
+    mockActiveSheet.getLastRow.mockReturnValue(0);
+    // Provide a header row for findOrCreateColumn
+    mockActiveSheet.getRange.mockImplementation(
+      (row: number, col: number, numRows?: number, _numCols?: number) => {
+        if (row === 1 && col === 1 && numRows === 1) {
+          return { getValues: () => [["source_drive"]] };
+        }
+        return { setValues: mockSetValues };
+      },
+    );
+  });
+
+  it("calls DriveApp and writes file URLs to the output column", () => {
+    const mockFile = {
+      getUrl: (): string => "https://drive.google.com/file/1",
+      getMimeType: (): string => "application/pdf",
+    };
+    const mockFiles = makeFileIterator([mockFile]);
+    const mockSubfolders = makeFileIterator([]);
+    const mockFolder = {
+      getFiles: () => mockFiles,
+      getFolders: () => mockSubfolders,
+    };
+    (globalThis as unknown as { DriveApp: unknown }).DriveApp = {
+      getFolderById: jest.fn().mockReturnValue(mockFolder),
+    };
+
+    importDriveLinks({
+      folderUrl: "https://drive.google.com/drive/folders/abc123",
+      outputCol: "source_drive",
+    });
+
+    expect(mockSetValues).toHaveBeenCalledWith([["https://drive.google.com/file/1"]]);
   });
 });

@@ -47,14 +47,10 @@ describe("ToolListPanel", () => {
     expect(mockNav.navigate).toHaveBeenCalledWith("recipes-list");
   });
 
-  it("clicking a tool button calls runTool with the function name and a jobId", () => {
-    (services.runTool as jest.Mock).mockResolvedValue(undefined);
+  it("clicking Import Drive Links navigates to import-drive-links panel", () => {
     const c = mountPanel();
     c.querySelector<HTMLButtonElement>("#btn-import-drive-links")!.click();
-    expect(services.runTool).toHaveBeenCalledWith(
-      "importDriveLinks",
-      expect.stringMatching(/^importDriveLinks-\d+$/),
-    );
+    expect(mockNav.navigate).toHaveBeenCalledWith("import-drive-links");
   });
 
   it("clicking Sample Rows calls runTool with 'sampleRowsToEvaluation' and a jobId", () => {
@@ -75,33 +71,6 @@ describe("ToolListPanel", () => {
       "extractTextFromSelection",
       expect.stringMatching(/^extractTextFromSelection-\d+$/),
     );
-  });
-
-  it("clicking a tool button dispatches to jobStore with matching jobId, label, and promise", () => {
-    const promise = Promise.resolve();
-    (services.runTool as jest.Mock).mockReturnValue(promise);
-    const c = mountPanel();
-    const btn = c.querySelector<HTMLButtonElement>("#btn-import-drive-links")!;
-    btn.click();
-    expect(jobStoreModule.jobStore.dispatch).toHaveBeenCalledWith(
-      expect.stringMatching(/^importDriveLinks-\d+$/),
-      expect.any(String),
-      promise,
-    );
-  });
-
-  it("on runTool failure: alerts with error message", async () => {
-    globalThis.alert = jest.fn();
-    const err = new Error("Drive error");
-    (services.runTool as jest.Mock).mockResolvedValue(undefined);
-    // Use mockImplementation so the rejection is created at call time (handlers attach before rejection fires)
-    (jobStoreModule.jobStore.dispatch as jest.Mock).mockImplementation(() =>
-      Promise.reject(err),
-    );
-    const c = mountPanel();
-    c.querySelector<HTMLButtonElement>("#btn-import-drive-links")!.click();
-    await new Promise((r) => setTimeout(r, 0));
-    expect(globalThis.alert).toHaveBeenCalledWith("Error: Drive error");
   });
 
   it("unmount() returns undefined", () => {

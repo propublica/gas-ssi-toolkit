@@ -47,14 +47,20 @@ export function createSeededRandom(seed?: number): () => number {
 export function getAllFilesRecursive(
   folder: GoogleAppsScript.Drive.Folder,
   fileList: DriveFileInfo[],
+  mimeTypePrefixes?: string[],
 ): void {
   const files = folder.getFiles();
   while (files.hasNext()) {
-    fileList.push({ url: files.next().getUrl() });
+    const file = files.next();
+    if (mimeTypePrefixes) {
+      const mime = file.getMimeType();
+      if (!mimeTypePrefixes.some((p) => mime.startsWith(p))) continue;
+    }
+    fileList.push({ url: file.getUrl() });
   }
   const subfolders = folder.getFolders();
   while (subfolders.hasNext()) {
-    getAllFilesRecursive(subfolders.next(), fileList);
+    getAllFilesRecursive(subfolders.next(), fileList, mimeTypePrefixes);
   }
 }
 

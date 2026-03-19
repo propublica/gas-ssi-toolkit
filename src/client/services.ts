@@ -1,4 +1,9 @@
-import type { PrepRecipeParams, PrepRecipeResult, RunConfig } from "../shared/types";
+import type {
+  ImportDriveLinksConfig,
+  PrepRecipeParams,
+  PrepRecipeResult,
+  RunConfig,
+} from "../shared/types";
 
 export function getSheetHeaders(): Promise<string[]> {
   return new Promise((resolve, reject) => {
@@ -33,6 +38,15 @@ export function prepRecipe(params: PrepRecipeParams): Promise<PrepRecipeResult> 
       .withSuccessHandler((result: unknown) => resolve(result as PrepRecipeResult))
       .withFailureHandler((err: Error) => reject(err))
       .prepRecipe(params);
+  });
+}
+
+export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler(() => resolve())
+      .withFailureHandler((err: Error) => reject(err))
+      .importDriveLinks(config, jobId);
   });
 }
 
