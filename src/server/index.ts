@@ -93,6 +93,11 @@ export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string)
     col,
     allFiles.map((f) => f.url),
   );
+  SpreadsheetApp.getActive().toast(
+    `Imported ${allFiles.length} link${allFiles.length === 1 ? "" : "s"} into "${config.outputCol}".`,
+    "Complete",
+    5,
+  );
 }
 
 // ==========================================
