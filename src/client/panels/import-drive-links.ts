@@ -53,11 +53,10 @@ export class ImportDriveLinksPanel implements Panel<undefined, SavedState> {
 
     getSheetHeaders().then(
       (headers) => {
-        this.outputColList = new SingleTagList(
-          container.querySelector("#output-col")!,
-          headers,
-          { includeNew: true, selected: savedState?.outputCol },
-        );
+        this.outputColList = new SingleTagList(container.querySelector("#output-col")!, headers, {
+          includeNew: true,
+          selected: savedState?.outputCol,
+        });
         container.querySelector<HTMLElement>("#config-form")!.style.display = "block";
         container
           .querySelector<HTMLButtonElement>("#import-btn")!

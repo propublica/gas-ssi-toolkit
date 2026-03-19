@@ -27,7 +27,12 @@ import {
   writeColumn,
   writeJobProgress,
 } from "./utils";
-import type { RunConfig, PrepRecipeParams, PrepRecipeResult, ImportDriveLinksConfig } from "../shared/types";
+import type {
+  RunConfig,
+  PrepRecipeParams,
+  PrepRecipeResult,
+  ImportDriveLinksConfig,
+} from "../shared/types";
 import type { DriveFileInfo } from "./types";
 
 // ==========================================
@@ -83,7 +88,11 @@ export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string)
   getAllFilesRecursive(parentFolder, allFiles, config.mimeTypes);
 
   const col = findOrCreateColumn(sheet, config.outputCol, SpreadsheetApp.WrapStrategy.CLIP);
-  writeColumn(sheet, col, allFiles.map((f) => f.url));
+  writeColumn(
+    sheet,
+    col,
+    allFiles.map((f) => f.url),
+  );
 }
 
 // ==========================================

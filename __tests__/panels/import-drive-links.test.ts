@@ -112,4 +112,41 @@ describe("ImportDriveLinksPanel", () => {
       "https://drive.google.com/drive/folders/saved",
     );
   });
+
+  it("navigates back when getSheetHeaders fails", async () => {
+    globalThis.alert = jest.fn();
+    (services.getSheetHeaders as jest.Mock).mockRejectedValue(new Error("network error"));
+    mountPanel();
+    await Promise.resolve();
+    expect(mockNav.back).toHaveBeenCalled();
+  });
+
+  it("alerts when output column is not selected and Import is clicked", async () => {
+    globalThis.alert = jest.fn();
+    (services.getSheetHeaders as jest.Mock).mockResolvedValue(["source_drive"]);
+    const c = mountPanel();
+    await Promise.resolve();
+    c.querySelector<HTMLInputElement>("#folder-url-input")!.value =
+      "https://drive.google.com/drive/folders/abc123";
+    // do NOT click any output column tag — leave it unselected
+    c.querySelector<HTMLButtonElement>("#import-btn")!.click();
+    expect(globalThis.alert).toHaveBeenCalledWith(expect.stringContaining("output column"));
+  });
+
+  it("alerts on jobStore dispatch failure", async () => {
+    globalThis.alert = jest.fn();
+    (services.getSheetHeaders as jest.Mock).mockResolvedValue(["source_drive"]);
+    (services.importDriveLinks as jest.Mock).mockReturnValue(Promise.resolve());
+    (jobStoreModule.jobStore.dispatch as jest.Mock).mockReturnValue(
+      Promise.reject(new Error("job failed")),
+    );
+    const c = mountPanel();
+    await Promise.resolve();
+    c.querySelector<HTMLInputElement>("#folder-url-input")!.value =
+      "https://drive.google.com/drive/folders/abc123";
+    c.querySelector<HTMLElement>("#output-col .tag")?.click();
+    c.querySelector<HTMLButtonElement>("#import-btn")!.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(globalThis.alert).toHaveBeenCalledWith("Error: job failed");
+  });
 });

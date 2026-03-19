@@ -1,4 +1,9 @@
-import type { ImportDriveLinksConfig, PrepRecipeParams, PrepRecipeResult, RunConfig } from "../shared/types";
+import type {
+  ImportDriveLinksConfig,
+  PrepRecipeParams,
+  PrepRecipeResult,
+  RunConfig,
+} from "../shared/types";
 
 export function getSheetHeaders(): Promise<string[]> {
   return new Promise((resolve, reject) => {
