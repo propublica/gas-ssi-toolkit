@@ -196,15 +196,20 @@ describe("getAllFilesRecursive", () => {
   });
 
   it("filters by mimeType prefix when mimeTypePrefixes is provided", () => {
-    const mockDoc = { getUrl: () => "doc-url", getMimeType: () => "application/vnd.google-apps.document" };
+    const mockDoc = {
+      getUrl: () => "doc-url",
+      getMimeType: () => "application/vnd.google-apps.document",
+    };
     const mockPdf = { getUrl: () => "pdf-url", getMimeType: () => "application/pdf" };
     const mockImg = { getUrl: () => "img-url", getMimeType: () => "image/png" };
-    const files = makeFileIterator([]) as any;
     let i = 0;
     const mockFiles = [mockDoc, mockPdf, mockImg];
     const fileIter = { hasNext: () => i < mockFiles.length, next: () => mockFiles[i++] };
     const subfolders = makeFolderIterator([]);
-    const folder = { getFiles: () => fileIter, getFolders: () => subfolders } as unknown as GoogleAppsScript.Drive.Folder;
+    const folder = {
+      getFiles: () => fileIter,
+      getFolders: () => subfolders,
+    } as unknown as GoogleAppsScript.Drive.Folder;
 
     const result: DriveFileInfo[] = [];
     getAllFilesRecursive(folder, result, ["application/"]);
@@ -212,13 +217,19 @@ describe("getAllFilesRecursive", () => {
   });
 
   it("imports all files when mimeTypePrefixes is absent", () => {
-    const mockDoc = { getUrl: () => "doc-url", getMimeType: () => "application/vnd.google-apps.document" };
+    const mockDoc = {
+      getUrl: () => "doc-url",
+      getMimeType: () => "application/vnd.google-apps.document",
+    };
     const mockImg = { getUrl: () => "img-url", getMimeType: () => "image/png" };
     let i = 0;
     const mockFiles = [mockDoc, mockImg];
     const fileIter = { hasNext: () => i < mockFiles.length, next: () => mockFiles[i++] };
     const subfolders = makeFolderIterator([]);
-    const folder = { getFiles: () => fileIter, getFolders: () => subfolders } as unknown as GoogleAppsScript.Drive.Folder;
+    const folder = {
+      getFiles: () => fileIter,
+      getFolders: () => subfolders,
+    } as unknown as GoogleAppsScript.Drive.Folder;
 
     const result: DriveFileInfo[] = [];
     getAllFilesRecursive(folder, result);
@@ -359,7 +370,11 @@ describe("writeJobProgress", () => {
     const mockPut = jest.fn();
     const mockCache = { put: mockPut } as unknown as GoogleAppsScript.Cache.Cache;
 
-    writeJobProgress(mockCache, "job-123", { message: "Processing row 3 of 10", current: 3, total: 10 });
+    writeJobProgress(mockCache, "job-123", {
+      message: "Processing row 3 of 10",
+      current: 3,
+      total: 10,
+    });
 
     expect(mockPut).toHaveBeenCalledWith(
       "job-123",

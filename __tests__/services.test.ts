@@ -130,7 +130,10 @@ describe("prepRecipe", () => {
 describe("importDriveLinks", () => {
   it("calls google.script.run.importDriveLinks with config and jobId and resolves", async () => {
     const handlers = captureHandlers();
-    const config = { folderUrl: "https://drive.google.com/drive/folders/abc", outputCol: "source_drive" };
+    const config = {
+      folderUrl: "https://drive.google.com/drive/folders/abc",
+      outputCol: "source_drive",
+    };
     const promise = services.importDriveLinks(config, "job-1");
     handlers.resolve(undefined);
     await expect(promise).resolves.toBeUndefined();
@@ -139,7 +142,10 @@ describe("importDriveLinks", () => {
 
   it("rejects on failure", async () => {
     const handlers = captureHandlers();
-    const config = { folderUrl: "https://drive.google.com/drive/folders/abc", outputCol: "source_drive" };
+    const config = {
+      folderUrl: "https://drive.google.com/drive/folders/abc",
+      outputCol: "source_drive",
+    };
     const promise = services.importDriveLinks(config, "job-1");
     handlers.reject(new Error("drive error"));
     await expect(promise).rejects.toThrow("drive error");

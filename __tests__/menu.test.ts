@@ -160,7 +160,10 @@ describe("importDriveLinks", () => {
       getFolderById: jest.fn().mockReturnValue(mockFolder),
     };
 
-    importDriveLinks({ folderUrl: "https://drive.google.com/drive/folders/abc123", outputCol: "source_drive" });
+    importDriveLinks({
+      folderUrl: "https://drive.google.com/drive/folders/abc123",
+      outputCol: "source_drive",
+    });
 
     expect(mockSetValues).toHaveBeenCalledWith([["https://drive.google.com/file/1"]]);
   });
