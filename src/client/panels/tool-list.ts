@@ -19,8 +19,8 @@ export class ToolListPanel implements Panel {
     container.querySelector("#btn-recipes")?.addEventListener("click", () => {
       nav.navigate("recipes-list");
     });
-    container.querySelector("#btn-import-drive-links")?.addEventListener("click", (e) => {
-      this.dispatchTool(e as MouseEvent, "importDriveLinks");
+    container.querySelector("#btn-import-drive-links")?.addEventListener("click", () => {
+      nav.navigate("import-drive-links");
     });
     container.querySelector("#btn-sample-rows")?.addEventListener("click", (e) => {
       this.dispatchTool(e as MouseEvent, "sampleRowsToEvaluation");
