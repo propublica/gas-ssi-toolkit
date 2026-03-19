@@ -1,4 +1,9 @@
-import type { PrepRecipeParams, PrepRecipeResult, RunConfig } from "../shared/types";
+import type {
+  ImportDriveLinksConfig,
+  PrepRecipeParams,
+  PrepRecipeResult,
+  RunConfig,
+} from "../shared/types";
 
 export function getSheetHeaders(): Promise<string[]> {
   return new Promise((resolve, reject) => {
@@ -9,21 +14,21 @@ export function getSheetHeaders(): Promise<string[]> {
   });
 }
 
-export function runBatchAI(config: RunConfig): Promise<void> {
+export function runBatchAI(config: RunConfig, jobId?: string): Promise<void> {
   return new Promise((resolve, reject) => {
     google.script.run
       .withSuccessHandler(() => resolve())
       .withFailureHandler((err: Error) => reject(err))
-      .runBatchAI(config);
+      .runBatchAI(config, jobId);
   });
 }
 
-export function runTool(fn: string): Promise<void> {
+export function runTool(fn: string, jobId?: string): Promise<void> {
   return new Promise((resolve, reject) => {
     google.script.run
       .withSuccessHandler(() => resolve())
       .withFailureHandler((err: Error) => reject(err))
-      .runTool(fn);
+      .runTool(fn, jobId);
   });
 }
 
@@ -33,5 +38,27 @@ export function prepRecipe(params: PrepRecipeParams): Promise<PrepRecipeResult> 
       .withSuccessHandler((result: unknown) => resolve(result as PrepRecipeResult))
       .withFailureHandler((err: Error) => reject(err))
       .prepRecipe(params);
+  });
+}
+
+export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler(() => resolve())
+      .withFailureHandler((err: Error) => reject(err))
+      .importDriveLinks(config, jobId);
+  });
+}
+
+export function getJobProgress(
+  jobId: string,
+): Promise<{ message?: string; current?: number; total?: number } | null> {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler((result: unknown) =>
+        resolve(result as { message?: string; current?: number; total?: number } | null),
+      )
+      .withFailureHandler((err: Error) => reject(err))
+      .getJobProgress(jobId);
   });
 }

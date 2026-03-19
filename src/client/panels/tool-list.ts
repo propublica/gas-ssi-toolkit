@@ -1,5 +1,6 @@
 import type { NavigationContext, Panel } from "../types";
 import { runTool } from "../services";
+import { jobStore } from "../job-store";
 
 export class ToolListPanel implements Panel {
   mount(container: HTMLElement, nav: NavigationContext): void {
@@ -18,8 +19,8 @@ export class ToolListPanel implements Panel {
     container.querySelector("#btn-recipes")?.addEventListener("click", () => {
       nav.navigate("recipes-list");
     });
-    container.querySelector("#btn-import-drive-links")?.addEventListener("click", (e) => {
-      this.dispatchTool(e as MouseEvent, "importDriveLinks");
+    container.querySelector("#btn-import-drive-links")?.addEventListener("click", () => {
+      nav.navigate("import-drive-links");
     });
     container.querySelector("#btn-sample-rows")?.addEventListener("click", (e) => {
       this.dispatchTool(e as MouseEvent, "sampleRowsToEvaluation");
@@ -31,23 +32,11 @@ export class ToolListPanel implements Panel {
 
   private dispatchTool(e: MouseEvent, fn: string): void {
     const btn = e.currentTarget as HTMLButtonElement;
-    const orig = btn.innerHTML;
-    btn.classList.add("loading");
-    btn.disabled = true;
-    btn.innerHTML = '<span class="icon">⏳</span> Working...';
-    runTool(fn).then(
-      () => {
-        btn.classList.remove("loading");
-        btn.disabled = false;
-        btn.innerHTML = orig;
-      },
-      (err: Error) => {
-        globalThis.alert("Error: " + err.message);
-        btn.classList.remove("loading");
-        btn.disabled = false;
-        btn.innerHTML = orig;
-      },
-    );
+    const jobId = `${fn}-${Date.now()}`;
+    const label = btn.textContent?.trim() ?? fn;
+    jobStore
+      .dispatch(jobId, label, runTool(fn, jobId))
+      .catch((err: Error) => globalThis.alert("Error: " + err.message));
   }
 
   private template(): string {

@@ -11,8 +11,8 @@
 export { SSI } from "./customFunctions";
 import { runInference } from "./inference";
 import {
-  buildInferenceCellContent,
-  buildGroundingCellContent,
+  buildRichInferenceCellContent,
+  buildRichGroundingCellContent,
   type CellContent,
 } from "./rich-text";
 import { checkDriveService, extractTextUniversal } from "./drive";
@@ -25,8 +25,15 @@ import {
   resolveColumns,
   findOrCreateColumn,
   writeColumn,
+  writeJobProgress,
 } from "./utils";
-import type { RunConfig, PrepRecipeParams, PrepRecipeResult } from "../shared/types";
+import type {
+  RunConfig,
+  PrepRecipeParams,
+  PrepRecipeResult,
+  ImportDriveLinksConfig,
+} from "../shared/types";
+import type { DriveFileInfo } from "./types";
 
 // ==========================================
 // 🚀 MENU & INITIALIZATION
@@ -35,7 +42,7 @@ import type { RunConfig, PrepRecipeParams, PrepRecipeResult } from "../shared/ty
 export function onOpen(): void {
   SpreadsheetApp.getUi()
     .createMenu("⚡ SSI Toolkit")
-    .addItem("🚀 Open SSI Sidebar", "showSidebar")
+    .addItem("🚀 Open SSI Toolkit", "showSidebar")
     .addToUi();
 }
 
@@ -68,61 +75,36 @@ export function showSidebar(): void {
 // 📂 TOOL 1: IMPORT DRIVE LINKS
 // ==========================================
 
-export function importDriveLinks(): void {
-  const ui = SpreadsheetApp.getUi();
+export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string): void {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const folderId = extractId(config.folderUrl);
 
-  // 1. Get Folder
-  const folderResponse = ui.prompt(
-    "Step 1/2: Select Folder",
-    "Paste the Google Drive Folder Link or ID:",
-    ui.ButtonSet.OK_CANCEL,
-  );
-  if (folderResponse.getSelectedButton() !== ui.Button.OK) return;
-  const folderId = extractId(folderResponse.getResponseText().trim());
-
-  // 2. Get Location
-  const activeA1 = sheet.getActiveCell().getA1Notation();
-  const cellResponse = ui.prompt(
-    "Step 2/2: Confirm Location",
-    `Importing links starting at cell ${activeA1}.\nClick OK to proceed or type a new cell below:`,
-    ui.ButtonSet.OK_CANCEL,
-  );
-  if (cellResponse.getSelectedButton() !== ui.Button.OK) return;
-  const startCell = cellResponse.getResponseText().trim() || activeA1;
-
-  try {
-    const parentFolder = DriveApp.getFolderById(folderId);
-    const targetRange = sheet.getRange(startCell);
-
-    SpreadsheetApp.getActive().toast("Scanning folder...", "Listing", -1);
-
-    const allFiles: { url: string }[] = [];
-    getAllFilesRecursive(parentFolder, allFiles);
-
-    if (allFiles.length > 0) {
-      const output = allFiles.map((f) => [f.url]);
-      sheet
-        .getRange(targetRange.getRow(), targetRange.getColumn(), output.length, 1)
-        .setValues(output);
-      ui.alert(`Success! Imported ${output.length} links starting at ${startCell}`);
-    } else {
-      ui.alert("No files found in that folder.");
-    }
-  } catch (e) {
-    ui.alert(
-      "Error accessing folder",
-      "Please ensure you have access to this folder ID.\n\nDetails: " + (e as Error).message,
-      ui.ButtonSet.OK,
-    );
+  if (jobId) {
+    writeJobProgress(CacheService.getUserCache(), jobId, { message: "Scanning folder..." });
   }
+
+  const parentFolder = DriveApp.getFolderById(folderId);
+  const allFiles: DriveFileInfo[] = [];
+  getAllFilesRecursive(parentFolder, allFiles, config.mimeTypes);
+
+  const col = findOrCreateColumn(sheet, config.outputCol, SpreadsheetApp.WrapStrategy.CLIP);
+  writeColumn(
+    sheet,
+    col,
+    allFiles.map((f) => f.url),
+  );
+  SpreadsheetApp.getActive().toast(
+    `Imported ${allFiles.length} link${allFiles.length === 1 ? "" : "s"} into "${config.outputCol}".`,
+    "Complete",
+    5,
+  );
 }
 
 // ==========================================
 // 📝 TOOL 2: EXTRACT TEXT
 // ==========================================
 
-export function extractTextFromSelection(): void {
+export function extractTextFromSelection(jobId?: string): void {
   const ui = SpreadsheetApp.getUi();
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
 
@@ -143,7 +125,6 @@ export function extractTextFromSelection(): void {
     if (confirm !== ui.Button.YES) return;
   }
 
-  SpreadsheetApp.getActive().toast("Starting extraction...", "Init", -1);
   let processedCount = 0;
 
   for (let i = 0; i < totalRows; i++) {
@@ -151,7 +132,14 @@ export function extractTextFromSelection(): void {
 
     if (isValidDriveLink(cellValue)) {
       const fileId = extractId(cellValue);
-      SpreadsheetApp.getActive().toast(`Extracting (${i + 1}/${totalRows})`, "Processing", -1);
+
+      if (jobId) {
+        writeJobProgress(CacheService.getUserCache(), jobId, {
+          message: `Extracting ${i + 1} of ${totalRows}`,
+          current: i + 1,
+          total: totalRows,
+        });
+      }
 
       const text = truncateText(extractTextUniversal(fileId), 49000);
 
@@ -167,7 +155,7 @@ export function extractTextFromSelection(): void {
 // 🎲 TOOL 3: DYNAMIC SAMPLING
 // ==========================================
 
-export function sampleRowsToEvaluation(): void {
+export function sampleRowsToEvaluation(_jobId?: string): void {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const ui = SpreadsheetApp.getUi();
   const sourceSheet = ss.getActiveSheet();
@@ -252,7 +240,7 @@ function toCellValue(content: CellContent): GoogleAppsScript.Spreadsheet.RichTex
   return builder.build();
 }
 
-export function runBatchAI(config: RunConfig): void {
+export function runBatchAI(config: RunConfig, jobId?: string): void {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getActiveSheet();
   const ui = SpreadsheetApp.getUi();
@@ -342,14 +330,20 @@ export function runBatchAI(config: RunConfig): void {
 
   const dataValues = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues();
 
-  SpreadsheetApp.getActive().toast(`Starting AI Batch...`, "AI Agent", -1);
+  const totalRows = dataValues.length;
   let processed = 0;
 
   for (let i = 0; i < dataValues.length; i++) {
     const row = dataValues[i];
     const realRowIndex = startRow + i;
 
-    SpreadsheetApp.getActive().toast(`Processing Row ${realRowIndex}...`, "AI Agent", -1);
+    if (jobId) {
+      writeJobProgress(CacheService.getUserCache(), jobId, {
+        message: `Processing row ${i + 1} of ${totalRows}`,
+        current: i + 1,
+        total: totalRows,
+      });
+    }
 
     const userPrompts = userPromptIdxs.map((idx) => row[idx]);
     const driveLinks = driveFileIdxs.length > 0 ? driveFileIdxs.map((idx) => row[idx]) : undefined;
@@ -362,7 +356,7 @@ export function runBatchAI(config: RunConfig): void {
       try {
         sheet
           .getRange(realRowIndex, outputIdx + 1)
-          .setRichTextValue(toCellValue(buildInferenceCellContent(result)));
+          .setRichTextValue(toCellValue(buildRichInferenceCellContent(result)));
       } catch (_e) {
         // Fall back to plain text if rich text rendering fails for this row.
         sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
@@ -372,7 +366,7 @@ export function runBatchAI(config: RunConfig): void {
     }
 
     if (config.includeGrounding && groundingIdx >= 0) {
-      const groundingContent = buildGroundingCellContent(result);
+      const groundingContent = buildRichGroundingCellContent(result);
       if (groundingContent !== null) {
         sheet
           .getRange(realRowIndex, groundingIdx + 1)
@@ -391,16 +385,12 @@ export function runBatchAI(config: RunConfig): void {
 // 🔀 SIDEBAR DISPATCHER
 // ==========================================
 
-const TOOLS: Record<string, () => void> = {
-  importDriveLinks,
-  sampleRowsToEvaluation,
-  extractTextFromSelection,
-};
-
-export function runTool(functionName: string): void {
-  const fn = TOOLS[functionName];
-  if (!fn) throw new Error("Function not found: " + functionName);
-  fn();
+export function runTool(functionName: string, jobId?: string): void {
+  const TOOLS: Record<string, (jobId?: string) => void> = {
+    extractTextFromSelection,
+    sampleRowsToEvaluation,
+  };
+  TOOLS[functionName]?.(jobId);
 }
 
 // ==========================================
@@ -473,4 +463,16 @@ export function prepRecipe(params: PrepRecipeParams): PrepRecipeResult {
     colNames,
     tools: params.tools,
   };
+}
+
+// ==========================================
+// JOB PROGRESS
+// ==========================================
+
+export function getJobProgress(
+  jobId: string,
+): { message?: string; current?: number; total?: number } | null {
+  const raw = CacheService.getUserCache().get(jobId);
+  if (!raw) return null;
+  return JSON.parse(raw) as { message?: string; current?: number; total?: number };
 }

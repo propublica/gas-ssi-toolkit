@@ -3,7 +3,9 @@ import type { RunConfig, ToolId } from "../../shared/types";
 import { TagList } from "../components/tag-list";
 import { SingleTagList } from "../components/single-tag-list";
 import { RowRange } from "../components/row-range";
+import { PanelLoader } from "../components/panel-loader";
 import { getSheetHeaders, runBatchAI } from "../services";
+import { jobStore } from "../job-store";
 import { TOOL_CATALOG } from "../tools";
 
 export type SavedState = Required<
@@ -21,6 +23,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private includeGroundingCb: HTMLInputElement | null = null;
   private applyMarkdownCb: HTMLInputElement | null = null;
   private nav: NavigationContext | null = null;
+  private headersLoaded = false;
 
   mount(
     container: HTMLElement,
@@ -30,6 +33,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   ): void {
     this.nav = nav;
     this.userPromptList = null; // reset so unmount() guards correctly before load
+    this.headersLoaded = false;
     container.innerHTML = this.template();
     this.wireNavButtons(container);
 
@@ -71,7 +75,13 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     updateGroundingVisibility();
     container.querySelector("#tools-list")?.addEventListener("click", updateGroundingVisibility);
 
-    getSheetHeaders().then(
+    const loader = new PanelLoader(container);
+    loader.setState({ status: "loading", message: "Loading columns..." });
+    this.loadHeaders(container, preset).finally(() => loader.setState({ status: "idle" }));
+  }
+
+  private loadHeaders(container: HTMLElement, preset: Partial<RunConfig>): Promise<void> {
+    return getSheetHeaders().then(
       (headers) => {
         if (headers.length === 0) {
           container.querySelector<HTMLElement>("#no-headers-msg")!.style.display = "block";
@@ -96,6 +106,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         this.outputColList = new SingleTagList(container.querySelector("#output-col")!, headers, {
           includeNew: true,
           selected: preset.outputCol,
+          newPlaceholder: "ai_column_name",
+          newDefault: "ai_",
         });
         this.rowRangeComp = new RowRange(
           container.querySelector("#row-range-container")!,
@@ -113,14 +125,17 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           .querySelector("#output-col input")
           ?.addEventListener("input", updateGroundingLabel);
 
-        container.querySelector<HTMLElement>("#config-form")!.style.display = "block";
-        container
-          .querySelector<HTMLButtonElement>("#run-btn")!
-          .addEventListener("click", () => this.handleRun(container));
+        if (!this.headersLoaded) {
+          container.querySelector<HTMLElement>("#config-form")!.style.display = "block";
+          container
+            .querySelector<HTMLButtonElement>("#run-btn")!
+            .addEventListener("click", () => this.handleRun(container));
+          this.headersLoaded = true;
+        }
       },
       (err: Error) => {
         globalThis.alert("Error loading headers: " + err.message);
-        nav.back();
+        this.nav?.back();
       },
     );
   }
@@ -141,28 +156,40 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
 
   private wireNavButtons(container: HTMLElement): void {
     container.querySelector("#back-btn")?.addEventListener("click", () => this.nav?.back());
+    container.querySelector("#refresh-btn")?.addEventListener("click", () => {
+      const btn = container.querySelector<HTMLButtonElement>("#refresh-btn")!;
+      btn.classList.add("spinning");
+      btn.disabled = true;
+      this.loadHeaders(container, this.currentPreset()).finally(() => {
+        btn.classList.remove("spinning");
+        btn.disabled = false;
+      });
+    });
+  }
+
+  private currentPreset(): Partial<RunConfig> {
+    return {
+      userPromptCols: this.userPromptList?.getValue(),
+      driveFileCols: this.driveFileList?.getValue(),
+      systemPromptCol: this.systemPromptList?.getValue() || undefined,
+      outputCol: this.outputColList?.getValue() || undefined,
+      rowRange: this.rowRangeComp?.getValue(),
+      tools: (this.toolsList?.getValue() ?? []) as ToolId[],
+      includeGrounding: this.includeGroundingCb?.checked,
+      applyMarkdown: this.applyMarkdownCb?.checked,
+    };
   }
 
   private handleRun(container: HTMLElement): void {
     const config = this.assembleRunConfig();
     if (!config) return;
 
-    const btn = container.querySelector<HTMLButtonElement>("#run-btn")!;
-    btn.disabled = true;
-    btn.textContent = "Running...";
+    const jobId = `batch-ai-${Date.now()}`;
+    jobStore.dispatch(jobId, "Batch AI Run", runBatchAI(config, jobId)).catch((err: Error) => {
+      globalThis.alert("Error: " + err.message);
+    });
 
-    runBatchAI(config).then(
-      () => {
-        btn.disabled = false;
-        btn.textContent = "Run AI";
-        this.nav?.back();
-      },
-      (err: Error) => {
-        globalThis.alert("Error: " + err.message);
-        btn.disabled = false;
-        btn.textContent = "Run AI";
-      },
-    );
+    this.loadHeaders(container, this.currentPreset());
   }
 
   private assembleRunConfig(): RunConfig | null {
@@ -205,6 +232,14 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       <div class="panel-header">
         <button id="back-btn" class="back-btn">← Back</button>
         <span class="panel-title">▶️ Run AI Inference</span>
+        <button id="refresh-btn" class="refresh-btn" title="Refresh columns">↻</button>
+      </div>
+      <div id="panel-loader" class="panel-loader" hidden>
+        <div class="panel-loader__bar-wrap" hidden>
+          <div class="panel-loader__bar-fill"></div>
+        </div>
+        <div class="panel-loader__spinner" hidden></div>
+        <p class="panel-loader__message"></p>
       </div>
       <div id="no-headers-msg" class="no-headers-msg" style="display:none">
         No columns found — add headers to your sheet first.

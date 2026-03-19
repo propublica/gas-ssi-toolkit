@@ -6,12 +6,24 @@
             --text-secondary: #5f6368;
         }
 
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+
         body {
             padding: 0;
-            margin: 0;
+            display: flex;
+            flex-direction: column;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             background-color: #ffffff;
             color: var(--text-main);
+        }
+
+        #app {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 16px;
         }
 
         .container { padding: 16px; }
@@ -107,6 +119,86 @@
             font-size: 14px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             padding: 0;
+        }
+
+        .refresh-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0;
+            margin-left: auto;
+            line-height: 1;
+        }
+
+        .refresh-btn:hover { color: var(--primary-blue); }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* ── Panel Loader ─────────────────────────────────────────────────────────── */
+
+        .panel-loader {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 16px;
+            gap: 12px;
+        }
+
+        .panel-loader[hidden] { display: none; }
+
+        /* ── Spinner (shared) ───────────────────────────────────────────────────── */
+
+        .panel-loader__spinner,
+        .job-strip__spinner,
+        .btn-spinner {
+          display: inline-block;
+          border-style: solid;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+          flex-shrink: 0;
+        }
+
+        .panel-loader__spinner {
+            width: 24px;
+            height: 24px;
+            border-width: 3px;
+            border-color: #e0e0e0;
+            border-top-color: #1a73e8;
+        }
+
+        .panel-loader__bar-wrap {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .panel-loader__bar-fill {
+            height: 100%;
+            background: #1a73e8;
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .panel-loader__message {
+            font-size: 12px;
+            color: #5f6368;
+            margin: 0;
+            text-align: center;
+        }
+
+        .refresh-btn.spinning {
+            animation: spin 0.8s linear infinite;
+            cursor: default;
+            color: var(--text-secondary);
         }
 
         .panel-title { font-weight: 500; font-size: 15px; }
@@ -394,4 +486,55 @@
         .unlock-btn:hover {
             border-color: var(--primary-blue);
             color: var(--primary-blue);
+        }
+
+        /* ── Job Strip (sidebar chrome) ──────────────────────────────────────────── */
+
+        .job-strip {
+          background: #f1f3f4;
+          border-top: 1px solid #dadce0;
+          padding: 6px 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .job-strip[hidden] {
+          display: none;
+        }
+
+        .job-strip__item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          color: #5f6368;
+        }
+
+        .job-strip__item--error {
+          color: #c5221f;
+        }
+
+        .job-strip__spinner {
+          width: 10px;
+          height: 10px;
+          border-width: 2px;
+          border-color: #dadce0;
+          border-top-color: #1a73e8;
+        }
+
+        .btn-spinner {
+          width: 12px;
+          height: 12px;
+          border-width: 2px;
+          border-color: rgba(255, 255, 255, 0.4);
+          border-top-color: white;
+          vertical-align: middle;
+          margin-right: 5px;
+        }
+
+        .job-strip__label {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }

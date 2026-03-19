@@ -15,6 +15,7 @@
 ### Task 1: Update build scripts to copy `Sidebar.html` to `dist/`
 
 **Files:**
+
 - Modify: `package.json`
 
 No test needed — the build either succeeds or fails. We verify by running the build at the end.
@@ -40,6 +41,7 @@ git commit -m "build: copy Sidebar.html to dist/ alongside appsscript.json"
 ### Task 2: Create `src/Sidebar.html`
 
 **Files:**
+
 - Create: `src/Sidebar.html`
 
 This file is a static HTML artifact — no unit test. Visual correctness is verified by deploying to dev.
@@ -241,6 +243,7 @@ git commit -m "feat: add Sidebar.html for persistent sidebar UI"
 ### Task 3: Update `rollup.config.js` footer stubs
 
 **Files:**
+
 - Modify: `rollup.config.js`
 
 **Step 1: Update the footer**
@@ -279,6 +282,7 @@ git commit -m "build: update rollup footer stubs for showSidebar and runTool"
 ### Task 4: Update `__tests__/menu.test.ts` (write failing tests first)
 
 **Files:**
+
 - Modify: `__tests__/menu.test.ts`
 
 This task replaces the entire test file. Read `__tests__/menu.test.ts` before editing.
@@ -286,6 +290,7 @@ This task replaces the entire test file. Read `__tests__/menu.test.ts` before ed
 **Step 1: Replace the file contents**
 
 The new file must:
+
 - Add mocks for `createTemplateFromFile`, `evaluate()`, and `showSidebar` on the UI
 - Update `onOpen` tests: single `addItem` call, new menu name `⚡ SSI Toolkit`
 - Remove the `openQuickstartDoc` describe block entirely
@@ -355,7 +360,7 @@ describe("onOpen", () => {
   it("adds a single item that opens the sidebar", () => {
     onOpen();
     expect(mockAddItem).toHaveBeenCalledTimes(1);
-    expect(mockAddItem).toHaveBeenCalledWith("🚀 Open SSI Sidebar", "showSidebar");
+    expect(mockAddItem).toHaveBeenCalledWith("🚀 Open SSI Toolkit", "showSidebar");
   });
 
   it("adds the menu to the UI", () => {
@@ -414,6 +419,7 @@ git commit -m "test: update menu tests for sidebar UX (failing)"
 ### Task 5: Update `src/server/index.ts` to make tests pass
 
 **Files:**
+
 - Modify: `src/server/index.ts`
 
 Read `src/server/index.ts` before editing. Make these changes:
@@ -426,7 +432,7 @@ Replace the existing `onOpen` body:
 export function onOpen(): void {
   SpreadsheetApp.getUi()
     .createMenu("⚡ SSI Toolkit")
-    .addItem("🚀 Open SSI Sidebar", "showSidebar")
+    .addItem("🚀 Open SSI Toolkit", "showSidebar")
     .addToUi();
 }
 ```
@@ -558,7 +564,7 @@ Confirm `Sidebar.html` appears in the file list alongside `Code.gs` / `index.gs`
 **Step 3: Open the spreadsheet and smoke-test**
 
 - Reload the Google Sheets document
-- The `⚡ SSI Toolkit` menu should appear with a single item: `🚀 Open SSI Sidebar`
+- The `⚡ SSI Toolkit` menu should appear with a single item: `🚀 Open SSI Toolkit`
 - Click it — the sidebar should open on the right
 - Click "View User Guide ↗" — should open the doc in a new tab
 - Click "Import Drive Links" — should trigger the folder prompt

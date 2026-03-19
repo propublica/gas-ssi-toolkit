@@ -47,14 +47,20 @@ export function createSeededRandom(seed?: number): () => number {
 export function getAllFilesRecursive(
   folder: GoogleAppsScript.Drive.Folder,
   fileList: DriveFileInfo[],
+  mimeTypePrefixes?: string[],
 ): void {
   const files = folder.getFiles();
   while (files.hasNext()) {
-    fileList.push({ url: files.next().getUrl() });
+    const file = files.next();
+    if (mimeTypePrefixes) {
+      const mime = file.getMimeType();
+      if (!mimeTypePrefixes.some((p) => mime.startsWith(p))) continue;
+    }
+    fileList.push({ url: file.getUrl() });
   }
   const subfolders = folder.getFolders();
   while (subfolders.hasNext()) {
-    getAllFilesRecursive(subfolders.next(), fileList);
+    getAllFilesRecursive(subfolders.next(), fileList, mimeTypePrefixes);
   }
 }
 
@@ -122,6 +128,18 @@ export function findOrCreateColumn(
     sheet.getRange(1, newCol, sheet.getMaxRows(), 1).setWrapStrategy(wrapStrategy);
   }
   return newCol;
+}
+
+/**
+ * Writes job progress to CacheService so the sidebar can poll it.
+ * TTL is 300s (5 minutes) — long enough for any single operation.
+ */
+export function writeJobProgress(
+  cache: GoogleAppsScript.Cache.Cache,
+  jobId: string,
+  state: { message?: string; current?: number; total?: number },
+): void {
+  cache.put(jobId, JSON.stringify(state), 300);
 }
 
 /**

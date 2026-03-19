@@ -17,6 +17,7 @@ import {
   resolveColumns,
   findOrCreateColumn,
   writeColumn,
+  writeJobProgress,
 } from "../src/server/utils";
 import type { DriveFileInfo } from "../src/server/types";
 
@@ -193,6 +194,36 @@ describe("getAllFilesRecursive", () => {
     getAllFilesRecursive(folder as any, result);
     expect(result).toHaveLength(0);
   });
+
+  it("filters by mimeType prefix when mimeTypePrefixes is provided", () => {
+    const mockDoc = { getUrl: () => "doc-url", getMimeType: () => "application/vnd.google-apps.document" };
+    const mockPdf = { getUrl: () => "pdf-url", getMimeType: () => "application/pdf" };
+    const mockImg = { getUrl: () => "img-url", getMimeType: () => "image/png" };
+    const files = makeFileIterator([]) as any;
+    let i = 0;
+    const mockFiles = [mockDoc, mockPdf, mockImg];
+    const fileIter = { hasNext: () => i < mockFiles.length, next: () => mockFiles[i++] };
+    const subfolders = makeFolderIterator([]);
+    const folder = { getFiles: () => fileIter, getFolders: () => subfolders } as unknown as GoogleAppsScript.Drive.Folder;
+
+    const result: DriveFileInfo[] = [];
+    getAllFilesRecursive(folder, result, ["application/"]);
+    expect(result.map((f) => f.url)).toEqual(["doc-url", "pdf-url"]);
+  });
+
+  it("imports all files when mimeTypePrefixes is absent", () => {
+    const mockDoc = { getUrl: () => "doc-url", getMimeType: () => "application/vnd.google-apps.document" };
+    const mockImg = { getUrl: () => "img-url", getMimeType: () => "image/png" };
+    let i = 0;
+    const mockFiles = [mockDoc, mockImg];
+    const fileIter = { hasNext: () => i < mockFiles.length, next: () => mockFiles[i++] };
+    const subfolders = makeFolderIterator([]);
+    const folder = { getFiles: () => fileIter, getFolders: () => subfolders } as unknown as GoogleAppsScript.Drive.Folder;
+
+    const result: DriveFileInfo[] = [];
+    getAllFilesRecursive(folder, result);
+    expect(result.map((f) => f.url)).toEqual(["doc-url", "img-url"]);
+  });
 });
 
 describe("flattenArg", () => {
@@ -322,6 +353,34 @@ describe("findOrCreateColumn", () => {
 });
 
 // ── writeColumn ─────────────────────────────────────────────────
+
+describe("writeJobProgress", () => {
+  it("writes serialized progress to cache with 5-minute TTL", () => {
+    const mockPut = jest.fn();
+    const mockCache = { put: mockPut } as unknown as GoogleAppsScript.Cache.Cache;
+
+    writeJobProgress(mockCache, "job-123", { message: "Processing row 3 of 10", current: 3, total: 10 });
+
+    expect(mockPut).toHaveBeenCalledWith(
+      "job-123",
+      JSON.stringify({ message: "Processing row 3 of 10", current: 3, total: 10 }),
+      300,
+    );
+  });
+
+  it("writes message-only progress (no current/total)", () => {
+    const mockPut = jest.fn();
+    const mockCache = { put: mockPut } as unknown as GoogleAppsScript.Cache.Cache;
+
+    writeJobProgress(mockCache, "job-456", { message: "Scanning folder..." });
+
+    expect(mockPut).toHaveBeenCalledWith(
+      "job-456",
+      JSON.stringify({ message: "Scanning folder..." }),
+      300,
+    );
+  });
+});
 
 describe("writeColumn", () => {
   it("writes values starting at row 2 using a single setValues call", () => {

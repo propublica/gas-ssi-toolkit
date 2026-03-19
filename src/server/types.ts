@@ -13,7 +13,25 @@ import type { ToolId } from "../shared/types";
 export interface AppConfig {
   API_KEY_PROPERTY: string;
   MODEL_NAME: string;
-  MAX_FILE_SIZE_BYTES: number;
+  /**
+   * Inline data size limits for the Gemini REST API.
+   * Source: https://ai.google.dev/gemini-api/docs/file-input-methods#method-comparison
+   *
+   * - Total request ceiling: 100MB (post-encoded, all inline_data parts combined)
+   * - Per-PDF ceiling: 50MB (post-encoded, per individual PDF file)
+   * - Base64 encoding expands raw file size by exactly 4/3
+   *
+   * We apply a 5% safety buffer to both ceilings to account for:
+   *   1. JSON envelope overhead (prompt text, mime_type fields, etc.)
+   *   2. Exported file size uncertainty (Docs/Sheets native size before export is unknown)
+   *
+   * For files exceeding these limits, consider the Gemini Files API (up to 2GB,
+   * no base64 overhead): https://ai.google.dev/api/files
+   */
+  INLINE_MAX_TOTAL_BYTES: number; // 95MB (100MB ceiling × 0.95)
+  INLINE_MAX_PDF_BYTES: number; // 47MB (50MB ceiling × 0.95)
+  INLINE_PREFLIGHT_FACTOR: number; // exact base64 expansion ratio (4/3)
+  MAX_OUTPUT_TOKENS: number;
 }
 
 export interface GeminiInlineData {

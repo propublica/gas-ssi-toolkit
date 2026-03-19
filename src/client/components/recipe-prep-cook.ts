@@ -41,7 +41,7 @@ export class RecipePrepCook {
 
   private handlePrep(onPrep: () => Promise<void>): void {
     this.prepBtn.disabled = true;
-    this.prepBtn.textContent = "Prepping...";
+    this.prepBtn.innerHTML = `<span class="btn-spinner"></span>Prepping...`;
     this.cookBtn.disabled = true;
 
     onPrep().then(

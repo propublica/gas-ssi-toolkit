@@ -78,12 +78,12 @@ export default [
  */
 function onOpen(e) { _GASEntry.onOpen(e); }
 function showSidebar() { _GASEntry.showSidebar(); }
-function runTool(fn) { _GASEntry.runTool(fn); }
+function runTool(fn, jobId) { _GASEntry.runTool(fn, jobId); }
 function getSheetHeaders() { return _GASEntry.getSheetHeaders(); }
-function runBatchAI(config) { _GASEntry.runBatchAI(config); }
-function importDriveLinks() { _GASEntry.importDriveLinks(); }
-function extractTextFromSelection() { _GASEntry.extractTextFromSelection(); }
-function sampleRowsToEvaluation() { _GASEntry.sampleRowsToEvaluation(); }
+function runBatchAI(config, jobId) { _GASEntry.runBatchAI(config, jobId); }
+function importDriveLinks(config, jobId) { _GASEntry.importDriveLinks(config, jobId); }
+function extractTextFromSelection(jobId) { _GASEntry.extractTextFromSelection(jobId); }
+function sampleRowsToEvaluation(jobId) { _GASEntry.sampleRowsToEvaluation(jobId); }
 /**
  * Call the Gemini API from a spreadsheet cell.
  * @param {string|Array} userTexts One or more text parts for the user message.
@@ -95,6 +95,7 @@ function sampleRowsToEvaluation() { _GASEntry.sampleRowsToEvaluation(); }
  */
 function SSI(userTexts, systemPrompt, toolNames) { return _GASEntry.SSI(userTexts, systemPrompt, toolNames); }
 function prepRecipe(params) { return _GASEntry.prepRecipe(params); }
+function getJobProgress(jobId) { return _GASEntry.getJobProgress(jobId); }
 `,
     },
     plugins: [

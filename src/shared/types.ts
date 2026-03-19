@@ -66,3 +66,12 @@ export interface PrepRecipeResult {
   /** Echoed from PrepRecipeParams — no server-side processing. */
   tools?: ToolId[];
 }
+
+// ── Import Drive Links ───────────────────────────────────────────
+
+export interface ImportDriveLinksConfig {
+  folderUrl: string;
+  outputCol: string;
+  /** MIME type prefix strings. Absent = import all files. */
+  mimeTypes?: string[];
+}
