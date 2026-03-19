@@ -49,25 +49,42 @@ export class ImportDriveLinksPanel implements Panel<undefined, SavedState> {
     );
 
     const loader = new PanelLoader(container);
-    loader.setState({ status: "loading", message: "Loading columns..." });
 
-    getSheetHeaders().then(
-      (headers) => {
-        this.outputColList = new SingleTagList(container.querySelector("#output-col")!, headers, {
-          includeNew: true,
-          selected: savedState?.outputCol,
-        });
-        container.querySelector<HTMLElement>("#config-form")!.style.display = "block";
-        container
-          .querySelector<HTMLButtonElement>("#import-btn")!
-          .addEventListener("click", () => this.handleImport());
-        loader.setState({ status: "idle" });
-      },
-      (err: Error) => {
-        globalThis.alert("Error loading headers: " + err.message);
-        nav.back();
-      },
-    );
+    const loadHeaders = (selected?: string): Promise<void> => {
+      loader.setState({ status: "loading", message: "Loading columns..." });
+      return getSheetHeaders().then(
+        (headers) => {
+          this.outputColList = new SingleTagList(container.querySelector("#output-col")!, headers, {
+            includeNew: true,
+            selected,
+            newPlaceholder: "drive_links",
+            newDefault: "",
+          });
+          container.querySelector<HTMLElement>("#config-form")!.style.display = "block";
+          loader.setState({ status: "idle" });
+        },
+        (err: Error) => {
+          globalThis.alert("Error loading headers: " + err.message);
+          nav.back();
+        },
+      );
+    };
+
+    container
+      .querySelector<HTMLButtonElement>("#import-btn")!
+      .addEventListener("click", () => this.handleImport());
+
+    container.querySelector("#refresh-btn")?.addEventListener("click", () => {
+      const btn = container.querySelector<HTMLButtonElement>("#refresh-btn")!;
+      btn.classList.add("spinning");
+      btn.disabled = true;
+      loadHeaders(this.outputColList?.getValue()).finally(() => {
+        btn.classList.remove("spinning");
+        btn.disabled = false;
+      });
+    });
+
+    loadHeaders(savedState?.outputCol);
   }
 
   unmount(): SavedState {
@@ -114,7 +131,8 @@ export class ImportDriveLinksPanel implements Panel<undefined, SavedState> {
     return `
       <div class="panel-header">
         <button id="back-btn" class="back-btn">← Back</button>
-        <span class="panel-title">Import Drive Links</span>
+        <span class="panel-title">📂 Import Drive Links</span>
+        <button id="refresh-btn" class="refresh-btn" title="Refresh columns">↻</button>
       </div>
       <div id="panel-loader" class="panel-loader" hidden>
         <div class="panel-loader__bar-wrap" hidden>
