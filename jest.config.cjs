@@ -115,6 +115,12 @@ module.exports = {
       branches: 70,
       functions: 100,
     },
+    "./src/client/panels/import-drive-links.ts": {
+      statements: 95,
+      branches: 75,
+      functions: 95,
+      lines: 95,
+    },
     "./src/server/rich-text.ts": {
       statements: 94,
       branches: 82,

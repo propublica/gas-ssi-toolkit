@@ -194,6 +194,36 @@ describe("getAllFilesRecursive", () => {
     getAllFilesRecursive(folder as any, result);
     expect(result).toHaveLength(0);
   });
+
+  it("filters by mimeType prefix when mimeTypePrefixes is provided", () => {
+    const mockDoc = { getUrl: () => "doc-url", getMimeType: () => "application/vnd.google-apps.document" };
+    const mockPdf = { getUrl: () => "pdf-url", getMimeType: () => "application/pdf" };
+    const mockImg = { getUrl: () => "img-url", getMimeType: () => "image/png" };
+    const files = makeFileIterator([]) as any;
+    let i = 0;
+    const mockFiles = [mockDoc, mockPdf, mockImg];
+    const fileIter = { hasNext: () => i < mockFiles.length, next: () => mockFiles[i++] };
+    const subfolders = makeFolderIterator([]);
+    const folder = { getFiles: () => fileIter, getFolders: () => subfolders } as unknown as GoogleAppsScript.Drive.Folder;
+
+    const result: DriveFileInfo[] = [];
+    getAllFilesRecursive(folder, result, ["application/"]);
+    expect(result.map((f) => f.url)).toEqual(["doc-url", "pdf-url"]);
+  });
+
+  it("imports all files when mimeTypePrefixes is absent", () => {
+    const mockDoc = { getUrl: () => "doc-url", getMimeType: () => "application/vnd.google-apps.document" };
+    const mockImg = { getUrl: () => "img-url", getMimeType: () => "image/png" };
+    let i = 0;
+    const mockFiles = [mockDoc, mockImg];
+    const fileIter = { hasNext: () => i < mockFiles.length, next: () => mockFiles[i++] };
+    const subfolders = makeFolderIterator([]);
+    const folder = { getFiles: () => fileIter, getFolders: () => subfolders } as unknown as GoogleAppsScript.Drive.Folder;
+
+    const result: DriveFileInfo[] = [];
+    getAllFilesRecursive(folder, result);
+    expect(result.map((f) => f.url)).toEqual(["doc-url", "img-url"]);
+  });
 });
 
 describe("flattenArg", () => {

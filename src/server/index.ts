@@ -27,7 +27,13 @@ import {
   writeColumn,
   writeJobProgress,
 } from "./utils";
-import type { RunConfig, PrepRecipeParams, PrepRecipeResult } from "../shared/types";
+import type {
+  RunConfig,
+  PrepRecipeParams,
+  PrepRecipeResult,
+  ImportDriveLinksConfig,
+} from "../shared/types";
+import type { DriveFileInfo } from "./types";
 
 // ==========================================
 // 🚀 MENU & INITIALIZATION
@@ -69,60 +75,29 @@ export function showSidebar(): void {
 // 📂 TOOL 1: IMPORT DRIVE LINKS
 // ==========================================
 
-export function importDriveLinks(jobId?: string): void {
-  const ui = SpreadsheetApp.getUi();
+export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string): void {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const folderId = extractId(config.folderUrl);
 
-  // 1. Get Folder
-  const folderResponse = ui.prompt(
-    "Step 1/2: Select Folder",
-    "Paste the Google Drive Folder Link or ID:",
-    ui.ButtonSet.OK_CANCEL,
-  );
-  if (folderResponse.getSelectedButton() !== ui.Button.OK) return;
-  const folderId = extractId(folderResponse.getResponseText().trim());
-
-  // 2. Get Location
-  const activeA1 = sheet.getActiveCell().getA1Notation();
-  const cellResponse = ui.prompt(
-    "Step 2/2: Confirm Location",
-    `Importing links starting at cell ${activeA1}.\nClick OK to proceed or type a new cell below:`,
-    ui.ButtonSet.OK_CANCEL,
-  );
-  if (cellResponse.getSelectedButton() !== ui.Button.OK) return;
-  const startCell = cellResponse.getResponseText().trim() || activeA1;
-
-  try {
-    const parentFolder = DriveApp.getFolderById(folderId);
-    const targetRange = sheet.getRange(startCell);
-
-    if (jobId) {
-      writeJobProgress(CacheService.getUserCache(), jobId, { message: "Scanning folder..." });
-    }
-
-    const allFiles: { url: string }[] = [];
-    getAllFilesRecursive(parentFolder, allFiles);
-
-    if (allFiles.length > 0) {
-      const output = allFiles.map((f) => [f.url]);
-      sheet
-        .getRange(targetRange.getRow(), targetRange.getColumn(), output.length, 1)
-        .setValues(output);
-      SpreadsheetApp.getActive().toast(
-        `Imported ${output.length} links starting at ${startCell}`,
-        "Complete",
-        5,
-      );
-    } else {
-      ui.alert("No files found in that folder.");
-    }
-  } catch (e) {
-    ui.alert(
-      "Error accessing folder",
-      "Please ensure you have access to this folder ID.\n\nDetails: " + (e as Error).message,
-      ui.ButtonSet.OK,
-    );
+  if (jobId) {
+    writeJobProgress(CacheService.getUserCache(), jobId, { message: "Scanning folder..." });
   }
+
+  const parentFolder = DriveApp.getFolderById(folderId);
+  const allFiles: DriveFileInfo[] = [];
+  getAllFilesRecursive(parentFolder, allFiles, config.mimeTypes);
+
+  const col = findOrCreateColumn(sheet, config.outputCol, SpreadsheetApp.WrapStrategy.CLIP);
+  writeColumn(
+    sheet,
+    col,
+    allFiles.map((f) => f.url),
+  );
+  SpreadsheetApp.getActive().toast(
+    `Imported ${allFiles.length} link${allFiles.length === 1 ? "" : "s"} into "${config.outputCol}".`,
+    "Complete",
+    5,
+  );
 }
 
 // ==========================================
@@ -412,7 +387,6 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
 export function runTool(functionName: string, jobId?: string): void {
   const TOOLS: Record<string, (jobId?: string) => void> = {
-    importDriveLinks,
     extractTextFromSelection,
     sampleRowsToEvaluation,
   };

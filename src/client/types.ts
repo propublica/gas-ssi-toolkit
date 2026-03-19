@@ -47,7 +47,12 @@ export interface RecipeParams {
 /**
  * All registered panel identifiers. Add new panels here first.
  */
-export type PanelId = "tool-list" | "configure-ai-run" | "recipes-list" | "recipe";
+export type PanelId =
+  | "tool-list"
+  | "configure-ai-run"
+  | "recipes-list"
+  | "recipe"
+  | "import-drive-links";
 
 /**
  * Passed to each panel's mount() so panels can trigger navigation

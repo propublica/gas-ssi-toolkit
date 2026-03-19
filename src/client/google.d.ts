@@ -1,4 +1,4 @@
-import type { RunConfig, PrepRecipeParams } from "../shared/types";
+import type { RunConfig, PrepRecipeParams, ImportDriveLinksConfig } from "../shared/types";
 
 declare global {
   interface GoogleScriptRun {
@@ -7,6 +7,7 @@ declare global {
     runTool(functionName: string, jobId?: string): void;
     getSheetHeaders(): void;
     runBatchAI(config: RunConfig, jobId?: string): void;
+    importDriveLinks(config: ImportDriveLinksConfig, jobId?: string): void;
     prepRecipe(params: PrepRecipeParams): void;
     getJobProgress(jobId: string): void;
   }
