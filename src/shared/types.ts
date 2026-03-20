@@ -75,3 +75,12 @@ export interface ImportDriveLinksConfig {
   /** MIME type prefix strings. Absent = import all files. */
   mimeTypes?: string[];
 }
+
+// ── Extract Text ─────────────────────────────────────────────────
+
+export interface ExtractTextConfig {
+  sourceCol: string;
+  outputCol: string;
+  startRow: number;
+  endRow: number;
+}
