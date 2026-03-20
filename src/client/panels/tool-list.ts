@@ -25,8 +25,8 @@ export class ToolListPanel implements Panel {
     container.querySelector("#btn-sample-rows")?.addEventListener("click", (e) => {
       this.dispatchTool(e as MouseEvent, "sampleRowsToEvaluation");
     });
-    container.querySelector("#btn-extract-text")?.addEventListener("click", (e) => {
-      this.dispatchTool(e as MouseEvent, "extractTextFromSelection");
+    container.querySelector("#btn-extract-text")?.addEventListener("click", () => {
+      nav.navigate("extract-text");
     });
   }
 
