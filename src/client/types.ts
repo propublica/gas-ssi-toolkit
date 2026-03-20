@@ -52,7 +52,8 @@ export type PanelId =
   | "configure-ai-run"
   | "recipes-list"
   | "recipe"
-  | "import-drive-links";
+  | "import-drive-links"
+  | "extract-text";
 
 /**
  * Passed to each panel's mount() so panels can trigger navigation

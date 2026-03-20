@@ -32,6 +32,7 @@ import type {
   PrepRecipeParams,
   PrepRecipeResult,
   ImportDriveLinksConfig,
+  ExtractTextConfig,
 } from "../shared/types";
 import type { DriveFileInfo } from "./types";
 
@@ -104,51 +105,55 @@ export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string)
 // 📝 TOOL 2: EXTRACT TEXT
 // ==========================================
 
-export function extractTextFromSelection(jobId?: string): void {
-  const ui = SpreadsheetApp.getUi();
+export function extractText(config: ExtractTextConfig, jobId?: string): void {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
 
-  if (!checkDriveService(ui)) return;
+  if (!checkDriveService(SpreadsheetApp.getUi())) return;
 
-  const range = sheet.getActiveRange();
-  if (!range) return;
+  const lastCol = sheet.getLastColumn();
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
+  const sourceColIdx = headers.indexOf(config.sourceCol);
 
-  const values = range.getValues();
-  const totalRows = range.getNumRows();
-
-  if (totalRows > 10) {
-    const confirm = ui.alert(
-      "Batch Process",
-      `You selected ${totalRows} rows. This may take time. Continue?`,
-      ui.ButtonSet.YES_NO,
-    );
-    if (confirm !== ui.Button.YES) return;
+  if (sourceColIdx === -1) {
+    throw new Error(`Column "${config.sourceCol}" not found`);
   }
 
-  let processedCount = 0;
+  const outputCol = findOrCreateColumn(sheet, config.outputCol, SpreadsheetApp.WrapStrategy.WRAP);
 
-  for (let i = 0; i < totalRows; i++) {
-    const cellValue = values[i][0];
+  let startRow: number;
+  let total: number;
+  if (config.rowRange) {
+    startRow = config.rowRange.start;
+    total = config.rowRange.end - config.rowRange.start + 1;
+  } else {
+    const activeRange = sheet.getActiveRange();
+    if (!activeRange) return;
+    startRow = activeRange.getRow();
+    total = activeRange.getNumRows();
+  }
 
-    if (isValidDriveLink(cellValue)) {
-      const fileId = extractId(cellValue);
+  for (let i = 0; i < total; i++) {
+    const rowIdx = startRow + i; // sheet row number (1-indexed; start=2 = first data row)
 
-      if (jobId) {
-        writeJobProgress(CacheService.getUserCache(), jobId, {
-          message: `Extracting ${i + 1} of ${totalRows}`,
-          current: i + 1,
-          total: totalRows,
-        });
-      }
-
-      const text = truncateText(extractTextUniversal(fileId), 49000);
-
-      range.getCell(i + 1, 2).setValue(text);
-      processedCount++;
-      SpreadsheetApp.flush();
+    if (jobId) {
+      writeJobProgress(CacheService.getUserCache(), jobId, {
+        message: `Extracting row ${i + 1} of ${total}...`,
+        current: i + 1,
+        total,
+      });
     }
+
+    const cellValue = sheet.getRange(rowIdx, sourceColIdx + 1).getValue() as string;
+
+    if (!isValidDriveLink(cellValue)) {
+      continue;
+    }
+
+    const fileId = extractId(cellValue);
+    const text = truncateText(extractTextUniversal(fileId), 49000);
+    sheet.getRange(rowIdx, outputCol).setValue(text);
+    SpreadsheetApp.flush();
   }
-  SpreadsheetApp.getActive().toast(`Done! Extracted ${processedCount} files.`, "Complete", 5);
 }
 
 // ==========================================
@@ -387,7 +392,6 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
 export function runTool(functionName: string, jobId?: string): void {
   const TOOLS: Record<string, (jobId?: string) => void> = {
-    extractTextFromSelection,
     sampleRowsToEvaluation,
   };
   TOOLS[functionName]?.(jobId);

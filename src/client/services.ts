@@ -1,4 +1,5 @@
 import type {
+  ExtractTextConfig,
   ImportDriveLinksConfig,
   PrepRecipeParams,
   PrepRecipeResult,
@@ -47,6 +48,15 @@ export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string)
       .withSuccessHandler(() => resolve())
       .withFailureHandler((err: Error) => reject(err))
       .importDriveLinks(config, jobId);
+  });
+}
+
+export function extractText(config: ExtractTextConfig, jobId?: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler(() => resolve())
+      .withFailureHandler((err: Error) => reject(err))
+      .extractText(config, jobId);
   });
 }
 
