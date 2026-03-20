@@ -149,14 +149,13 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
       <div id="config-form" style="display:none">
         <div class="field-group">
           <span class="field-label">Source Column <span class="required">*</span></span>
+          <p class="field-helper">Accepts Google Docs, PDFs, and images (OCR'd via Google Drive).</p>
           <div id="source-col" class="tag-list"></div>
-          <p class="field-helper">Supported file types: Google Docs, PDFs, and images (JPEG, PNG, GIF, WebP, etc.)</p>
-          <p class="field-helper">Google Docs are read directly. PDFs and images are processed using Google Drive's native OCR service.</p>
         </div>
         <div class="field-group">
           <span class="field-label">Output Column <span class="required">*</span></span>
+          <p class="field-helper">Truncated at 49,000 characters.</p>
           <div id="output-col" class="tag-list"></div>
-          <p class="field-helper">Output is truncated at 49,000 characters.</p>
         </div>
         <div class="field-group">
           <span class="field-label">Row Range <span class="required">*</span></span>
