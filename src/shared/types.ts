@@ -76,11 +76,13 @@ export interface ImportDriveLinksConfig {
   mimeTypes?: string[];
 }
 
-// ── Extract Text ─────────────────────────────────────────────────
+// ── Extract Text ────────────────────────────────────────────────
 
 export interface ExtractTextConfig {
+  /** Header of the column containing Drive links or file IDs to extract text from. */
   sourceCol: string;
+  /** Header of the column where extracted text will be written. */
   outputCol: string;
-  startRow: number;
-  endRow: number;
+  /** Inclusive row range (1-based data rows) over which extraction runs. */
+  rowRange: { start: number; end: number };
 }
