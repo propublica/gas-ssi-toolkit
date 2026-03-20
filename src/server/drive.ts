@@ -52,6 +52,8 @@ export function extractTextUniversal(fileId: string): string {
         mimeType: MimeType.GOOGLE_DOCS,
       };
       // Drive.Files.create with content triggers server-side OCR
+      // TODO: enforce a max file size here if needed before calling the Drive API
+      // e.g. if (file.getBlob().getBytes().length > MAX_BYTES) return "[Skipped: File too large]";
       const tempFile = Drive.Files.create(resource, file.getBlob());
       const tempId = tempFile.id!;
       const text = DocumentApp.openById(tempId).getBody().getText();

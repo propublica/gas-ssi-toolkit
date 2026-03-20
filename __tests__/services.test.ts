@@ -11,6 +11,7 @@ const mockRun = {
   prepRecipe: jest.fn(),
   getJobProgress: jest.fn(),
   importDriveLinks: jest.fn(),
+  extractText: jest.fn(),
 };
 (globalThis as unknown as { google: unknown }).google = { script: { run: mockRun } };
 
@@ -149,6 +150,33 @@ describe("importDriveLinks", () => {
     const promise = services.importDriveLinks(config, "job-1");
     handlers.reject(new Error("drive error"));
     await expect(promise).rejects.toThrow("drive error");
+  });
+});
+
+describe("extractText", () => {
+  it("calls google.script.run.extractText with config and jobId and resolves", async () => {
+    const handlers = captureHandlers();
+    const config: import("../src/shared/types").ExtractTextConfig = {
+      sourceCol: "source_drive",
+      outputCol: "source_text",
+      rowRange: { start: 2, end: 10 },
+    };
+    const promise = services.extractText(config, "job-2");
+    handlers.resolve(undefined);
+    await expect(promise).resolves.toBeUndefined();
+    expect(mockRun.extractText).toHaveBeenCalledWith(config, "job-2");
+  });
+
+  it("rejects on failure", async () => {
+    const handlers = captureHandlers();
+    const config: import("../src/shared/types").ExtractTextConfig = {
+      sourceCol: "source_drive",
+      outputCol: "source_text",
+      rowRange: { start: 2, end: 10 },
+    };
+    const promise = services.extractText(config, "job-2");
+    handlers.reject(new Error("extract error"));
+    await expect(promise).rejects.toThrow("extract error");
   });
 });
 

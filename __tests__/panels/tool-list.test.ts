@@ -63,14 +63,10 @@ describe("ToolListPanel", () => {
     );
   });
 
-  it("clicking Extract Text calls runTool with 'extractTextFromSelection' and a jobId", () => {
-    (services.runTool as jest.Mock).mockResolvedValue(undefined);
+  it("clicking Extract Text navigates to extract-text panel", () => {
     const c = mountPanel();
     c.querySelector<HTMLButtonElement>("#btn-extract-text")!.click();
-    expect(services.runTool).toHaveBeenCalledWith(
-      "extractTextFromSelection",
-      expect.stringMatching(/^extractTextFromSelection-\d+$/),
-    );
+    expect(mockNav.navigate).toHaveBeenCalledWith("extract-text");
   });
 
   it("unmount() returns undefined", () => {

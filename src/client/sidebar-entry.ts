@@ -12,6 +12,7 @@ import { ConfigureAIRunPanel } from "./panels/configure-ai-run";
 import { RecipesListPanel } from "./panels/recipes-list";
 import { RecipePanel } from "./panels/recipe";
 import { ImportDriveLinksPanel } from "./panels/import-drive-links";
+import { ExtractTextPanel } from "./panels/extract-text";
 import { JobIndicator } from "./components/job-indicator";
 import { jobStore } from "./job-store";
 import type { Panel, PanelId } from "./types";
@@ -31,6 +32,7 @@ function init(): void {
     ["recipes-list", new RecipesListPanel()],
     ["recipe", new RecipePanel()],
     ["import-drive-links", new ImportDriveLinksPanel()],
+    ["extract-text", new ExtractTextPanel()],
   ]);
 
   const router = new Router(app, panels);

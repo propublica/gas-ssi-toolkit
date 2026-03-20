@@ -75,3 +75,14 @@ export interface ImportDriveLinksConfig {
   /** MIME type prefix strings. Absent = import all files. */
   mimeTypes?: string[];
 }
+
+// ── Extract Text ────────────────────────────────────────────────
+
+export interface ExtractTextConfig {
+  /** Header of the column containing Drive links or file IDs to extract text from. */
+  sourceCol: string;
+  /** Header of the column where extracted text will be written. */
+  outputCol: string;
+  /** Inclusive row range (1-based data rows) over which extraction runs. Absent = use active sheet selection. */
+  rowRange?: { start: number; end: number };
+}
