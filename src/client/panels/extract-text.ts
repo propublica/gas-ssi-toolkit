@@ -123,12 +123,10 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
       return null;
     }
 
-    const range = this.rowRange?.getValue();
-
     return {
       sourceCol,
       outputCol,
-      rowRange: range ? { start: range.start, end: range.end } : { start: 2, end: 2 },
+      rowRange: this.rowRange?.getValue(),
     };
   }
 

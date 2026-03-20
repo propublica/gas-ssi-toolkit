@@ -83,6 +83,6 @@ export interface ExtractTextConfig {
   sourceCol: string;
   /** Header of the column where extracted text will be written. */
   outputCol: string;
-  /** Inclusive row range (1-based data rows) over which extraction runs. */
-  rowRange: { start: number; end: number };
+  /** Inclusive row range (1-based data rows) over which extraction runs. Absent = use active sheet selection. */
+  rowRange?: { start: number; end: number };
 }

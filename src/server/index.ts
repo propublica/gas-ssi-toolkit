@@ -124,10 +124,20 @@ export function extractText(config: ExtractTextConfig, jobId?: string): void {
     SpreadsheetApp.WrapStrategy.WRAP,
   );
 
-  const total = config.rowRange.end - config.rowRange.start + 1;
+  let startRow: number;
+  let total: number;
+  if (config.rowRange) {
+    startRow = config.rowRange.start;
+    total = config.rowRange.end - config.rowRange.start + 1;
+  } else {
+    const activeRange = sheet.getActiveRange();
+    if (!activeRange) return;
+    startRow = activeRange.getRow();
+    total = activeRange.getNumRows();
+  }
 
   for (let i = 0; i < total; i++) {
-    const rowIdx = config.rowRange.start + i; // sheet row number (1-indexed; start=2 = first data row)
+    const rowIdx = startRow + i; // sheet row number (1-indexed; start=2 = first data row)
 
     if (jobId) {
       writeJobProgress(CacheService.getUserCache(), jobId, {
