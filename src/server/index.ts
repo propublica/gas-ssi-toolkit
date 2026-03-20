@@ -127,7 +127,7 @@ export function extractText(config: ExtractTextConfig, jobId?: string): void {
   const total = config.rowRange.end - config.rowRange.start + 1;
 
   for (let i = 0; i < total; i++) {
-    const rowIdx = config.rowRange.start + i; // 1-based data row (row 1 = header)
+    const rowIdx = config.rowRange.start + i; // sheet row number (1-indexed; start=2 = first data row)
 
     if (jobId) {
       writeJobProgress(CacheService.getUserCache(), jobId, {
@@ -138,7 +138,7 @@ export function extractText(config: ExtractTextConfig, jobId?: string): void {
     }
 
     const cellValue = sheet
-      .getRange(rowIdx + 1, sourceColIdx + 1)
+      .getRange(rowIdx, sourceColIdx + 1)
       .getValue() as string;
 
     if (!isValidDriveLink(cellValue)) {
@@ -147,7 +147,7 @@ export function extractText(config: ExtractTextConfig, jobId?: string): void {
 
     const fileId = extractId(cellValue);
     const text = truncateText(extractTextUniversal(fileId), 49000);
-    sheet.getRange(rowIdx + 1, outputCol).setValue(text);
+    sheet.getRange(rowIdx, outputCol).setValue(text);
     SpreadsheetApp.flush();
   }
 }
