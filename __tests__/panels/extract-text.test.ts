@@ -96,6 +96,49 @@ describe("ExtractTextPanel", () => {
     );
   });
 
+  it("passes rowRange: undefined to extractText when sheet selection is active", async () => {
+    (services.getSheetHeaders as jest.Mock).mockResolvedValue(["source_drive", "extracted_text"]);
+    (services.extractText as jest.Mock).mockReturnValue(Promise.resolve());
+    const c = mountPanel();
+    await Promise.resolve();
+
+    c.querySelector<HTMLElement>("#source-col .tag")?.click();
+    c.querySelector<HTMLElement>("#output-col .tag")?.click();
+    // leave RowRange in default "Use sheet selection" mode
+    c.querySelector<HTMLButtonElement>("#extract-btn")!.click();
+
+    expect(services.extractText).toHaveBeenCalledWith(
+      expect.objectContaining({ rowRange: undefined }),
+      expect.any(String),
+    );
+  });
+
+  it("passes explicit rowRange to extractText when specify range is active", async () => {
+    (services.getSheetHeaders as jest.Mock).mockResolvedValue(["source_drive", "extracted_text"]);
+    (services.extractText as jest.Mock).mockReturnValue(Promise.resolve());
+    const c = mountPanel();
+    await Promise.resolve();
+
+    c.querySelector<HTMLElement>("#source-col .tag")?.click();
+    c.querySelector<HTMLElement>("#output-col .tag")?.click();
+
+    // switch to "Specify range" and fill in values
+    const rangeRadio = c.querySelector<HTMLInputElement>("input[value='range']")!;
+    rangeRadio.click();
+    const rangeInputs = c.querySelectorAll<HTMLInputElement>(".range-inputs input");
+    const startInput = rangeInputs[0];
+    const endInput = rangeInputs[1];
+    startInput.value = "3";
+    endInput.value = "7";
+
+    c.querySelector<HTMLButtonElement>("#extract-btn")!.click();
+
+    expect(services.extractText).toHaveBeenCalledWith(
+      expect.objectContaining({ rowRange: { start: 3, end: 7 } }),
+      expect.any(String),
+    );
+  });
+
   it("unmount returns saved state", async () => {
     (services.getSheetHeaders as jest.Mock).mockResolvedValue(["source_drive"]);
     document.body.innerHTML = '<div id="app"></div>';
