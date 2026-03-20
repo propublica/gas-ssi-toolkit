@@ -31,28 +31,19 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
 
     const loader = new PanelLoader(container);
 
-    const loadHeaders = (
-      selectedSource?: string,
-      selectedOutput?: string,
-    ): Promise<void> => {
+    const loadHeaders = (selectedSource?: string, selectedOutput?: string): Promise<void> => {
       loader.setState({ status: "loading", message: "Loading columns..." });
       return getSheetHeaders().then(
         (headers) => {
-          this.sourceColList = new SingleTagList(
-            container.querySelector("#source-col")!,
-            headers,
-            { selected: selectedSource },
-          );
-          this.outputColList = new SingleTagList(
-            container.querySelector("#output-col")!,
-            headers,
-            {
-              includeNew: true,
-              selected: selectedOutput,
-              newPlaceholder: "extracted_text",
-              newDefault: "",
-            },
-          );
+          this.sourceColList = new SingleTagList(container.querySelector("#source-col")!, headers, {
+            selected: selectedSource,
+          });
+          this.outputColList = new SingleTagList(container.querySelector("#output-col")!, headers, {
+            includeNew: true,
+            selected: selectedOutput,
+            newPlaceholder: "extracted_text",
+            newDefault: "",
+          });
           container.querySelector<HTMLElement>("#config-form")!.style.display = "block";
           loader.setState({ status: "idle" });
         },
@@ -78,10 +69,7 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
       const btn = container.querySelector<HTMLButtonElement>("#refresh-btn")!;
       btn.classList.add("spinning");
       btn.disabled = true;
-      loadHeaders(
-        this.sourceColList?.getValue(),
-        this.outputColList?.getValue(),
-      ).finally(() => {
+      loadHeaders(this.sourceColList?.getValue(), this.outputColList?.getValue()).finally(() => {
         btn.classList.remove("spinning");
         btn.disabled = false;
       });

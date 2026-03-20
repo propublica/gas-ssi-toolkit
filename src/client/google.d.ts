@@ -1,4 +1,9 @@
-import type { RunConfig, PrepRecipeParams, ImportDriveLinksConfig, ExtractTextConfig } from "../shared/types";
+import type {
+  RunConfig,
+  PrepRecipeParams,
+  ImportDriveLinksConfig,
+  ExtractTextConfig,
+} from "../shared/types";
 
 declare global {
   interface GoogleScriptRun {

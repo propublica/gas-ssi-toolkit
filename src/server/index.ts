@@ -118,11 +118,7 @@ export function extractText(config: ExtractTextConfig, jobId?: string): void {
     throw new Error(`Column "${config.sourceCol}" not found`);
   }
 
-  const outputCol = findOrCreateColumn(
-    sheet,
-    config.outputCol,
-    SpreadsheetApp.WrapStrategy.WRAP,
-  );
+  const outputCol = findOrCreateColumn(sheet, config.outputCol, SpreadsheetApp.WrapStrategy.WRAP);
 
   let startRow: number;
   let total: number;
@@ -147,9 +143,7 @@ export function extractText(config: ExtractTextConfig, jobId?: string): void {
       });
     }
 
-    const cellValue = sheet
-      .getRange(rowIdx, sourceColIdx + 1)
-      .getValue() as string;
+    const cellValue = sheet.getRange(rowIdx, sourceColIdx + 1).getValue() as string;
 
     if (!isValidDriveLink(cellValue)) {
       continue;
