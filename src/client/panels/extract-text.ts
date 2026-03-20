@@ -38,12 +38,9 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
       loader.setState({ status: "loading", message: "Loading columns..." });
       return getSheetHeaders().then(
         (headers) => {
-          const sourceHeaders = headers.filter(
-            (h) => h.toLowerCase().includes("source") || h.toLowerCase().includes("drive"),
-          );
           this.sourceColList = new SingleTagList(
             container.querySelector("#source-col")!,
-            sourceHeaders.length > 0 ? sourceHeaders : headers,
+            headers,
             { selected: selectedSource },
           );
           this.outputColList = new SingleTagList(

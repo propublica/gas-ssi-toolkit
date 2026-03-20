@@ -84,10 +84,9 @@ describe("ExtractTextPanel", () => {
     const c = mountPanel();
     await Promise.resolve();
 
-    // select source column (first tag) and output column (second tag)
-    const tags = c.querySelectorAll<HTMLElement>(".tag");
-    tags[0]?.click(); // source-col first tag
-    tags[1]?.click(); // output-col first tag (or new col)
+    // select first tag in each list independently
+    c.querySelector<HTMLElement>("#source-col .tag")?.click();
+    c.querySelector<HTMLElement>("#output-col .tag")?.click();
 
     c.querySelector<HTMLButtonElement>("#extract-btn")!.click();
     expect(jobStoreModule.jobStore.dispatch).toHaveBeenCalledWith(
@@ -141,9 +140,8 @@ describe("ExtractTextPanel", () => {
     const c = mountPanel();
     await Promise.resolve();
 
-    const tags = c.querySelectorAll<HTMLElement>(".tag");
-    tags[0]?.click();
-    tags[1]?.click();
+    c.querySelector<HTMLElement>("#source-col .tag")?.click();
+    c.querySelector<HTMLElement>("#output-col .tag")?.click();
     c.querySelector<HTMLButtonElement>("#extract-btn")!.click();
     await new Promise((r) => setTimeout(r, 0));
     expect(globalThis.alert).toHaveBeenCalledWith("Error: job failed");
