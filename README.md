@@ -6,8 +6,37 @@ Google Apps Script add-on built with TypeScript, bundled by Rollup, and deployed
 
 - Node.js 22+
 - Apps Script API enabled at [script.google.com/home/usersettings](https://script.google.com/home/usersettings)
-- The SSI Toolkit Apps Script add-on project (script ID in `.clasp.json`)
+- An Apps Script project to deploy to (see [Connecting to Apps Script](#connecting-to-apps-script))
 - A Gemini API key (required for the Run AI tool)
+
+## Connecting to Apps Script
+
+`.clasp.json` is not committed to this repo — you need to create it pointing at your own Apps Script project before you can deploy.
+
+**1. Create an Apps Script project**
+
+Go to [script.google.com](https://script.google.com) and create a new project, or open an existing one.
+
+**2. Get the script ID**
+
+In the script editor: **Project Settings** (gear icon) → copy the **Script ID** shown under "IDs".
+
+**3. Create `.clasp.json` at the project root**
+
+```json
+{
+  "scriptId": "<your-script-id>",
+  "rootDir": "./dist"
+}
+```
+
+**4. Enable the Drive Advanced Service**
+
+In the script editor: **Services** (+ icon in the left panel) → find **Drive API** → click **Add**. This is required for the Extract Text tool to access Drive files.
+
+**5. Set the Gemini API key**
+
+In the script editor: **Project Settings** → **Script Properties** → add a property named `GEMINI_API_KEY` with your Gemini API key as the value. This is required for the Run AI tool.
 
 ## Setup
 
