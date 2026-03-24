@@ -82,14 +82,12 @@ HtmlService can only serve `.html` files — all JavaScript and CSS must be inli
 4. Emits `dist/Sidebar.html` as an asset
 5. Deletes the intermediate `.js` chunk so clasp never pushes it as a `.gs` file
 
-The `src/Sidebar.html` template is also read at test time by `__tests__/helpers/sidebar-fixtures.ts` to keep DOM fixtures structurally in sync with the real template.
-
 ### Module Dependency Graph
 
 **Server:**
 ```
 src/server/index.ts          (entry point — menu, 4 tool orchestrators, UI handlers, re-exports custom functions)
-├── src/server/config.ts         (CONFIG object: API key property name, model, column names, limits)
+├── src/server/config.ts         (CONFIG object: API key property name, model name, size limits)
 ├── src/server/api.ts            (callGeminiAPI, buildGeminiPayload, invokeGemini — pure HTTP adapter via UrlFetchApp;
 │                                 buildGeminiPayload resolves ToolId[] via TOOL_REGISTRY, splits grounding vs function tools)
 ├── src/server/inference.ts      (runInference — unified inference handler for menu-triggered AI calls; no SpreadsheetApp dep;
@@ -99,13 +97,14 @@ src/server/index.ts          (entry point — menu, 4 tool orchestrators, UI han
 ├── src/server/types.ts          (server-only types: AppConfig, GeminiRequest, GeminiTool discriminated union,
 │                                 GeminiInlineData, GeminiFunctionDeclaration, DriveFileInfo; never imported by client)
 ├── src/server/drive.ts          (extractTextUniversal, fetchAndEncodeFile, checkDriveService)
-├── src/server/dialog.ts         (HTML_TEMPLATE string for AI mode selection modal)
+├── src/server/rich-text.ts      (CellContent, TextRange interfaces; buildRichInferenceCellContent, buildRichGroundingCellContent —
+│                                 pure layer between GeminiResponse and Sheets cell content; no GAS globals)
 ├── src/server/customFunctions.ts  (SSI — Sheets custom function; calls invokeGemini directly; always returns string,
 │                                 uses "[SSI Error: ...]" format)
 ├── src/server/utils.ts          (extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive, sampleRows,
 │                                 truncateText, findOrCreateColumn, writeColumn, flattenArg)
-└── src/shared/types.ts          (RPC boundary ONLY — ToolId union, RunConfig, PrepRecipeParams, PrepRecipeResult;
-                                  all with optional tools?: ToolId[])
+└── src/shared/types.ts          (RPC boundary ONLY — ToolId union, RunConfig, PrepRecipeParams, PrepRecipeResult,
+                                  ImportDriveLinksConfig, ExtractTextConfig; all with optional tools?: ToolId[])
 ```
 
 **Client:**
@@ -118,9 +117,12 @@ src/client/sidebar-entry.ts  (thin init — instantiates all panels, creates Rou
 └── src/client/tools.ts          (TOOL_CATALOG: ToolCatalogEntry[] — display metadata for sidebar TagList;
 │                                 hardcoded at build time, no RPC needed)
 └── src/client/recipes.ts        (RECIPES registry — RecipeDefinition[] for all standard recipes)
+└── src/client/job-store.ts      (JobStore class — tracks active jobs, polls getJobProgress, notifies subscribers)
 └── src/client/panels/
 │   ├── tool-list.ts             (ToolListPanel — entry screen, dispatches to tool or recipes)
 │   ├── configure-ai-run.ts      (ConfigureAIRunPanel — column mapping, row range, tool selection, AI run)
+│   ├── import-drive-links.ts    (ImportDriveLinksPanel — Drive folder import UI; mime-type filter, output column)
+│   ├── extract-text.ts          (ExtractTextPanel — text extraction UI; source/output column, row range)
 │   ├── recipes-list.ts          (RecipesListPanel — browsable list of recipes)
 │   └── recipe.ts                (RecipePanel — generic panel driven by RecipeParams; prep → cook flow)
 └── src/client/components/       (reusable UI components)
@@ -128,7 +130,9 @@ src/client/sidebar-entry.ts  (thin init — instantiates all panels, creates Rou
     ├── single-tag-list.ts       (SingleTagList — exclusive-select tag chips)
     ├── row-range.ts             (RowRange — start/end row inputs)
     ├── lockable-field.ts        (LockableField — value + lock/unlock toggle; optional onUnlock callback)
-    └── recipe-prep-cook.ts      (RecipePrepCook — 4-state machine: idle/prepping/prep-complete/cooking)
+    ├── recipe-prep-cook.ts      (RecipePrepCook — 4-state machine: idle/prepping/prep-complete/cooking)
+    ├── panel-loader.ts          (PanelLoader — drives panel loading skeleton: progress bar, spinner, message)
+    └── job-indicator.ts         (JobIndicator — renders active/failed jobs to #job-strip; persists across navigation)
     └── src/shared/types.ts
 
 src/client/google.d.ts       (compile-time type stub for google.script.run — uses declare global{} pattern)
@@ -194,13 +198,6 @@ beforeEach(() => {
 // Then invoke capturedSuccess(...) / capturedFailure(...) to simulate GAS callbacks.
 ```
 
-**Shared DOM fixtures:** `__tests__/helpers/sidebar-fixtures.ts` exports:
-- `FULL_SIDEBAR_HTML` — the sidebar HTML template read from `src/Sidebar.html` at test time (placeholders stripped), so tests stay structurally in sync with the real template without manual drift.
-- `setupConfigPanel(headers?)` — sets `document.body.innerHTML` and populates all tag containers.
-- `setupWithSelections(opts)` — calls `setupConfigPanel` then pre-selects values via `applyPreset`.
-
-The `__tests__/helpers/` directory is excluded from test discovery via `testPathIgnorePatterns` in `jest.config.cjs`.
-
 **Coverage:** Run `npm run test:coverage` to collect coverage and enforce per-file thresholds. Coverage is opt-in — the pre-commit hook runs `jest --bail` without `--coverage`.
 
 Two files are excluded from coverage collection entirely:
@@ -213,15 +210,7 @@ See `docs/plans/2026-02-18-testing-coverage-design.md` for full rationale.
 
 ### Tool 4 — Spreadsheet Column Requirements
 
-`runBatchAI` maps column headers by name. The active sheet must contain these exact headers (case-sensitive):
-
-| Config key | Column header |
-| --- | --- |
-| `SOURCE_DRIVE` | `source_drive` |
-| `SOURCE_TEXT` | `source_text` |
-| `SYS_PROMPT` | `system_prompt` |
-| `USER_PROMPT` | `user_prompt` |
-| `OUTPUT` | `ai_inference` |
+`runBatchAI` maps column headers by name via `RunConfig` (user-selected in the sidebar — no hardcoded column names). The user selects which columns serve as user prompt inputs, drive file inputs, system prompt, and output. `runBatchAI` calls `resolveColumns` to locate them by header string and `findOrCreateColumn` to create the output column if absent.
 
 The Gemini API key must be set as a Script Property (`GEMINI_API_KEY`) in Apps Script > Project Settings > Script Properties before Tool 4 will run.
 

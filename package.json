@@ -19,8 +19,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "clasp:login": "clasp login",
-    "clasp:open": "clasp open",
-    "clasp:logs": "clasp logs",
+    "clasp:open": "clasp open-script",
+    "clasp:logs": "clasp open-logs",
     "prepare": "husky"
   },
   "lint-staged": {
