@@ -41,12 +41,6 @@ export class ToolListPanel implements Panel {
 
   private template(): string {
     return `
-      <div class="guide-card">
-        <a href="https://docs.google.com/document/d/1BQJzBHiE6L0hvU6NMD0jaQE71VWRpWH-vNQu3UtGjBA/edit?tab=t.66jobsqlduah#heading=h.h5k0s81xpiiq"
-            target="_blank" class="guide-link">
-          <span>📖</span> View User Guide ↗
-        </a>
-      </div>
       <div class="section">
         <h3>Main Tools</h3>
         <button id="btn-recipes" class="tool-btn">

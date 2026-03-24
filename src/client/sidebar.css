@@ -28,28 +28,6 @@
 
         .container { padding: 16px; }
 
-        .guide-card {
-            background-color: #f8f9fa;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 24px;
-            text-align: center;
-            transition: background-color 0.2s;
-        }
-
-        .guide-card:hover { background-color: #f1f3f4; }
-
-        .guide-link {
-            color: var(--primary-blue);
-            font-weight: 500;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            font-size: 14px;
-        }
 
         .section { margin-bottom: 28px; }
 
