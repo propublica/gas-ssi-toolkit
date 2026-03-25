@@ -335,14 +335,11 @@ describe("prepRecipe", () => {
   // which call sheet.getRange / setValues under the hood.
   // We capture calls via mockActiveSheet.getRange mock.
 
-  let findOrCreateColumnColCounter: number;
-
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetAllFilesRecursive.mockReset();
     mockWriteColumnCalls.length = 0;
     mockFindOrCreateColumnResults.clear();
-    findOrCreateColumnColCounter = 2; // start at col 2 (after existing header col)
 
     // SpreadsheetApp.flush is called at the end of prepRecipe
     (globalThis as unknown as { SpreadsheetApp: typeof mockSpreadsheetApp & { flush: jest.Mock } })
