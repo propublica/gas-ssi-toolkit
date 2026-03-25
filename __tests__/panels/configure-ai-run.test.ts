@@ -105,6 +105,15 @@ describe("ConfigureAIRunPanel — mount", () => {
     const selected = container.querySelectorAll("#user-prompt-cols .tag.selected");
     expect(selected[0].getAttribute("data-value")).toBe("col_b");
   });
+
+  it("pre-selects drive-file-cols from file parts in userPromptParts", async () => {
+    const { container } = await mountAndLoad({
+      userPromptParts: [{ kind: "file", col: "col_b" }],
+    });
+    const selected = container.querySelectorAll("#drive-file-cols .tag.selected");
+    expect(selected).toHaveLength(1);
+    expect(selected[0].getAttribute("data-value")).toBe("col_b");
+  });
 });
 
 describe("ConfigureAIRunPanel — Run AI", () => {
