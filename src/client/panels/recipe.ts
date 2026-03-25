@@ -1,19 +1,17 @@
 import type { NavigationContext, Panel, RecipeDefinition } from "../types";
-import type { ColumnSpec, PromptAppendField, RecipeParams } from "../types";
+import type { RecipeParams } from "../types";
 import type { PrepRecipeParams, PrepRecipeResult, RunConfig } from "../../shared/types";
 import { LockableField } from "../components/lockable-field";
 import { RecipePrepCook } from "../components/recipe-prep-cook";
 import { prepRecipe } from "../services";
 
-type ColumnSavedState = {
-  colTitle?: string;
-  url?: string;
-  prompt?: string;
-  appendFieldValues?: Record<string, string>; // keyed by PromptAppendField.id
-};
-
 type SavedState = {
-  columnStates: ColumnSavedState[];
+  driveFolderValue?: string;
+  systemPromptTitle?: string;
+  systemPromptValue?: string;
+  userPromptTitles?: string[];
+  userPromptValues?: string[];
+  outputColTitle?: string;
   prepComplete: boolean;
   preppedRunConfig?: Partial<RunConfig>;
 };
@@ -24,13 +22,15 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
   private params: RecipeParams | null = null;
   private prepCook: RecipePrepCook | null = null;
   private preppedRunConfig: Partial<RunConfig> | null = null;
+  private driveFolderInput: HTMLInputElement | null = null;
 
-  private columnFields: Array<{
-    colTitle?: LockableField;
-    url?: LockableField;
-    prompt?: LockableField;
-    appendFieldInputs?: Map<string, HTMLTextAreaElement>;
-  }> = [];
+  private fields: {
+    systemPromptTitle?: LockableField;
+    systemPromptValue?: LockableField;
+    userPromptTitles: LockableField[];
+    userPromptValues: LockableField[];
+    outputColTitle?: LockableField;
+  } = { userPromptTitles: [], userPromptValues: [] };
 
   mount(
     container: HTMLElement,
@@ -40,8 +40,8 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
   ): void {
     this.nav = nav;
     this.definition = definition ?? null;
-    this.params = definition?.params ?? { columns: [] };
-    this.columnFields = [];
+    this.params = definition?.params ?? {};
+    this.fields = { userPromptTitles: [], userPromptValues: [] };
     this.preppedRunConfig = savedState?.preppedRunConfig ?? null;
 
     container.innerHTML = this.template(this.definition);
@@ -49,27 +49,17 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
     container.querySelector("#back-btn")?.addEventListener("click", () => nav.back());
 
     this.mountFields(container, this.params, savedState);
-    this.mountPrepCook(container, savedState?.prepComplete ?? false);
+    this.mountPrepCook(container, savedState?.prepComplete ?? false, container);
   }
 
   unmount(): SavedState {
-    const columnStates: ColumnSavedState[] = this.columnFields.map((cf) => {
-      const state: ColumnSavedState = {};
-      if (cf.colTitle) state.colTitle = cf.colTitle.getValue();
-      if (cf.url) state.url = cf.url.getValue();
-      if (cf.prompt) state.prompt = cf.prompt.getValue();
-      if (cf.appendFieldInputs) {
-        const appendFieldValues: Record<string, string> = {};
-        cf.appendFieldInputs.forEach((el, id) => {
-          appendFieldValues[id] = el.value;
-        });
-        state.appendFieldValues = appendFieldValues;
-      }
-      return state;
-    });
-
     return {
-      columnStates,
+      driveFolderValue: this.driveFolderInput?.value,
+      systemPromptTitle: this.fields.systemPromptTitle?.getValue(),
+      systemPromptValue: this.fields.systemPromptValue?.getValue(),
+      userPromptTitles: this.fields.userPromptTitles.map((f) => f.getValue()),
+      userPromptValues: this.fields.userPromptValues.map((f) => f.getValue()),
+      outputColTitle: this.fields.outputColTitle?.getValue(),
       prepComplete: this.prepCook?.isPrepComplete() ?? false,
       preppedRunConfig: this.preppedRunConfig ?? undefined,
     };
@@ -78,64 +68,78 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
   private mountFields(container: HTMLElement, params: RecipeParams, savedState?: SavedState): void {
     const reset = (): void => this.prepCook?.reset();
 
-    params.columns.forEach((col, i) => {
-      const colFields: (typeof this.columnFields)[number] = {};
+    if (params.driveFolder) {
+      this.driveFolderInput = container.querySelector<HTMLInputElement>("#drive-folder-input");
+      if (savedState?.driveFolderValue && this.driveFolderInput) {
+        this.driveFolderInput.value = savedState.driveFolderValue;
+      }
+      this.driveFolderInput?.addEventListener("input", reset);
+    }
 
-      // Mount colTitle LockableField for all column kinds
-      const colTitleContainer = container.querySelector<HTMLElement>(`#col-title-${i}-container`);
-      if (colTitleContainer) {
-        colFields.colTitle = new LockableField(colTitleContainer, {
+    if (params.systemPrompt) {
+      this.fields.systemPromptTitle = new LockableField(
+        container.querySelector("#system-prompt-title-container")!,
+        {
           label: "Column",
-          defaultValue: savedState?.columnStates?.[i]?.colTitle ?? col.colTitle.value,
-          locked: col.colTitle.locked ?? true,
+          defaultValue: savedState?.systemPromptTitle ?? params.systemPrompt.colTitle.value,
+          locked: params.systemPrompt.colTitle.locked,
           onUnlock: reset,
-        });
-      }
+        },
+      );
+      this.fields.systemPromptValue = new LockableField(
+        container.querySelector("#system-prompt-value-container")!,
+        {
+          label: "Prompt",
+          defaultValue: savedState?.systemPromptValue ?? params.systemPrompt.prompt.value,
+          locked: params.systemPrompt.prompt.locked,
+          multiline: true,
+          onUnlock: reset,
+        },
+      );
+    }
 
-      if (col.kind === "drive-file-folder" || col.kind === "drive-file-constant") {
-        const urlContainer = container.querySelector<HTMLElement>(`#col-url-${i}-container`);
-        if (urlContainer) {
-          colFields.url = new LockableField(urlContainer, {
-            label: "URL",
-            defaultValue: savedState?.columnStates?.[i]?.url ?? col.url.value,
-            locked: col.url.locked ?? true,
-            placeholder: col.url.placeholder,
+    if (params.userPrompts) {
+      params.userPrompts.forEach((up, i) => {
+        this.fields.userPromptTitles[i] = new LockableField(
+          container.querySelector(`#user-prompt-title-${i}-container`)!,
+          {
+            label: "Column",
+            defaultValue: savedState?.userPromptTitles?.[i] ?? up.colTitle.value,
+            locked: up.colTitle.locked,
             onUnlock: reset,
-          });
-        }
-      }
-
-      if (col.kind === "system-prompt" || col.kind === "user-prompt") {
-        const promptContainer = container.querySelector<HTMLElement>(`#col-prompt-${i}-container`);
-        if (promptContainer) {
-          colFields.prompt = new LockableField(promptContainer, {
+          },
+        );
+        this.fields.userPromptValues[i] = new LockableField(
+          container.querySelector(`#user-prompt-value-${i}-container`)!,
+          {
             label: "Prompt",
-            defaultValue: savedState?.columnStates?.[i]?.prompt ?? col.prompt.value,
-            locked: col.prompt.locked ?? true,
+            defaultValue: savedState?.userPromptValues?.[i] ?? up.prompt.value,
+            locked: up.prompt.locked,
             multiline: true,
             onUnlock: reset,
-          });
-        }
+          },
+        );
+      });
+    }
 
-        if (col.appendFields && col.appendFields.length > 0) {
-          colFields.appendFieldInputs = new Map<string, HTMLTextAreaElement>();
-          col.appendFields.forEach((af: PromptAppendField) => {
-            const textarea = container.querySelector<HTMLTextAreaElement>(
-              `#append-field-${i}-${af.id}`,
-            )!;
-            const savedVal = savedState?.columnStates?.[i]?.appendFieldValues?.[af.id];
-            if (savedVal !== undefined) textarea.value = savedVal;
-            textarea.addEventListener("input", reset);
-            colFields.appendFieldInputs!.set(af.id, textarea);
-          });
-        }
-      }
-
-      this.columnFields[i] = colFields;
-    });
+    if (params.outputCol) {
+      this.fields.outputColTitle = new LockableField(
+        container.querySelector("#output-col-title-container")!,
+        {
+          label: "Column",
+          defaultValue: savedState?.outputColTitle ?? params.outputCol.colTitle.value,
+          locked: params.outputCol.colTitle.locked,
+          onUnlock: reset,
+        },
+      );
+    }
   }
 
-  private mountPrepCook(container: HTMLElement, prepComplete: boolean): void {
+  private mountPrepCook(
+    container: HTMLElement,
+    prepComplete: boolean,
+    _panelContainer: HTMLElement,
+  ): void {
     this.prepCook = new RecipePrepCook(container.querySelector("#prep-cook-container")!, {
       onPrep: async (): Promise<void> => {
         const params = this.buildPrepParams();
@@ -155,151 +159,100 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
 
   private buildPrepParams(): PrepRecipeParams | null {
     const params = this.params!;
-    const columns: PrepRecipeParams["columns"] = [];
+    const result: PrepRecipeParams = {};
 
-    for (let i = 0; i < params.columns.length; i++) {
-      const col = params.columns[i];
-      const cf = this.columnFields[i];
-      const colTitle = cf?.colTitle?.getValue() ?? col.colTitle.value;
-
-      switch (col.kind) {
-        case "drive-file-folder": {
-          const url = cf?.url?.getValue()?.trim() ?? "";
-          if (!url) {
-            globalThis.alert("Please enter a Google Drive folder link.");
-            return null;
-          }
-          columns.push({ kind: "drive-file-folder", colTitle, url });
-          break;
-        }
-        case "drive-file-constant": {
-          const url = cf?.url?.getValue()?.trim() ?? "";
-          if (!url) break; // optional field — skip silently
-          columns.push({ kind: "drive-file-constant", colTitle, url });
-          break;
-        }
-        case "system-prompt":
-        case "user-prompt": {
-          let text = cf?.prompt?.getValue() ?? col.prompt.value;
-          if (col.appendFields) {
-            for (const af of col.appendFields) {
-              const textarea = cf?.appendFieldInputs?.get(af.id);
-              const val = textarea?.value?.trim() ?? "";
-              if (!val) {
-                globalThis.alert(`Please fill in "${af.label}".`);
-                return null;
-              }
-              text += (af.prefix ?? "") + val;
-            }
-          }
-          columns.push({ kind: col.kind, colTitle, text });
-          break;
-        }
-        case "output": {
-          columns.push({ kind: "output", colTitle });
-          break;
-        }
+    if (params.driveFolder) {
+      const url = this.driveFolderInput?.value.trim() ?? "";
+      if (!url) {
+        globalThis.alert("Please enter a Google Drive folder link.");
+        return null;
       }
+      result.driveFolder = { url, colTitle: params.driveFolder.colTitle };
     }
 
-    return { columns, settings: this.definition?.params?.settings };
+    if (params.systemPrompt) {
+      result.systemPrompt = {
+        colTitle: this.fields.systemPromptTitle?.getValue() ?? params.systemPrompt.colTitle.value,
+        value: this.fields.systemPromptValue?.getValue() ?? params.systemPrompt.prompt.value,
+      };
+    }
+
+    if (params.userPrompts) {
+      result.userPrompts = params.userPrompts.map((up, i) => ({
+        colTitle: this.fields.userPromptTitles[i]?.getValue() ?? up.colTitle.value,
+        value: this.fields.userPromptValues[i]?.getValue() ?? up.prompt.value,
+      }));
+    }
+
+    if (params.outputCol) {
+      result.outputCol = {
+        colTitle: this.fields.outputColTitle?.getValue() ?? params.outputCol.colTitle.value,
+      };
+    }
+
+    return result;
   }
 
   private buildRunConfig(result: PrepRecipeResult): Partial<RunConfig> {
-    const userPromptParts: RunConfig["userPromptParts"] = [];
-    let systemPromptCol: string | undefined;
-    let outputCol = "";
-
-    for (const col of result.columns) {
-      switch (col.kind) {
-        case "drive-file-folder":
-        case "drive-file-constant":
-          userPromptParts.push({ kind: "file", col: col.colTitle });
-          break;
-        case "user-prompt":
-          userPromptParts.push({ kind: "text", col: col.colTitle });
-          break;
-        case "system-prompt":
-          systemPromptCol = col.colTitle;
-          break;
-        case "output":
-          outputCol = col.colTitle;
-          break;
-      }
-    }
-
     return {
-      userPromptParts,
-      systemPromptCol,
-      outputCol,
+      driveFileCols: result.colNames.driveLink ? [result.colNames.driveLink] : undefined,
+      systemPromptCol: result.colNames.systemPrompt,
+      userPromptCols: result.colNames.userPrompts ?? [],
+      outputCol: result.colNames.outputCol ?? "",
       rowRange: result.rowRange,
-      tools: result.settings?.tools,
-      applyMarkdown: result.settings?.applyMarkdown,
-      includeGrounding: result.settings?.includeGrounding,
     };
   }
 
   private template(definition: RecipeDefinition | null): string {
-    const params = definition?.params ?? { columns: [] };
+    const params = definition?.params ?? {};
     const title = definition ? `${definition.icon} ${definition.name}` : "Recipe";
-
-    const sectionTitle = (col: ColumnSpec): string => {
-      switch (col.kind) {
-        case "drive-file-folder":
-          return "Drive Folder";
-        case "drive-file-constant":
-          return "Drive File";
-        case "system-prompt":
-          return "System Prompt";
-        case "user-prompt":
-          return "User Prompt";
-        case "output":
-          return "Output Column";
-      }
-    };
-
-    const columnCards = params.columns
-      .map((col, i) => {
-        const appendFieldsHtml =
-          col.kind === "system-prompt" || col.kind === "user-prompt"
-            ? (col.appendFields ?? [])
-                .map(
-                  (af) => `
-          <div class="append-field-group">
-            <label class="field-label" for="append-field-${i}-${af.id}">${af.label}</label>
-            <textarea id="append-field-${i}-${af.id}" class="text-input"${af.placeholder ? ` placeholder="${af.placeholder}"` : ""}></textarea>
-          </div>`,
-                )
-                .join("")
-            : "";
-
-        const urlContainerHtml =
-          col.kind === "drive-file-folder" || col.kind === "drive-file-constant"
-            ? `<div id="col-url-${i}-container"></div>`
-            : "";
-
-        const promptContainerHtml =
-          col.kind === "system-prompt" || col.kind === "user-prompt"
-            ? `<div id="col-prompt-${i}-container"></div>${appendFieldsHtml}`
-            : "";
-
-        return `
-      <div class="recipe-section-card">
-        <div class="recipe-section-card-title">${sectionTitle(col)}</div>
-        ${col.helperText ? `<p class="field-helper">${col.helperText}</p>` : ""}
-        <div id="col-title-${i}-container"></div>
-        ${urlContainerHtml}
-        ${promptContainerHtml}
-      </div>`;
-      })
-      .join("");
+    const numUserPrompts = params.userPrompts?.length ?? 0;
 
     return `
       <div class="panel-header">
         <button id="back-btn" class="back-btn">← Back</button>
         <span class="panel-title">${title}</span>
       </div>
-      ${columnCards}
+      ${
+        params.driveFolder
+          ? `
+      <div class="recipe-section-card">
+        <div class="recipe-section-card-title">Drive Folder <span class="required">*</span></div>
+        ${params.driveFolder.helperText ? `<p class="field-helper">${params.driveFolder.helperText}</p>` : ""}
+        <input id="drive-folder-input" type="text" class="text-input"
+          placeholder="Paste Google Drive folder URL or ID" />
+      </div>`
+          : ""
+      }
+      ${
+        params.systemPrompt
+          ? `
+      <div class="recipe-section-card">
+        <div class="recipe-section-card-title">System Prompt</div>
+        <div id="system-prompt-title-container"></div>
+        <div id="system-prompt-value-container"></div>
+      </div>`
+          : ""
+      }
+      ${(params.userPrompts ?? [])
+        .map(
+          (_, i) => `
+      <div class="recipe-section-card">
+        <div class="recipe-section-card-title">User Prompt${numUserPrompts > 1 ? ` ${i + 1}` : ""}</div>
+        <div id="user-prompt-title-${i}-container"></div>
+        <div id="user-prompt-value-${i}-container"></div>
+      </div>`,
+        )
+        .join("")}
+      ${
+        params.outputCol
+          ? `
+      <div class="recipe-section-card">
+        <div class="recipe-section-card-title">Output Column</div>
+        <div id="output-col-title-container"></div>
+      </div>`
+          : ""
+      }
       <div id="prep-cook-container"></div>
     `;
   }
