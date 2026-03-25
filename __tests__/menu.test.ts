@@ -2,6 +2,11 @@
  * Tests for src/server/index.ts (Menu and sidebar functions)
  */
 
+// ── Mock runInference (hoisted by Jest) ────────────────────────
+jest.mock("../src/server/inference", () => ({
+  runInference: jest.fn(),
+}));
+
 // ── Mock globals BEFORE imports ────────────────────────────────
 
 const mockAddItem = jest.fn().mockReturnThis();
@@ -68,7 +73,10 @@ const mockHtmlService = {
 
 // ── Import after mocks ─────────────────────────────────────────
 
-import { onOpen, showSidebar, runTool, importDriveLinks } from "../src/server/index";
+import { onOpen, showSidebar, runTool, importDriveLinks, runBatchAI } from "../src/server/index";
+import { runInference } from "../src/server/inference";
+
+const mockRunInference = runInference as jest.MockedFunction<typeof runInference>;
 
 // ── Tests ──────────────────────────────────────────────────────
 
@@ -166,5 +174,133 @@ describe("importDriveLinks", () => {
     });
 
     expect(mockSetValues).toHaveBeenCalledWith([["https://drive.google.com/file/1"]]);
+  });
+});
+
+const mockSetValue = jest.fn();
+const mockFlush = jest.fn();
+
+describe("runBatchAI", () => {
+  // Headers: [Prompt(0), DriveLink(1), Output(2)]
+  const HEADERS = ["Prompt", "Drive Link", "Output"];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRunInference.mockReturnValue({ text: "AI result" });
+    (globalThis as unknown as { SpreadsheetApp: unknown }).SpreadsheetApp = {
+      ...mockSpreadsheetApp,
+      flush: mockFlush,
+      getActive: jest.fn().mockReturnValue({ toast: jest.fn() }),
+    };
+
+    // Sheet: 3 columns (Prompt, Drive Link, Output), last row = 2
+    mockActiveSheet.getLastColumn.mockReturnValue(3);
+    mockActiveSheet.getLastRow.mockReturnValue(2);
+
+    mockActiveSheet.getRange.mockImplementation(
+      (row: number, col: number, numRows?: number, numCols?: number) => {
+        // Header row read for getSheetHeaders
+        if (row === 1 && col === 1 && numRows === 1) {
+          return { getValues: () => [HEADERS] };
+        }
+        // Data range read for the row loop
+        if (numRows !== undefined && numCols !== undefined) {
+          return {
+            getValues: () => [["hello prompt", "https://drive.google.com/file/abc", ""]],
+          };
+        }
+        // Individual cell write
+        return { setValue: mockSetValue, setRichTextValue: jest.fn() };
+      },
+    );
+
+    // SpreadsheetApp.flush is called after each row
+    (globalThis as unknown as { SpreadsheetApp: { flush: jest.Mock } }).SpreadsheetApp.flush =
+      mockFlush;
+  });
+
+  it("writes runInference result to output column", () => {
+    const config = {
+      userPromptParts: [{ kind: "text" as const, col: "Prompt" }],
+      outputCol: "Output",
+      rowRange: { start: 2, end: 2 },
+    };
+
+    runBatchAI(config);
+
+    expect(mockRunInference).toHaveBeenCalledTimes(1);
+    expect(mockSetValue).toHaveBeenCalledWith("AI result");
+  });
+
+  it("alerts and returns early when a userPromptParts column is missing", () => {
+    const config = {
+      userPromptParts: [{ kind: "text" as const, col: "NonExistent" }],
+      outputCol: "Output",
+      rowRange: { start: 2, end: 2 },
+    };
+
+    runBatchAI(config);
+
+    expect(mockUi.alert).toHaveBeenCalledWith(
+      "Error: Missing Columns",
+      expect.stringContaining("NonExistent"),
+      expect.anything(),
+    );
+    expect(mockRunInference).not.toHaveBeenCalled();
+  });
+
+  it("skips rows where runInference returns null", () => {
+    mockRunInference.mockReturnValue(null);
+    const config = {
+      userPromptParts: [{ kind: "text" as const, col: "Prompt" }],
+      outputCol: "Output",
+      rowRange: { start: 2, end: 2 },
+    };
+
+    runBatchAI(config);
+
+    expect(mockRunInference).toHaveBeenCalledTimes(1);
+    expect(mockSetValue).not.toHaveBeenCalled();
+  });
+
+  it("passes userPromptParts to runInference in declared order", () => {
+    // Headers: Context(0), Doc(1), Question(2), Output(3)
+    const orderedHeaders = ["Context", "Doc", "Question", "Output"];
+    mockActiveSheet.getLastColumn.mockReturnValue(4);
+    mockActiveSheet.getRange.mockImplementation(
+      (row: number, col: number, numRows?: number, numCols?: number) => {
+        if (row === 1 && col === 1 && numRows === 1) {
+          return { getValues: () => [orderedHeaders] };
+        }
+        if (numRows !== undefined && numCols !== undefined) {
+          return {
+            getValues: () => [["ctx val", "doc val", "q val", ""]],
+          };
+        }
+        return { setValue: mockSetValue, setRichTextValue: jest.fn() };
+      },
+    );
+
+    const config = {
+      userPromptParts: [
+        { kind: "text" as const, col: "Context" },
+        { kind: "file" as const, col: "Doc" },
+        { kind: "text" as const, col: "Question" },
+      ],
+      outputCol: "Output",
+      rowRange: { start: 2, end: 2 },
+    };
+
+    runBatchAI(config);
+
+    expect(mockRunInference).toHaveBeenCalledWith(
+      [
+        { kind: "text", value: "ctx val" },
+        { kind: "file", value: "doc val" },
+        { kind: "text", value: "q val" },
+      ],
+      undefined,
+      undefined,
+    );
   });
 });
