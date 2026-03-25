@@ -1,3 +1,5 @@
+import type { ToolId } from "../shared/types";
+
 // ── Loading / Progress types ─────────────────────────────────────────────────
 
 export type LoadingStatus = "idle" | "loading" | "progress" | "complete" | "error";
@@ -26,22 +28,55 @@ export interface RecipeFieldConfig {
   placeholder?: string;
 }
 
+// ── Recipe column specs ──────────────────────────────────────────────────────
+
+export interface PromptAppendField {
+  id: string;
+  label: string;
+  placeholder?: string;
+  /**
+   * Text injected before the reporter's value when concatenating onto the base prompt.
+   * e.g. "\n\nYou are specifically looking for:\n\n"
+   * For system-prompt columns: required because Gemini systemInstruction is a single string.
+   * For user-prompt columns: preferred to keep related inputs in one column (less sheet clutter).
+   */
+  prefix?: string;
+}
+
+export interface DriveColumnSpec {
+  colTitle: RecipeFieldConfig;
+  url: RecipeFieldConfig;
+  helperText?: string;
+}
+
+export interface PromptColumnSpec {
+  colTitle: RecipeFieldConfig;
+  prompt: RecipeFieldConfig;
+  appendFields?: PromptAppendField[];
+  helperText?: string;
+}
+
+export type ColumnSpec =
+  | ({ kind: "drive-file-folder" } & DriveColumnSpec)
+  | ({ kind: "drive-file-constant" } & DriveColumnSpec)
+  | ({ kind: "system-prompt" } & PromptColumnSpec)
+  | ({ kind: "user-prompt" } & PromptColumnSpec)
+  | ({ kind: "output" } & { colTitle: RecipeFieldConfig; helperText?: string });
+
+export interface RecipeSettings {
+  tools?: ToolId[];
+  applyMarkdown?: boolean;
+  includeGrounding?: boolean;
+  // future: modelId?: string;
+}
+
 export interface RecipeParams {
-  driveFolder?: {
-    colTitle: string;
-    helperText?: string;
-  };
-  systemPrompt?: {
-    colTitle: RecipeFieldConfig;
-    prompt: RecipeFieldConfig;
-  };
-  userPrompts?: Array<{
-    colTitle: RecipeFieldConfig;
-    prompt: RecipeFieldConfig;
-  }>;
-  outputCol?: {
-    colTitle: RecipeFieldConfig;
-  };
+  columns: ColumnSpec[];
+  /**
+   * Optional recipe-level AI run settings pre-applied to RunConfig after Prep.
+   * Reporters can still adjust them in ConfigureAIRunPanel.
+   */
+  settings?: RecipeSettings;
 }
 
 /**
