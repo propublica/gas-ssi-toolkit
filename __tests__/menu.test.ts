@@ -7,6 +7,12 @@ jest.mock("../src/server/inference", () => ({
   runInference: jest.fn(),
 }));
 
+// ── Mock getAllFilesRecursive (keep rest of utils real) ─────────
+jest.mock("../src/server/utils", () => ({
+  ...jest.requireActual("../src/server/utils"),
+  getAllFilesRecursive: jest.fn(),
+}));
+
 // ── Mock globals BEFORE imports ────────────────────────────────
 
 const mockAddItem = jest.fn().mockReturnThis();
@@ -36,6 +42,7 @@ const mockActiveSheet = {
   getActiveRange: jest.fn(),
   getLastRow: jest.fn().mockReturnValue(0),
   getLastColumn: jest.fn().mockReturnValue(0),
+  getMaxRows: jest.fn().mockReturnValue(100),
   getRange: jest.fn(),
   getName: jest.fn().mockReturnValue("Sheet1"),
 };
@@ -73,10 +80,14 @@ const mockHtmlService = {
 
 // ── Import after mocks ─────────────────────────────────────────
 
-import { onOpen, showSidebar, runTool, importDriveLinks, runBatchAI } from "../src/server/index";
+import { onOpen, showSidebar, runTool, importDriveLinks, runBatchAI, prepRecipe } from "../src/server/index";
 import { runInference } from "../src/server/inference";
+import { getAllFilesRecursive } from "../src/server/utils";
 
 const mockRunInference = runInference as jest.MockedFunction<typeof runInference>;
+const mockGetAllFilesRecursive = getAllFilesRecursive as jest.MockedFunction<
+  typeof getAllFilesRecursive
+>;
 
 // ── Tests ──────────────────────────────────────────────────────
 
@@ -139,6 +150,12 @@ describe("importDriveLinks", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Restore real getAllFilesRecursive behaviour for importDriveLinks tests
+    const realUtils = jest.requireActual<typeof import("../src/server/utils")>(
+      "../src/server/utils",
+    );
+    mockGetAllFilesRecursive.mockImplementation(realUtils.getAllFilesRecursive);
+
     mockActiveSheet.getRange.mockReturnValue({ setValues: mockSetValues });
     mockActiveSheet.getLastColumn.mockReturnValue(1);
     mockActiveSheet.getLastRow.mockReturnValue(0);
@@ -148,7 +165,7 @@ describe("importDriveLinks", () => {
         if (row === 1 && col === 1 && numRows === 1) {
           return { getValues: () => [["source_drive"]] };
         }
-        return { setValues: mockSetValues };
+        return { setValues: mockSetValues, setWrapStrategy: jest.fn() };
       },
     );
   });
@@ -302,5 +319,275 @@ describe("runBatchAI", () => {
       undefined,
       undefined,
     );
+  });
+});
+
+// ── prepRecipe helpers ─────────────────────────────────────────
+
+const mockWriteColumnCalls: Array<{ colIdx: number; values: string[] }> = [];
+const mockFindOrCreateColumnResults: Map<string, number> = new Map();
+
+describe("prepRecipe", () => {
+  const mockFlushPrep = jest.fn();
+
+  // Track writeColumn calls by spying on mockActiveSheet.getRange behaviour.
+  // findOrCreateColumn and writeColumn use the real util implementations,
+  // which call sheet.getRange / setValues under the hood.
+  // We capture calls via mockActiveSheet.getRange mock.
+
+  let findOrCreateColumnColCounter: number;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetAllFilesRecursive.mockReset();
+    mockWriteColumnCalls.length = 0;
+    mockFindOrCreateColumnResults.clear();
+    findOrCreateColumnColCounter = 2; // start at col 2 (after existing header col)
+
+    // SpreadsheetApp.flush is called at the end of prepRecipe
+    (globalThis as unknown as { SpreadsheetApp: typeof mockSpreadsheetApp & { flush: jest.Mock } })
+      .SpreadsheetApp.flush = mockFlushPrep;
+
+    // Sheet setup for findOrCreateColumn + writeColumn:
+    //   - getLastColumn returns 0 so findOrCreateColumn always appends a new col
+    //   - getRange(1, 1, 1, ...) returns a header row (empty so no match → append)
+    //   - getRange(2, colIdx, numRows, 1) is called by writeColumn → setValues
+    mockActiveSheet.getLastColumn.mockReturnValue(0);
+    mockActiveSheet.getLastRow.mockReturnValue(10);
+
+    mockActiveSheet.getRange.mockImplementation(
+      (row: number, col: number, numRows?: number, numCols?: number) => {
+        // Header row read by findOrCreateColumn (getRange(1, 1, 1, lastCol))
+        if (row === 1 && col === 1 && numRows === 1) {
+          return { getValues: () => [[]] };
+        }
+        // Header cell title write by findOrCreateColumn: getRange(1, newCol)
+        if (row === 1 && numRows === undefined) {
+          return { setValue: jest.fn() };
+        }
+        // Wrap strategy range: getRange(1, newCol, maxRows, 1) — row=1, numRows>1
+        if (row === 1 && numRows !== undefined && numRows > 1 && numCols === 1) {
+          return { setWrapStrategy: jest.fn() };
+        }
+        // writeColumn range: (2, colIdx, n, 1)
+        if (row === 2 && numRows !== undefined && numCols === 1) {
+          const captured = { colIdx: col, values: [] as string[] };
+          mockWriteColumnCalls.push(captured);
+          return {
+            setValues: (vals: string[][]) => {
+              captured.values = vals.map((r) => r[0]);
+            },
+            setWrapStrategy: jest.fn(),
+          };
+        }
+        // Fallback
+        return { setValue: jest.fn(), setValues: jest.fn(), setWrapStrategy: jest.fn() };
+      },
+    );
+
+    // DriveApp.getFolderById — always returns a stub folder
+    (globalThis as unknown as { DriveApp: unknown }).DriveApp = {
+      getFolderById: jest.fn().mockReturnValue({}),
+    };
+  });
+
+  it("writes drive-file-folder column and sets rowRange from file count", () => {
+    // getAllFilesRecursive mutates files array — inject 3 entries
+    mockGetAllFilesRecursive.mockImplementation(
+      (_folder: unknown, files: { url: string }[]) => {
+        files.push(
+          { url: "https://drive.google.com/file/a" },
+          { url: "https://drive.google.com/file/b" },
+          { url: "https://drive.google.com/file/c" },
+        );
+      },
+    );
+
+    const result = prepRecipe({
+      columns: [
+        {
+          kind: "drive-file-folder",
+          colTitle: "Drive Link",
+          url: "https://drive.google.com/drive/folders/abc1234567890123456789012345",
+        },
+      ],
+    });
+
+    expect(result.rowRange).toEqual({ start: 2, end: 4 });
+    expect(result.columns).toEqual([{ kind: "drive-file-folder", colTitle: "Drive Link" }]);
+    expect(mockWriteColumnCalls).toHaveLength(1);
+    expect(mockWriteColumnCalls[0].values).toEqual([
+      "https://drive.google.com/file/a",
+      "https://drive.google.com/file/b",
+      "https://drive.google.com/file/c",
+    ]);
+  });
+
+  it("writes drive-file-constant same URL to every row", () => {
+    // First column: folder with 2 files → numRows = 2
+    mockGetAllFilesRecursive.mockImplementation(
+      (_folder: unknown, files: { url: string }[]) => {
+        files.push(
+          { url: "https://drive.google.com/file/x" },
+          { url: "https://drive.google.com/file/y" },
+        );
+      },
+    );
+
+    const constUrl = "https://drive.google.com/file/d/xyz123456789012345678901234/view";
+
+    const result = prepRecipe({
+      columns: [
+        {
+          kind: "drive-file-folder",
+          colTitle: "Drive Link",
+          url: "https://drive.google.com/drive/folders/abc1234567890123456789012345",
+        },
+        {
+          kind: "drive-file-constant",
+          colTitle: "Ref File",
+          url: constUrl,
+        },
+      ],
+    });
+
+    expect(result.rowRange).toEqual({ start: 2, end: 3 });
+    // Find the writeColumn call for "Ref File" — it's the second call
+    const refFileWrite = mockWriteColumnCalls[1];
+    expect(refFileWrite).toBeDefined();
+    expect(refFileWrite.values).toEqual([constUrl, constUrl]);
+  });
+
+  it("writes system-prompt text to every row", () => {
+    mockGetAllFilesRecursive.mockImplementation(
+      (_folder: unknown, files: { url: string }[]) => {
+        files.push(
+          { url: "https://drive.google.com/file/p" },
+          { url: "https://drive.google.com/file/q" },
+        );
+      },
+    );
+
+    const result = prepRecipe({
+      columns: [
+        {
+          kind: "drive-file-folder",
+          colTitle: "Drive Link",
+          url: "https://drive.google.com/drive/folders/abc1234567890123456789012345",
+        },
+        {
+          kind: "system-prompt",
+          colTitle: "System Prompt",
+          text: "You are an analyst.",
+        },
+      ],
+    });
+
+    expect(result.rowRange).toEqual({ start: 2, end: 3 });
+    const sysPromptWrite = mockWriteColumnCalls[1];
+    expect(sysPromptWrite).toBeDefined();
+    expect(sysPromptWrite.values).toEqual(["You are an analyst.", "You are an analyst."]);
+  });
+
+  it("writes user-prompt text to every row", () => {
+    mockGetAllFilesRecursive.mockImplementation(
+      (_folder: unknown, files: { url: string }[]) => {
+        files.push({ url: "https://drive.google.com/file/r" });
+      },
+    );
+
+    prepRecipe({
+      columns: [
+        {
+          kind: "drive-file-folder",
+          colTitle: "Drive Link",
+          url: "https://drive.google.com/drive/folders/abc1234567890123456789012345",
+        },
+        {
+          kind: "user-prompt",
+          colTitle: "User Prompt",
+          text: "Summarize this document.",
+        },
+      ],
+    });
+
+    const userPromptWrite = mockWriteColumnCalls[1];
+    expect(userPromptWrite).toBeDefined();
+    expect(userPromptWrite.values).toEqual(["Summarize this document."]);
+  });
+
+  it("creates output column without writing data", () => {
+    // No folder column — numRows stays 1, but output column should only be created
+    const result = prepRecipe({
+      columns: [{ kind: "output", colTitle: "AI_Output" }],
+    });
+
+    expect(result.columns).toEqual([{ kind: "output", colTitle: "AI_Output" }]);
+    // writeColumn should NOT have been called (no data written for output)
+    expect(mockWriteColumnCalls).toHaveLength(0);
+    // rowRange defaults to { start: 2, end: 2 } (numRows=1)
+    expect(result.rowRange).toEqual({ start: 2, end: 2 });
+  });
+
+  it("echoes settings in result", () => {
+    const result = prepRecipe({
+      columns: [{ kind: "output", colTitle: "Out" }],
+      settings: { tools: ["google_search"], applyMarkdown: true },
+    });
+
+    expect(result.settings).toEqual({ tools: ["google_search"], applyMarkdown: true });
+  });
+
+  it("returns columns in input order", () => {
+    mockGetAllFilesRecursive.mockImplementation(
+      (_folder: unknown, files: { url: string }[]) => {
+        files.push({ url: "https://drive.google.com/file/s" });
+      },
+    );
+
+    const result = prepRecipe({
+      columns: [
+        {
+          kind: "drive-file-folder",
+          colTitle: "Drive Link",
+          url: "https://drive.google.com/drive/folders/abc1234567890123456789012345",
+        },
+        {
+          kind: "user-prompt",
+          colTitle: "User Prompt",
+          text: "Describe the file.",
+        },
+        { kind: "output", colTitle: "Result" },
+      ],
+    });
+
+    expect(result.columns.map((c) => c.kind)).toEqual([
+      "drive-file-folder",
+      "user-prompt",
+      "output",
+    ]);
+    expect(result.columns.map((c) => c.colTitle)).toEqual([
+      "Drive Link",
+      "User Prompt",
+      "Result",
+    ]);
+  });
+
+  it("uses numRows=1 for drive-file-constant when no folder column precedes it", () => {
+    const constUrl = "https://drive.google.com/file/d/xyz123456789012345678901234/view";
+
+    const result = prepRecipe({
+      columns: [
+        {
+          kind: "drive-file-constant",
+          colTitle: "Ref File",
+          url: constUrl,
+        },
+      ],
+    });
+
+    expect(result.rowRange).toEqual({ start: 2, end: 2 });
+    expect(mockWriteColumnCalls).toHaveLength(1);
+    expect(mockWriteColumnCalls[0].values).toEqual([constUrl]);
   });
 });
