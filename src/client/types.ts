@@ -56,12 +56,17 @@ export interface PromptColumnSpec {
   helperText?: string;
 }
 
+export interface OutputColumnSpec {
+  colTitle: RecipeFieldConfig;
+  helperText?: string;
+}
+
 export type ColumnSpec =
   | ({ kind: "drive-file-folder" } & DriveColumnSpec)
   | ({ kind: "drive-file-constant" } & DriveColumnSpec)
   | ({ kind: "system-prompt" } & PromptColumnSpec)
   | ({ kind: "user-prompt" } & PromptColumnSpec)
-  | ({ kind: "output" } & { colTitle: RecipeFieldConfig; helperText?: string });
+  | ({ kind: "output" } & OutputColumnSpec);
 
 export interface RecipeSettings {
   tools?: ToolId[];
