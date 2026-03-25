@@ -128,13 +128,11 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
           col.appendFields.forEach((af: PromptAppendField) => {
             const textarea = container.querySelector<HTMLTextAreaElement>(
               `#append-field-${i}-${af.id}`,
-            );
-            if (textarea) {
-              const savedVal = savedState?.columnStates?.[i]?.appendFieldValues?.[af.id];
-              if (savedVal !== undefined) textarea.value = savedVal;
-              textarea.addEventListener("input", reset);
-              colFields.appendFieldInputs!.set(af.id, textarea);
-            }
+            )!;
+            const savedVal = savedState?.columnStates?.[i]?.appendFieldValues?.[af.id];
+            if (savedVal !== undefined) textarea.value = savedVal;
+            textarea.addEventListener("input", reset);
+            colFields.appendFieldInputs!.set(af.id, textarea);
           });
         }
       }
@@ -194,7 +192,7 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
               const textarea = cf?.appendFieldInputs?.get(af.id);
               const val = textarea?.value?.trim() ?? "";
               if (!val) {
-                globalThis.alert(`Please fill in: ${af.label}`);
+                globalThis.alert(`Please fill in "${af.label}".`);
                 return null;
               }
               text += (af.prefix ?? "") + val;
