@@ -20,8 +20,12 @@ export type ToolId = "google_search" | "url_context" | "code_execution";
 // ── Configuration ───────────────────────────────────────────────
 
 export interface RunConfig {
-  userPromptCols: string[];
-  driveFileCols?: string[];
+  /**
+   * Ordered parts of the user message. Each part references a column by header name.
+   * Text parts are read as strings; file parts are fetched from Drive and encoded
+   * as inline data. Order is preserved in the Gemini request.
+   */
+  userPromptParts: Array<{ kind: "text" | "file"; col: string }>;
   systemPromptCol?: string;
   outputCol: string;
   rowRange?: { start: number; end: number };
@@ -32,39 +36,52 @@ export interface RunConfig {
   /**
    * When true, runBatchAI applies markdown parsing and rich text formatting to the output
    * column. When false (default), result.text is written directly via setValue.
-   * The grounding column is unaffected by this setting.
-   *
-   * Future: recipes could pre-set this via PrepRecipeParams/PrepRecipeResult —
-   * follow the tools echo pattern if needed.
+   * Recipe settings can pre-set this via PrepRecipeParams/PrepRecipeResult settings echo.
    */
   applyMarkdown?: boolean;
 }
 
 // ── Recipes ─────────────────────────────────────────────────────
 
+export type ColumnKind =
+  | "drive-file-folder"
+  | "drive-file-constant"
+  | "system-prompt"
+  | "user-prompt"
+  | "output";
+
 export interface PrepRecipeParams {
-  driveFolder?: { url: string; colTitle: string };
-  systemPrompt?: { colTitle: string; value: string };
-  userPrompts?: Array<{ colTitle: string; value: string }>;
-  outputCol?: { colTitle: string };
+  columns: Array<
+    | { kind: "drive-file-folder"; colTitle: string; url: string }
+    | { kind: "drive-file-constant"; colTitle: string; url: string }
+    | { kind: "system-prompt"; colTitle: string; text: string }
+    | { kind: "user-prompt"; colTitle: string; text: string }
+    | { kind: "output"; colTitle: string }
+  >;
   /**
-   * Tool IDs to pass through to PrepRecipeResult.
-   * The server does not process these during prep — they are echoed back
-   * to preserve the single-source-of-truth invariant for preppedRunConfig.
+   * Non-column settings echoed back in PrepRecipeResult without server processing.
+   * Preserves single-source-of-truth for RunConfig assembly on the client.
    */
-  tools?: ToolId[];
+  settings?: {
+    tools?: ToolId[];
+    applyMarkdown?: boolean;
+    includeGrounding?: boolean;
+  };
 }
 
 export interface PrepRecipeResult {
   rowRange: { start: number; end: number };
-  colNames: {
-    driveLink?: string;
-    systemPrompt?: string;
-    userPrompts?: string[];
-    outputCol?: string;
+  /**
+   * Columns as written to the sheet, in the same order as PrepRecipeParams.columns.
+   * The client assembles RunConfig from this — it is the single source of truth.
+   */
+  columns: Array<{ kind: ColumnKind; colTitle: string }>;
+  /** Echoed from PrepRecipeParams.settings — no server-side processing. */
+  settings?: {
+    tools?: ToolId[];
+    applyMarkdown?: boolean;
+    includeGrounding?: boolean;
   };
-  /** Echoed from PrepRecipeParams — no server-side processing. */
-  tools?: ToolId[];
 }
 
 // ── Import Drive Links ───────────────────────────────────────────

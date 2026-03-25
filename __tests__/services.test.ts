@@ -68,7 +68,7 @@ describe("getSheetHeaders", () => {
 describe("runBatchAI", () => {
   it("calls google.script.run.runBatchAI with config and resolves", async () => {
     const handlers = captureHandlers();
-    const config = { userPromptCols: ["col_a"], outputCol: "out" };
+    const config = { userPromptParts: [{ kind: "text" as const, col: "col_a" }], outputCol: "out" };
     const promise = services.runBatchAI(config as import("../src/shared/types").RunConfig);
     handlers.resolve(undefined);
     await expect(promise).resolves.toBeUndefined();
@@ -78,7 +78,7 @@ describe("runBatchAI", () => {
   it("rejects on failure", async () => {
     const handlers = captureHandlers();
     const promise = services.runBatchAI({
-      userPromptCols: [],
+      userPromptParts: [],
       outputCol: "out",
     });
     handlers.reject(new Error("api error"));
@@ -107,12 +107,17 @@ describe("prepRecipe", () => {
   it("calls google.script.run.prepRecipe with params and resolves with result", async () => {
     const handlers = captureHandlers();
     const params: import("../src/shared/types").PrepRecipeParams = {
-      driveFolder: { url: "https://drive.google.com/folder/abc", colTitle: "Drive Link" },
-      outputCol: { colTitle: "AI_Summarization" },
+      columns: [
+        { kind: "drive-file-folder", colTitle: "Drive Link", url: "https://drive.google.com/folder/abc" },
+        { kind: "output", colTitle: "AI_Summarization" },
+      ],
     };
     const result: import("../src/shared/types").PrepRecipeResult = {
       rowRange: { start: 2, end: 5 },
-      colNames: { driveLink: "Drive Link", outputCol: "AI_Summarization" },
+      columns: [
+        { kind: "drive-file-folder", colTitle: "Drive Link" },
+        { kind: "output", colTitle: "AI_Summarization" },
+      ],
     };
     const promise = services.prepRecipe(params);
     handlers.resolve(result);
@@ -122,7 +127,7 @@ describe("prepRecipe", () => {
 
   it("rejects on failure", async () => {
     const handlers = captureHandlers();
-    const promise = services.prepRecipe({});
+    const promise = services.prepRecipe({ columns: [] });
     handlers.reject(new Error("prep error"));
     await expect(promise).rejects.toThrow("prep error");
   });
