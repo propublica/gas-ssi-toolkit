@@ -75,11 +75,7 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
     };
   }
 
-  private mountFields(
-    container: HTMLElement,
-    params: RecipeParams,
-    savedState?: SavedState,
-  ): void {
+  private mountFields(container: HTMLElement, params: RecipeParams, savedState?: SavedState): void {
     const reset = (): void => this.prepCook?.reset();
 
     params.columns.forEach((col, i) => {
@@ -110,9 +106,7 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
       }
 
       if (col.kind === "system-prompt" || col.kind === "user-prompt") {
-        const promptContainer = container.querySelector<HTMLElement>(
-          `#col-prompt-${i}-container`,
-        );
+        const promptContainer = container.querySelector<HTMLElement>(`#col-prompt-${i}-container`);
         if (promptContainer) {
           colFields.prompt = new LockableField(promptContainer, {
             label: "Prompt",

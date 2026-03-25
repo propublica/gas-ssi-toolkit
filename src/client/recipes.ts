@@ -70,8 +70,8 @@ export const RECIPES: RecipeDefinition[] = [
             value:
               "You are a document analyst helping a reporter identify specific items within " +
               "a collection of files. For each file you receive, determine whether it contains " +
-              "the item described below. Respond with exactly one of: \"yes\", \"no\", or " +
-              "\"unsure\". Follow your answer with a single sentence explaining your reasoning. " +
+              'the item described below. Respond with exactly one of: "yes", "no", or ' +
+              '"unsure". Follow your answer with a single sentence explaining your reasoning. ' +
               "Do not add any other commentary.\n\n" +
               "If a reference file is attached, it is a concrete example of what you are looking " +
               "for — use it as a visual or structural guide when evaluating the document.",
