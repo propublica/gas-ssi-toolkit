@@ -12,8 +12,6 @@ const mockDriveApp = {
     getBlob: () => ({ getBytes: () => [1, 2, 3] }),
   }),
 };
-const mockBlob = { getBytes: () => [1, 2, 3] };
-
 (globalThis as any).UrlFetchApp = {
   fetch: mockFetch,
 };

@@ -48,6 +48,10 @@ export function runInference(
 
     const inlineData = driveIds.length > 0 ? prepareDriveAttachments(driveIds) : [];
 
+    // Note: buildGeminiPayload groups all text parts before all inline_data parts
+    // in the Gemini request — interleaved text/file ordering is not currently preserved
+    // through to the API call. For most recipes this is acceptable. See docs/plans/
+    // 2026-03-25-find-a-thing-recipe-design.md §2.2 for future ordering work.
     return invokeGemini({
       systemPrompt: systemPrompt !== undefined ? flattenArg(systemPrompt)[0] : undefined,
       userTexts,
