@@ -12,34 +12,46 @@ import { flattenArg, isValidDriveLink, extractId } from "./utils";
 import type { GeminiResponse } from "./types";
 import type { ToolId } from "../shared/types";
 
+/** A single part of the user prompt — either a text value or a Drive file link. */
+export interface UserPromptPart {
+  kind: "text" | "file";
+  value: unknown;
+}
+
 /**
- * Execute a single Gemini inference from raw cell values.
+ * Execute a single Gemini inference from an ordered array of prompt parts.
  *
- * @param userPrompts  Cell value(s) for the user message — scalar or 2D range.
- * @param driveLinks   Cell value(s) containing Drive URLs to attach as inline
- *                     data. Invalid or non-Drive strings are silently filtered.
- *                     Omit or pass `undefined` to skip Drive attachment.
- * @param systemPrompt Cell value for the system instruction. First non-empty
- *                     string is used. Omit or pass `undefined` to use the model default.
- * @param tools        Tool IDs to enable for this inference call.
+ * @param userPromptParts  Ordered parts — text cell values and/or Drive URLs to
+ *                         attach as inline data. Invalid or non-Drive strings are
+ *                         silently filtered from file parts.
+ * @param systemPrompt     Cell value for the system instruction. First non-empty
+ *                         string is used. Omit or pass `undefined` to use the model default.
+ * @param tools            Tool IDs to enable for this inference call.
  * @returns The model response object, an object with "Error: ..." text on failure,
- *          or null if userPrompts is empty (signals caller to skip this row).
+ *          or null if all text parts are empty (signals caller to skip this row).
  */
 export function runInference(
-  userPrompts: unknown,
-  driveLinks?: unknown,
+  userPromptParts: UserPromptPart[],
   systemPrompt?: unknown,
   tools?: ToolId[],
 ): GeminiResponse | null {
-  const userTexts = flattenArg(userPrompts);
-  if (userTexts.length === 0) return null;
+  const textParts = userPromptParts.filter((p) => p.kind === "text");
+  const userTexts = textParts.flatMap((p) => flattenArg(p.value));
+  if (userTexts.filter(Boolean).length === 0) return null;
 
   try {
-    const inlineData =
-      driveLinks !== undefined
-        ? prepareDriveAttachments(flattenArg(driveLinks).filter(isValidDriveLink).map(extractId))
-        : [];
+    const fileParts = userPromptParts.filter((p) => p.kind === "file");
+    const driveIds = fileParts
+      .flatMap((p) => flattenArg(p.value))
+      .filter(isValidDriveLink)
+      .map(extractId);
 
+    const inlineData = driveIds.length > 0 ? prepareDriveAttachments(driveIds) : [];
+
+    // Note: buildGeminiPayload groups all text parts before all inline_data parts
+    // in the Gemini request — interleaved text/file ordering is not currently preserved
+    // through to the API call. For most recipes this is acceptable. See docs/plans/
+    // 2026-03-25-find-a-thing-recipe-design.md §2.2 for future ordering work.
     return invokeGemini({
       systemPrompt: systemPrompt !== undefined ? flattenArg(systemPrompt)[0] : undefined,
       userTexts,
