@@ -269,12 +269,6 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
     return;
   }
 
-  // Build a header→0-based-index map for O(1) lookup inside the row loop
-  const resolvedCols: Record<string, number> = {};
-  config.userPromptParts.forEach((p, i) => {
-    resolvedCols[p.col] = partIdxs[i];
-  });
-
   // Validate system prompt column (if selected)
   let systemPromptIdx = -1;
   if (config.systemPromptCol) {
@@ -343,9 +337,9 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
     }
 
     // Build parts for this row in declared order
-    const rowParts = config.userPromptParts.map((part) => ({
+    const rowParts = config.userPromptParts.map((part, i) => ({
       kind: part.kind,
-      value: row[resolvedCols[part.col]],
+      value: row[partIdxs[i]],
     }));
     const systemPrompt = systemPromptIdx >= 0 ? row[systemPromptIdx] : undefined;
 
