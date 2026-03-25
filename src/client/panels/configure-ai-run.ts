@@ -39,7 +39,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
 
     const preset: Partial<RunConfig> = savedState
       ? {
-          userPromptParts: savedState.userPromptParts,
+          userPromptCols: savedState.userPromptCols,
+          driveFileCols: savedState.driveFileCols.length ? savedState.driveFileCols : undefined,
           systemPromptCol: savedState.systemPromptCol || undefined,
           outputCol: savedState.outputCol || undefined,
           rowRange: savedState.rowRange,
@@ -87,22 +88,15 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           return;
         }
 
-        const presetText = (preset.userPromptParts ?? [])
-          .filter((p) => p.kind === "text")
-          .map((p) => p.col);
-        const presetFile = (preset.userPromptParts ?? [])
-          .filter((p) => p.kind === "file")
-          .map((p) => p.col);
-
         this.userPromptList = new TagList(
           container.querySelector("#user-prompt-cols")!,
           headers,
-          presetText,
+          preset.userPromptCols ?? [],
         );
         this.driveFileList = new TagList(
           container.querySelector("#drive-file-cols")!,
           headers,
-          presetFile,
+          preset.driveFileCols ?? [],
         );
         this.systemPromptList = new SingleTagList(
           container.querySelector("#system-prompt-col")!,
@@ -149,10 +143,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   unmount(): SavedState | undefined {
     if (!this.userPromptList) return undefined;
     return {
-      userPromptParts: [
-        ...(this.userPromptList?.getValue() ?? []).map((col) => ({ kind: "text" as const, col })),
-        ...(this.driveFileList?.getValue() ?? []).map((col) => ({ kind: "file" as const, col })),
-      ],
+      userPromptCols: this.userPromptList.getValue(),
+      driveFileCols: this.driveFileList?.getValue() ?? [],
       systemPromptCol: this.systemPromptList?.getValue() ?? "",
       outputCol: this.outputColList?.getValue() ?? "",
       rowRange: this.rowRangeComp?.getValue(),
@@ -177,10 +169,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
 
   private currentPreset(): Partial<RunConfig> {
     return {
-      userPromptParts: [
-        ...(this.userPromptList?.getValue() ?? []).map((col) => ({ kind: "text" as const, col })),
-        ...(this.driveFileList?.getValue() ?? []).map((col) => ({ kind: "file" as const, col })),
-      ],
+      userPromptCols: this.userPromptList?.getValue(),
+      driveFileCols: this.driveFileList?.getValue(),
       systemPromptCol: this.systemPromptList?.getValue() || undefined,
       outputCol: this.outputColList?.getValue() || undefined,
       rowRange: this.rowRangeComp?.getValue(),
@@ -226,10 +216,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     const applyMarkdown = this.applyMarkdownCb?.checked ?? false;
 
     return {
-      userPromptParts: [
-        ...userPromptCols.map((col) => ({ kind: "text" as const, col })),
-        ...driveFileCols.map((col) => ({ kind: "file" as const, col })),
-      ],
+      userPromptCols,
+      driveFileCols: driveFileCols.length > 0 ? driveFileCols : undefined,
       systemPromptCol,
       outputCol,
       rowRange,

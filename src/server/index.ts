@@ -256,17 +256,31 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
     return;
   }
 
-  // Resolve all userPromptParts columns once before the row loop
-  const partCols = config.userPromptParts.map((p) => p.col);
-  const partIdxs = resolveColumns(headers, partCols);
-  const missingParts = partCols.filter((_, i) => partIdxs[i] === -1);
-  if (missingParts.length > 0) {
+  // Validate user prompt columns (required)
+  const userPromptIdxs = resolveColumns(headers, config.userPromptCols);
+  const missingUserPrompt = config.userPromptCols.filter((_, i) => userPromptIdxs[i] === -1);
+  if (missingUserPrompt.length > 0) {
     ui.alert(
       "Error: Missing Columns",
-      `Could not find columns: ${missingParts.join(", ")}`,
+      `Could not find columns: ${missingUserPrompt.join(", ")}`,
       ui.ButtonSet.OK,
     );
     return;
+  }
+
+  // Validate drive file columns (if selected)
+  let driveFileIdxs: number[] = [];
+  if (config.driveFileCols && config.driveFileCols.length > 0) {
+    driveFileIdxs = resolveColumns(headers, config.driveFileCols);
+    const missingDrive = config.driveFileCols.filter((_, i) => driveFileIdxs[i] === -1);
+    if (missingDrive.length > 0) {
+      ui.alert(
+        "Error: Missing Columns",
+        `Could not find columns: ${missingDrive.join(", ")}`,
+        ui.ButtonSet.OK,
+      );
+      return;
+    }
   }
 
   // Validate system prompt column (if selected)
@@ -336,14 +350,11 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
       });
     }
 
-    // Build parts for this row in declared order
-    const rowParts = config.userPromptParts.map((part, i) => ({
-      kind: part.kind,
-      value: row[partIdxs[i]],
-    }));
+    const userPrompts = userPromptIdxs.map((idx) => row[idx]);
+    const driveLinks = driveFileIdxs.length > 0 ? driveFileIdxs.map((idx) => row[idx]) : undefined;
     const systemPrompt = systemPromptIdx >= 0 ? row[systemPromptIdx] : undefined;
 
-    const result = runInference(rowParts, systemPrompt, config.tools);
+    const result = runInference(userPrompts, driveLinks, systemPrompt, config.tools);
     if (result === null) continue;
 
     if (config.applyMarkdown) {
@@ -392,74 +403,69 @@ export function runTool(functionName: string, jobId?: string): void {
 
 export function prepRecipe(params: PrepRecipeParams): PrepRecipeResult {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const colNames: PrepRecipeResult["colNames"] = {};
   let numRows = 1;
-  const resultColumns: PrepRecipeResult["columns"] = [];
 
-  for (const col of params.columns) {
-    switch (col.kind) {
-      case "drive-file-folder": {
-        const folderId = extractId(col.url);
-        const folder = DriveApp.getFolderById(folderId);
-        const files: { url: string }[] = [];
-        getAllFilesRecursive(folder, files);
-        numRows = files.length || 1;
-        const colIdx = findOrCreateColumn(sheet, col.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
-        writeColumn(
-          sheet,
-          colIdx,
-          files.map((f) => f.url),
-          SpreadsheetApp.WrapStrategy.CLIP,
-        );
-        resultColumns.push({ kind: col.kind, colTitle: col.colTitle });
-        break;
-      }
-      case "drive-file-constant": {
-        const colIdx = findOrCreateColumn(sheet, col.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
-        writeColumn(
-          sheet,
-          colIdx,
-          Array(numRows).fill(col.url) as string[],
-          SpreadsheetApp.WrapStrategy.CLIP,
-        );
-        resultColumns.push({ kind: col.kind, colTitle: col.colTitle });
-        break;
-      }
-      case "system-prompt": {
-        const colIdx = findOrCreateColumn(sheet, col.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
-        writeColumn(
-          sheet,
-          colIdx,
-          Array(numRows).fill(col.text) as string[],
-          SpreadsheetApp.WrapStrategy.CLIP,
-        );
-        resultColumns.push({ kind: col.kind, colTitle: col.colTitle });
-        break;
-      }
-      case "user-prompt": {
-        const colIdx = findOrCreateColumn(sheet, col.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
-        writeColumn(
-          sheet,
-          colIdx,
-          Array(numRows).fill(col.text) as string[],
-          SpreadsheetApp.WrapStrategy.CLIP,
-        );
-        resultColumns.push({ kind: col.kind, colTitle: col.colTitle });
-        break;
-      }
-      case "output": {
-        findOrCreateColumn(sheet, col.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
-        resultColumns.push({ kind: col.kind, colTitle: col.colTitle });
-        break;
-      }
+  if (params.driveFolder) {
+    const folderId = extractId(params.driveFolder.url);
+    const folder = DriveApp.getFolderById(folderId);
+    const files: { url: string }[] = [];
+    getAllFilesRecursive(folder, files);
+    numRows = files.length || 1;
+    const col = findOrCreateColumn(
+      sheet,
+      params.driveFolder.colTitle,
+      SpreadsheetApp.WrapStrategy.CLIP,
+    );
+    writeColumn(
+      sheet,
+      col,
+      files.map((f) => f.url),
+      SpreadsheetApp.WrapStrategy.CLIP,
+    );
+    colNames.driveLink = params.driveFolder.colTitle;
+  }
+
+  if (params.systemPrompt) {
+    const col = findOrCreateColumn(
+      sheet,
+      params.systemPrompt.colTitle,
+      SpreadsheetApp.WrapStrategy.CLIP,
+    );
+    writeColumn(
+      sheet,
+      col,
+      Array(numRows).fill(params.systemPrompt.value) as string[],
+      SpreadsheetApp.WrapStrategy.CLIP,
+    );
+    colNames.systemPrompt = params.systemPrompt.colTitle;
+  }
+
+  if (params.userPrompts) {
+    colNames.userPrompts = [];
+    for (const up of params.userPrompts) {
+      const col = findOrCreateColumn(sheet, up.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
+      writeColumn(
+        sheet,
+        col,
+        Array(numRows).fill(up.value) as string[],
+        SpreadsheetApp.WrapStrategy.CLIP,
+      );
+      colNames.userPrompts.push(up.colTitle);
     }
+  }
+
+  if (params.outputCol) {
+    findOrCreateColumn(sheet, params.outputCol.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
+    colNames.outputCol = params.outputCol.colTitle;
   }
 
   SpreadsheetApp.flush();
 
   return {
     rowRange: { start: 2, end: 2 + numRows - 1 },
-    columns: resultColumns,
-    settings: params.settings,
+    colNames,
+    tools: params.tools,
   };
 }
 
