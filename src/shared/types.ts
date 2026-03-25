@@ -29,12 +29,26 @@ export interface RunConfig {
   systemPromptCol?: string;
   outputCol: string;
   rowRange?: { start: number; end: number };
+  /** Tool IDs to enable for every row in this run. */
   tools?: ToolId[];
+  /** When true, runBatchAI writes a {outputCol}_grounding column with source attribution. */
   includeGrounding?: boolean;
+  /**
+   * When true, runBatchAI applies markdown parsing and rich text formatting to the output
+   * column. When false (default), result.text is written directly via setValue.
+   * Recipe settings can pre-set this via PrepRecipeParams/PrepRecipeResult settings echo.
+   */
   applyMarkdown?: boolean;
 }
 
 // ── Recipes ─────────────────────────────────────────────────────
+
+export type ColumnKind =
+  | "drive-file-folder"
+  | "drive-file-constant"
+  | "system-prompt"
+  | "user-prompt"
+  | "output";
 
 export interface PrepRecipeParams {
   columns: Array<
@@ -61,15 +75,7 @@ export interface PrepRecipeResult {
    * Columns as written to the sheet, in the same order as PrepRecipeParams.columns.
    * The client assembles RunConfig from this — it is the single source of truth.
    */
-  columns: Array<{
-    kind:
-      | "drive-file-folder"
-      | "drive-file-constant"
-      | "system-prompt"
-      | "user-prompt"
-      | "output";
-    colTitle: string;
-  }>;
+  columns: Array<{ kind: ColumnKind; colTitle: string }>;
   /** Echoed from PrepRecipeParams.settings — no server-side processing. */
   settings?: {
     tools?: ToolId[];
