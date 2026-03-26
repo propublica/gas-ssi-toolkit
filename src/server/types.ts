@@ -39,6 +39,29 @@ export interface GeminiInlineData {
   data: string; // base64-encoded bytes
 }
 
+export interface GeminiFileApiData {
+  mime_type: string;
+  /** URI returned by the Gemini Files API after uploading a file. */
+  file_uri: string;
+}
+
+/**
+ * A single part of the user turn in a Gemini request.
+ *
+ * - "text"        — plain text content in the user turn.
+ * - "inline_data" — base64-encoded file bytes embedded in the request body; used when
+ *                   file size is within the inline limit (~100 MB encoded).
+ * - "file_uri"    — reference to a file uploaded via the Gemini Files API (up to 2 GB);
+ *                   no producer exists yet. Type and payload path reserved for a future
+ *                   phase when large-file support is wired up in drive.ts.
+ *
+ * Order within userParts[] is preserved through to the Gemini REST payload.
+ */
+export type GeminiUserPart =
+  | { kind: "text"; text: string }
+  | { kind: "inline_data"; data: GeminiInlineData }
+  | { kind: "file_uri"; data: GeminiFileApiData };
+
 export interface GeminiFunctionDeclaration {
   name: string;
   description: string;
@@ -109,8 +132,8 @@ export interface GeminiRequest {
   apiKey: string;
   modelName?: string; // defaults to CONFIG.MODEL_NAME if omitted
   systemPrompt?: string;
-  userTexts: string[]; // assembled into parts: [{text}, {text}, ...]
-  inlineData?: GeminiInlineData[]; // each item appended as an inline_data part
+  /** Ordered user-turn parts assembled by the caller. Maps 1:1 to contents[0].parts in the REST payload. */
+  userParts: GeminiUserPart[];
   /** Tool IDs to enable. Resolved against TOOL_REGISTRY in buildGeminiPayload. */
   tools?: ToolId[];
   generationConfig?: GeminiGenerationConfig;
