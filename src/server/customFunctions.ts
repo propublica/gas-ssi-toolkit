@@ -39,7 +39,7 @@ export function SSI(userTexts: unknown, systemPrompt?: string, toolNames?: unkno
 
     return invokeGemini({
       systemPrompt: systemPrompt || undefined,
-      userParts: flattenArg(userTexts).map((text): GeminiUserPart => ({ kind: "text", text })),
+      userParts: flattenArg(userTexts).map((text): GeminiUserPart => ({ text })),
       tools: resolvedToolIds.length ? resolvedToolIds : undefined,
     }).text;
   } catch (e) {
