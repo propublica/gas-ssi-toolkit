@@ -74,4 +74,7 @@ TAG="v$VERSION"
 git tag -a "$TAG" -m "Release $TAG — deployed $TIMESTAMP"
 git push origin "$TAG"
 
+echo "→ Creating GitHub release..."
+gh release create "$TAG" --generate-notes --title "$TAG"
+
 echo "✓ Released version $VERSION to deployment $DEPLOYMENT_ID (tagged $TAG)"
