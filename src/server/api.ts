@@ -11,9 +11,10 @@ import { CONFIG } from "./config";
 import { TOOL_REGISTRY } from "./tools";
 import type { GeminiInlineData, GeminiRequest, GeminiResponse, GeminiCodePair } from "./types";
 
-interface GeminiPart {
+interface GeminiRestPart {
   text?: string;
   inline_data?: GeminiInlineData;
+  file_data?: { mime_type: string; file_uri: string };
 }
 
 /**
@@ -21,8 +22,11 @@ interface GeminiPart {
  * Pure function — no GAS globals. Independently testable.
  */
 export function buildGeminiPayload(req: GeminiRequest): Record<string, unknown> {
-  const parts: GeminiPart[] = req.userTexts.map((text) => ({ text }));
-  req.inlineData?.forEach((d) => parts.push({ inline_data: d }));
+  const parts: GeminiRestPart[] = req.parts.map((p) => {
+    if (p.kind === "text") return { text: p.text };
+    if (p.kind === "inline_data") return { inline_data: p.data };
+    return { file_data: { mime_type: p.mimeType, file_uri: p.fileUri } };
+  });
 
   const payload: Record<string, unknown> = {
     system_instruction: {
