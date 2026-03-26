@@ -17,6 +17,18 @@
  */
 export type ToolId = "google_search" | "url_context" | "code_execution";
 
+// ── Prompt column spec ──────────────────────────────────────────
+
+/**
+ * A reference to a spreadsheet column together with its prompt kind.
+ * Crosses the RPC boundary in RunConfig.promptCols (Phase 2) and is
+ * echoed through PrepRecipeResult so the client never needs to infer kinds.
+ */
+export interface PromptColumnSpec {
+  col: string;
+  kind: "text" | "file";
+}
+
 // ── Configuration ───────────────────────────────────────────────
 
 export interface RunConfig {

@@ -34,7 +34,7 @@ import type {
   ImportDriveLinksConfig,
   ExtractTextConfig,
 } from "../shared/types";
-import type { DriveFileInfo } from "./types";
+import type { DriveFileInfo, PromptInput } from "./types";
 
 // ==========================================
 // 🚀 MENU & INITIALIZATION
@@ -350,11 +350,13 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
       });
     }
 
-    const userPrompts = userPromptIdxs.map((idx) => row[idx]);
-    const driveLinks = driveFileIdxs.length > 0 ? driveFileIdxs.map((idx) => row[idx]) : undefined;
+    const promptInputs: PromptInput[] = [
+      ...userPromptIdxs.map((idx) => ({ kind: "text" as const, value: row[idx] })),
+      ...driveFileIdxs.map((idx) => ({ kind: "file" as const, value: row[idx] })),
+    ];
     const systemPrompt = systemPromptIdx >= 0 ? row[systemPromptIdx] : undefined;
 
-    const result = runInference(userPrompts, driveLinks, systemPrompt, config.tools);
+    const result = runInference(promptInputs, systemPrompt, config.tools);
     if (result === null) continue;
 
     if (config.applyMarkdown) {

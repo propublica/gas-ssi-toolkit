@@ -8,7 +8,7 @@
  * tools array, but with different structures.
  */
 
-import type { ToolId } from "../shared/types";
+import type { PromptColumnSpec, ToolId } from "../shared/types";
 
 export interface AppConfig {
   API_KEY_PROPERTY: string;
@@ -124,6 +124,17 @@ export interface GeminiResponse {
 export type GeminiTool =
   | { kind: "grounding"; id: ToolId }
   | { kind: "function"; declaration: GeminiFunctionDeclaration };
+
+/**
+ * A single ordered prompt input from a spreadsheet row.
+ * Carries the raw cell value alongside the kind declared in PromptColumnSpec.
+ * Consumed by runInference, which resolves text values via flattenArg and
+ * file values via prepareDriveAttachments into an ordered GeminiUserPart[].
+ */
+export type PromptInput = {
+  kind: PromptColumnSpec["kind"];
+  value: unknown;
+};
 
 export interface DriveFileInfo {
   url: string;
