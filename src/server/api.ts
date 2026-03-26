@@ -9,37 +9,18 @@
 
 import { CONFIG } from "./config";
 import { TOOL_REGISTRY } from "./tools";
-import type {
-  GeminiFileApiData,
-  GeminiInlineData,
-  GeminiRequest,
-  GeminiResponse,
-  GeminiCodePair,
-} from "./types";
-
-type GeminiUserApiPart =
-  | { text: string }
-  | { inline_data: GeminiInlineData }
-  | { file_data: GeminiFileApiData };
+import type { GeminiRequest, GeminiResponse, GeminiCodePair } from "./types";
 
 /**
  * Assemble the Gemini generateContent request payload from a GeminiRequest.
  * Pure function — no GAS globals. Independently testable.
  */
 export function buildGeminiPayload(req: GeminiRequest): Record<string, unknown> {
-  const userParts: GeminiUserApiPart[] = req.userParts.map((p) => {
-    if (p.kind === "text") return { text: p.text };
-    if (p.kind === "inline_data") return { inline_data: p.data };
-    if (p.kind === "file_uri") return { file_data: p.data };
-    const _exhaustive: never = p;
-    throw new Error(`Unhandled GeminiUserPart kind: ${JSON.stringify(_exhaustive)}`);
-  });
-
   const payload: Record<string, unknown> = {
     system_instruction: {
       parts: [{ text: req.systemPrompt || "You are a helpful assistant." }],
     },
-    contents: [{ role: "user", parts: userParts }],
+    contents: [{ role: "user", parts: req.userParts }],
   };
 
   payload.generationConfig = {

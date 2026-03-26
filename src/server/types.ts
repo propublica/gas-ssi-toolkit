@@ -47,20 +47,21 @@ export interface GeminiFileApiData {
 
 /**
  * A single part of the user turn in a Gemini request.
+ * Shapes match the Gemini REST API directly — no translation needed in buildGeminiPayload.
  *
- * - "text"        — plain text content in the user turn.
- * - "inline_data" — base64-encoded file bytes embedded in the request body; used when
- *                   file size is within the inline limit (~100 MB encoded).
- * - "file_uri"    — reference to a file uploaded via the Gemini Files API (up to 2 GB);
- *                   no producer exists yet. Type and payload path reserved for a future
- *                   phase when large-file support is wired up in drive.ts.
+ * - { text }        — plain text content in the user turn.
+ * - { inline_data } — base64-encoded file bytes embedded in the request body; used when
+ *                     file size is within the inline limit (~100 MB encoded).
+ * - { file_data }   — reference to a file uploaded via the Gemini Files API (up to 2 GB);
+ *                     no producer exists yet. Type reserved for a future phase when
+ *                     large-file support is wired up in drive.ts.
  *
  * Order within userParts[] is preserved through to the Gemini REST payload.
  */
 export type GeminiUserPart =
-  | { kind: "text"; text: string }
-  | { kind: "inline_data"; data: GeminiInlineData }
-  | { kind: "file_uri"; data: GeminiFileApiData };
+  | { text: string }
+  | { inline_data: GeminiInlineData }
+  | { file_data: GeminiFileApiData };
 
 export interface GeminiFunctionDeclaration {
   name: string;

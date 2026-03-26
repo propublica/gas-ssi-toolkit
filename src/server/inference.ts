@@ -35,12 +35,12 @@ export function runInference(
   if (userTexts.length === 0) return null;
 
   try {
-    const textParts: GeminiUserPart[] = userTexts.map((text) => ({ kind: "text", text }));
+    const textParts: GeminiUserPart[] = userTexts.map((text) => ({ text }));
     const fileParts: GeminiUserPart[] =
       driveLinks !== undefined
         ? prepareDriveAttachments(
             flattenArg(driveLinks).filter(isValidDriveLink).map(extractId),
-          ).map((data) => ({ kind: "inline_data", data }))
+          ).map((inline_data) => ({ inline_data }))
         : [];
 
     return invokeGemini({

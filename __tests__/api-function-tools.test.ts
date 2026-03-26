@@ -21,7 +21,7 @@ import type { ToolId } from "../src/shared/types";
 
 const baseReq: GeminiRequest = {
   apiKey: "key",
-  userParts: [{ kind: "text", text: "hello" }],
+  userParts: [{ text: "hello" }],
 };
 
 describe("buildGeminiPayload — function-calling tool", () => {
