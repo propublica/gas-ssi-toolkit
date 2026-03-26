@@ -68,7 +68,7 @@ describe("getSheetHeaders", () => {
 describe("runBatchAI", () => {
   it("calls google.script.run.runBatchAI with config and resolves", async () => {
     const handlers = captureHandlers();
-    const config = { userPromptCols: ["col_a"], outputCol: "out" };
+    const config = { promptCols: [{ col: "col_a", kind: "text" }], outputCol: "out" };
     const promise = services.runBatchAI(config as import("../src/shared/types").RunConfig);
     handlers.resolve(undefined);
     await expect(promise).resolves.toBeUndefined();
@@ -78,7 +78,7 @@ describe("runBatchAI", () => {
   it("rejects on failure", async () => {
     const handlers = captureHandlers();
     const promise = services.runBatchAI({
-      userPromptCols: [],
+      promptCols: [],
       outputCol: "out",
     });
     handlers.reject(new Error("api error"));

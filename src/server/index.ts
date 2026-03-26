@@ -256,31 +256,23 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
     return;
   }
 
-  // Validate user prompt columns (required)
-  const userPromptIdxs = resolveColumns(headers, config.userPromptCols);
-  const missingUserPrompt = config.userPromptCols.filter((_, i) => userPromptIdxs[i] === -1);
-  if (missingUserPrompt.length > 0) {
+  // Validate prompt columns (required — at least one)
+  const promptIdxs = resolveColumns(
+    headers,
+    config.promptCols.map((pc) => pc.col),
+  );
+  const missingPromptCols = config.promptCols
+    .filter((_, i) => promptIdxs[i] === -1)
+    .map((pc) => pc.col);
+  if (config.promptCols.length === 0 || missingPromptCols.length > 0) {
     ui.alert(
       "Error: Missing Columns",
-      `Could not find columns: ${missingUserPrompt.join(", ")}`,
+      missingPromptCols.length > 0
+        ? `Could not find columns: ${missingPromptCols.join(", ")}`
+        : "Please select at least one prompt column.",
       ui.ButtonSet.OK,
     );
     return;
-  }
-
-  // Validate drive file columns (if selected)
-  let driveFileIdxs: number[] = [];
-  if (config.driveFileCols && config.driveFileCols.length > 0) {
-    driveFileIdxs = resolveColumns(headers, config.driveFileCols);
-    const missingDrive = config.driveFileCols.filter((_, i) => driveFileIdxs[i] === -1);
-    if (missingDrive.length > 0) {
-      ui.alert(
-        "Error: Missing Columns",
-        `Could not find columns: ${missingDrive.join(", ")}`,
-        ui.ButtonSet.OK,
-      );
-      return;
-    }
   }
 
   // Validate system prompt column (if selected)
@@ -350,10 +342,10 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
       });
     }
 
-    const promptInputs: PromptInput[] = [
-      ...userPromptIdxs.map((idx) => ({ kind: "text" as const, value: row[idx] })),
-      ...driveFileIdxs.map((idx) => ({ kind: "file" as const, value: row[idx] })),
-    ];
+    const promptInputs: PromptInput[] = config.promptCols.map((pc, i) => ({
+      kind: pc.kind,
+      value: row[promptIdxs[i]],
+    }));
     const systemPrompt = systemPromptIdx >= 0 ? row[systemPromptIdx] : undefined;
 
     const result = runInference(promptInputs, systemPrompt, config.tools);

@@ -32,8 +32,7 @@ export interface PromptColumnSpec {
 // ── Configuration ───────────────────────────────────────────────
 
 export interface RunConfig {
-  userPromptCols: string[];
-  driveFileCols?: string[];
+  promptCols: PromptColumnSpec[];
   systemPromptCol?: string;
   outputCol: string;
   rowRange?: { start: number; end: number };

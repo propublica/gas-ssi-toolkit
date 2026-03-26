@@ -1,5 +1,5 @@
 import type { NavigationContext, Panel } from "../types";
-import type { RunConfig, ToolId } from "../../shared/types";
+import type { RunConfig, ToolId, PromptColumnSpec } from "../../shared/types";
 import { TagList } from "../components/tag-list";
 import { SingleTagList } from "../components/single-tag-list";
 import { RowRange } from "../components/row-range";
@@ -39,8 +39,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
 
     const preset: Partial<RunConfig> = savedState
       ? {
-          userPromptCols: savedState.userPromptCols,
-          driveFileCols: savedState.driveFileCols.length ? savedState.driveFileCols : undefined,
+          promptCols: savedState.promptCols,
           systemPromptCol: savedState.systemPromptCol || undefined,
           outputCol: savedState.outputCol || undefined,
           rowRange: savedState.rowRange,
@@ -88,15 +87,19 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           return;
         }
 
+        const presetTextCols =
+          preset.promptCols?.filter((p) => p.kind === "text").map((p) => p.col) ?? [];
+        const presetFileCols =
+          preset.promptCols?.filter((p) => p.kind === "file").map((p) => p.col) ?? [];
         this.userPromptList = new TagList(
           container.querySelector("#user-prompt-cols")!,
           headers,
-          preset.userPromptCols ?? [],
+          presetTextCols,
         );
         this.driveFileList = new TagList(
           container.querySelector("#drive-file-cols")!,
           headers,
-          preset.driveFileCols ?? [],
+          presetFileCols,
         );
         this.systemPromptList = new SingleTagList(
           container.querySelector("#system-prompt-col")!,
@@ -143,8 +146,10 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   unmount(): SavedState | undefined {
     if (!this.userPromptList) return undefined;
     return {
-      userPromptCols: this.userPromptList.getValue(),
-      driveFileCols: this.driveFileList?.getValue() ?? [],
+      promptCols: [
+        ...this.userPromptList.getValue().map((col) => ({ col, kind: "text" as const })),
+        ...(this.driveFileList?.getValue() ?? []).map((col) => ({ col, kind: "file" as const })),
+      ],
       systemPromptCol: this.systemPromptList?.getValue() ?? "",
       outputCol: this.outputColList?.getValue() ?? "",
       rowRange: this.rowRangeComp?.getValue(),
@@ -168,9 +173,13 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   }
 
   private currentPreset(): Partial<RunConfig> {
+    const textCols = this.userPromptList?.getValue() ?? [];
+    const fileCols = this.driveFileList?.getValue() ?? [];
     return {
-      userPromptCols: this.userPromptList?.getValue(),
-      driveFileCols: this.driveFileList?.getValue(),
+      promptCols: [
+        ...textCols.map((col) => ({ col, kind: "text" as const })),
+        ...fileCols.map((col) => ({ col, kind: "file" as const })),
+      ],
       systemPromptCol: this.systemPromptList?.getValue() || undefined,
       outputCol: this.outputColList?.getValue() || undefined,
       rowRange: this.rowRangeComp?.getValue(),
@@ -193,31 +202,28 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   }
 
   private assembleRunConfig(): RunConfig | null {
-    const userPromptCols = this.userPromptList?.getValue() ?? [];
-    if (userPromptCols.length === 0) {
+    const textCols = this.userPromptList?.getValue() ?? [];
+    if (textCols.length === 0) {
       globalThis.alert("Please select at least one User prompt column.");
       return null;
     }
-
-    const driveFileCols = this.driveFileList?.getValue() ?? [];
+    const fileCols = this.driveFileList?.getValue() ?? [];
+    const promptCols: PromptColumnSpec[] = [
+      ...textCols.map((col) => ({ col, kind: "text" as const })),
+      ...fileCols.map((col) => ({ col, kind: "file" as const })),
+    ];
     const systemPromptCol = this.systemPromptList?.getValue() || undefined;
     const outputCol = this.outputColList?.getValue() ?? "";
-
     if (!outputCol) {
       globalThis.alert("Please select an output column.");
       return null;
     }
-
     const rowRange = this.rowRangeComp?.getValue();
-
     const tools = (this.toolsList?.getValue() ?? []) as ToolId[];
-
     const includeGrounding = this.includeGroundingCb?.checked ?? false;
     const applyMarkdown = this.applyMarkdownCb?.checked ?? false;
-
     return {
-      userPromptCols,
-      driveFileCols: driveFileCols.length > 0 ? driveFileCols : undefined,
+      promptCols,
       systemPromptCol,
       outputCol,
       rowRange,

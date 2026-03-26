@@ -17,7 +17,6 @@ jest.mock("../../src/client/job-store", () => ({
 import { ConfigureAIRunPanel } from "../../src/client/panels/configure-ai-run";
 import type { SavedState } from "../../src/client/panels/configure-ai-run";
 import * as services from "../../src/client/services";
-import { jobStore } from "../../src/client/job-store";
 import type { NavigationContext } from "../../src/client/types";
 import type { RunConfig } from "../../src/shared/types";
 
@@ -84,7 +83,7 @@ describe("ConfigureAIRunPanel — mount", () => {
   });
 
   it("pre-selects params on mount", async () => {
-    const { container } = await mountAndLoad({ userPromptCols: ["col_a"] });
+    const { container } = await mountAndLoad({ promptCols: [{ col: "col_a", kind: "text" }] });
     const selected = container.querySelectorAll("#user-prompt-cols .tag.selected");
     expect(selected).toHaveLength(1);
     expect(selected[0].getAttribute("data-value")).toBe("col_a");
@@ -92,12 +91,14 @@ describe("ConfigureAIRunPanel — mount", () => {
 
   it("restores savedState over params", async () => {
     const savedState = {
-      userPromptCols: ["col_b"],
-      driveFileCols: [],
+      promptCols: [{ col: "col_b", kind: "text" as const }],
       systemPromptCol: "",
       outputCol: "ai_inference",
     };
-    const { container } = await mountAndLoad({ userPromptCols: ["col_a"] }, savedState);
+    const { container } = await mountAndLoad(
+      { promptCols: [{ col: "col_a", kind: "text" }] },
+      savedState,
+    );
     const selected = container.querySelectorAll("#user-prompt-cols .tag.selected");
     expect(selected[0].getAttribute("data-value")).toBe("col_b");
   });
@@ -140,13 +141,16 @@ describe("ConfigureAIRunPanel — Run AI", () => {
   it("calls runBatchAI with correctly assembled RunConfig and a jobId", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
     const { container } = await mountAndLoad({
-      userPromptCols: ["col_a"],
+      promptCols: [{ col: "col_a", kind: "text" }],
       outputCol: "ai_inference",
     });
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     await Promise.resolve();
     expect(services.runBatchAI).toHaveBeenCalledWith(
-      expect.objectContaining({ userPromptCols: ["col_a"], outputCol: "ai_inference" }),
+      expect.objectContaining({
+        promptCols: [{ col: "col_a", kind: "text" }],
+        outputCol: "ai_inference",
+      }),
       expect.stringMatching(/^batch-ai-\d+$/),
     );
   });
@@ -154,7 +158,7 @@ describe("ConfigureAIRunPanel — Run AI", () => {
   it("stays on panel after run is dispatched and refetches headers", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
     const { container } = await mountAndLoad({
-      userPromptCols: ["col_a"],
+      promptCols: [{ col: "col_a", kind: "text" }],
       outputCol: "ai_inference",
     });
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
@@ -166,7 +170,7 @@ describe("ConfigureAIRunPanel — Run AI", () => {
   it("alerts on failure via jobStore catch handler", async () => {
     (services.runBatchAI as jest.Mock).mockRejectedValue(new Error("API error"));
     const { container } = await mountAndLoad({
-      userPromptCols: ["col_a"],
+      promptCols: [{ col: "col_a", kind: "text" }],
       outputCol: "ai_inference",
     });
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
@@ -187,7 +191,10 @@ describe("ConfigureAIRunPanel — back", () => {
 describe("ConfigureAIRunPanel — refresh", () => {
   it("refresh-btn refetches headers preserving current selections", async () => {
     (services.getSheetHeaders as jest.Mock).mockResolvedValue(["col_a", "col_b"]);
-    const { container } = await mountAndLoad({ userPromptCols: ["col_a"], outputCol: "col_b" });
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "col_b",
+    });
     expect(services.getSheetHeaders).toHaveBeenCalledTimes(1);
     container.querySelector<HTMLButtonElement>("#refresh-btn")!.click();
     await Promise.resolve();
@@ -222,7 +229,7 @@ describe("ConfigureAIRunPanel — tools TagList", () => {
   it("includes selected tool IDs in runBatchAI call", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
     const { container } = await mountAndLoad({
-      userPromptCols: ["col_a"],
+      promptCols: [{ col: "col_a", kind: "text" }],
       outputCol: "ai_inference",
     });
     container.querySelector<HTMLButtonElement>('[data-value="google_search"]')!.click();
@@ -244,7 +251,7 @@ describe("includeGrounding checkbox", () => {
   it("assembleRunConfig includes includeGrounding: true when checkbox is checked", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
     const { container } = await mountAndLoad({
-      userPromptCols: ["col_a"],
+      promptCols: [{ col: "col_a", kind: "text" }],
       outputCol: "ai_inference",
     });
     const cb = container.querySelector<HTMLInputElement>("#include-grounding-cb")!;
@@ -258,7 +265,7 @@ describe("includeGrounding checkbox", () => {
   it("assembleRunConfig omits includeGrounding when checkbox is unchecked", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
     const { container } = await mountAndLoad({
-      userPromptCols: ["col_a"],
+      promptCols: [{ col: "col_a", kind: "text" }],
       outputCol: "ai_inference",
     });
     container.querySelector<HTMLInputElement>("#include-grounding-cb")!.checked = false;
@@ -288,11 +295,10 @@ describe("includeGrounding checkbox", () => {
 
   it("restores includeGrounding from savedState", async () => {
     const { container } = await mountAndLoad(undefined, {
-      userPromptCols: ["col_a"],
-      driveFileCols: [],
+      promptCols: [{ col: "col_a", kind: "text" as const }],
       systemPromptCol: "",
       outputCol: "ai_inference",
-      tools: ["google_search"], // ← add this line
+      tools: ["google_search"] as import("../../src/shared/types").ToolId[],
       includeGrounding: true,
     });
     const cb = container.querySelector<HTMLInputElement>("#include-grounding-cb")!;
@@ -314,11 +320,10 @@ describe("includeGrounding checkbox", () => {
 
   it("shows the grounding group on mount when tools are pre-selected in savedState", async () => {
     const { container } = await mountAndLoad(undefined, {
-      userPromptCols: ["col_a"],
-      driveFileCols: [],
+      promptCols: [{ col: "col_a", kind: "text" as const }],
       systemPromptCol: "",
       outputCol: "ai_inference",
-      tools: ["google_search"],
+      tools: ["google_search"] as import("../../src/shared/types").ToolId[],
       includeGrounding: false,
     });
     const group = container.querySelector<HTMLElement>("#include-grounding-group");
@@ -344,7 +349,8 @@ describe("ConfigureAIRunPanel — unmount", () => {
       .click();
     const state = panel.unmount();
     expect(state).not.toBeUndefined();
-    expect((state as { userPromptCols: string[] }).userPromptCols).toContain("col_a");
+    const typedState = state as { promptCols: Array<{ col: string; kind: string }> };
+    expect(typedState.promptCols.map((p) => p.col)).toContain("col_a");
     expect((state as { tools: string[] }).tools).toEqual([]); // no tools selected
   });
 
