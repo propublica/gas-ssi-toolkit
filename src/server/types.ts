@@ -39,10 +39,15 @@ export interface GeminiInlineData {
   data: string; // base64-encoded bytes
 }
 
+export interface GeminiFileApiData {
+  mime_type: string;
+  file_uri: string;
+}
+
 export type GeminiUserPart =
   | { kind: "text"; text: string }
   | { kind: "inline_data"; data: GeminiInlineData }
-  | { kind: "file_uri"; mimeType: string; fileUri: string };
+  | { kind: "file_uri"; data: GeminiFileApiData };
 
 export interface GeminiFunctionDeclaration {
   name: string;
@@ -114,7 +119,7 @@ export interface GeminiRequest {
   apiKey: string;
   modelName?: string; // defaults to CONFIG.MODEL_NAME if omitted
   systemPrompt?: string;
-  parts: GeminiUserPart[];
+  userParts: GeminiUserPart[];
   /** Tool IDs to enable. Resolved against TOOL_REGISTRY in buildGeminiPayload. */
   tools?: ToolId[];
   generationConfig?: GeminiGenerationConfig;

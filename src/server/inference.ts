@@ -45,7 +45,7 @@ export function runInference(
 
     return invokeGemini({
       systemPrompt: systemPrompt !== undefined ? flattenArg(systemPrompt)[0] : undefined,
-      parts: [...textParts, ...fileParts],
+      userParts: [...textParts, ...fileParts],
       tools: tools?.length ? tools : undefined,
     });
   } catch (e) {
