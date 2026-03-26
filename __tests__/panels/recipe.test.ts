@@ -196,11 +196,14 @@ describe("Cook flow", () => {
     await flush();
     container.querySelector<HTMLButtonElement>("#cook-btn")!.click();
     expect(nav.navigate).toHaveBeenCalledWith("configure-ai-run", {
-      driveFileCols: ["Drive Link"],
+      promptCols: [
+        { col: "User", kind: "text" },
+        { col: "Drive Link", kind: "file" },
+      ],
       systemPromptCol: "Sys",
-      userPromptCols: ["User"],
       outputCol: "Out",
       rowRange: { start: 2, end: 5 },
+      tools: undefined,
     });
   });
 });
@@ -242,7 +245,7 @@ describe("unmount / saved state", () => {
   it("mounts with savedState prepComplete: true — Cook is enabled", () => {
     const savedState = {
       prepComplete: true,
-      preppedRunConfig: { outputCol: "Out", userPromptCols: ["User"] },
+      preppedRunConfig: { outputCol: "Out", promptCols: [{ col: "User", kind: "text" as const }] },
     };
     const { container } = mount(
       { outputCol: { colTitle: { value: "Out", locked: true } } },

@@ -1,6 +1,11 @@
 import type { NavigationContext, Panel, RecipeDefinition } from "../types";
 import type { RecipeParams } from "../types";
-import type { PrepRecipeParams, PrepRecipeResult, RunConfig } from "../../shared/types";
+import type {
+  PrepRecipeParams,
+  PrepRecipeResult,
+  RunConfig,
+  PromptColumnSpec,
+} from "../../shared/types";
 import { LockableField } from "../components/lockable-field";
 import { RecipePrepCook } from "../components/recipe-prep-cook";
 import { prepRecipe } from "../services";
@@ -194,12 +199,18 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
   }
 
   private buildRunConfig(result: PrepRecipeResult): Partial<RunConfig> {
+    const promptCols: PromptColumnSpec[] = [
+      ...(result.colNames.userPrompts ?? []).map((col) => ({ col, kind: "text" as const })),
+      ...(result.colNames.driveLink
+        ? [{ col: result.colNames.driveLink, kind: "file" as const }]
+        : []),
+    ];
     return {
-      driveFileCols: result.colNames.driveLink ? [result.colNames.driveLink] : undefined,
+      promptCols,
       systemPromptCol: result.colNames.systemPrompt,
-      userPromptCols: result.colNames.userPrompts ?? [],
       outputCol: result.colNames.outputCol ?? "",
       rowRange: result.rowRange,
+      tools: result.tools,
     };
   }
 
