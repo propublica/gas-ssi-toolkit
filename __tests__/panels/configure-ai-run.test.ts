@@ -178,6 +178,28 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     await Promise.resolve(); // flush rejection
     expect(globalThis.alert).toHaveBeenCalledWith("Error: API error");
   });
+
+  it("assembleRunConfig includes drive file cols as file entries in promptCols", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad({
+      promptCols: [
+        { col: "col_a", kind: "text" },
+        { col: "col_b", kind: "file" },
+      ],
+      outputCol: "ai_inference",
+    });
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    await Promise.resolve();
+    expect(services.runBatchAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        promptCols: expect.arrayContaining([
+          { col: "col_a", kind: "text" },
+          { col: "col_b", kind: "file" },
+        ]),
+      }),
+      expect.stringMatching(/^batch-ai-\d+$/),
+    );
+  });
 });
 
 describe("ConfigureAIRunPanel — back", () => {
@@ -360,5 +382,18 @@ describe("ConfigureAIRunPanel — unmount", () => {
     const panel = new ConfigureAIRunPanel();
     panel.mount(container, mockNav);
     expect(panel.unmount()).toBeUndefined();
+  });
+
+  it("unmount() saves drive file cols as kind: file entries in promptCols", async () => {
+    const { panel } = await mountAndLoad({
+      promptCols: [
+        { col: "col_a", kind: "text" },
+        { col: "col_b", kind: "file" },
+      ],
+    });
+    const state = panel.unmount();
+    expect(state).not.toBeUndefined();
+    const typedState = state as { promptCols: Array<{ col: string; kind: string }> };
+    expect(typedState.promptCols).toContainEqual({ col: "col_b", kind: "file" });
   });
 });
