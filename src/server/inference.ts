@@ -9,7 +9,7 @@
 import { invokeGemini } from "./api";
 import { prepareDriveAttachments } from "./drive";
 import { flattenArg, isValidDriveLink, extractId } from "./utils";
-import type { GeminiResponse } from "./types";
+import type { GeminiResponse, GeminiUserPart } from "./types";
 import type { ToolId } from "../shared/types";
 
 /**
@@ -35,15 +35,17 @@ export function runInference(
   if (userTexts.length === 0) return null;
 
   try {
-    const inlineData =
+    const textParts: GeminiUserPart[] = userTexts.map((text) => ({ kind: "text", text }));
+    const fileParts: GeminiUserPart[] =
       driveLinks !== undefined
-        ? prepareDriveAttachments(flattenArg(driveLinks).filter(isValidDriveLink).map(extractId))
+        ? prepareDriveAttachments(
+            flattenArg(driveLinks).filter(isValidDriveLink).map(extractId),
+          ).map((data) => ({ kind: "inline_data", data }))
         : [];
 
     return invokeGemini({
       systemPrompt: systemPrompt !== undefined ? flattenArg(systemPrompt)[0] : undefined,
-      userTexts,
-      inlineData: inlineData.length ? inlineData : undefined,
+      parts: [...textParts, ...fileParts],
       tools: tools?.length ? tools : undefined,
     });
   } catch (e) {
