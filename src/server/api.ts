@@ -30,7 +30,9 @@ export function buildGeminiPayload(req: GeminiRequest): Record<string, unknown> 
   const userParts: GeminiUserApiPart[] = req.userParts.map((p) => {
     if (p.kind === "text") return { text: p.text };
     if (p.kind === "inline_data") return { inline_data: p.data };
-    return { file_data: p.data };
+    if (p.kind === "file_uri") return { file_data: p.data };
+    const _exhaustive: never = p;
+    throw new Error(`Unhandled GeminiUserPart kind: ${JSON.stringify(_exhaustive)}`);
   });
 
   const payload: Record<string, unknown> = {

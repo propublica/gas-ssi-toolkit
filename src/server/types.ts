@@ -41,9 +41,22 @@ export interface GeminiInlineData {
 
 export interface GeminiFileApiData {
   mime_type: string;
+  /** URI returned by the Gemini Files API after uploading a file. */
   file_uri: string;
 }
 
+/**
+ * A single part of the user turn in a Gemini request.
+ *
+ * - "text"        — plain text; produced by userPromptCols in runBatchAI and SSI.
+ * - "inline_data" — base64-encoded file bytes; produced by prepareDriveAttachments
+ *                   for files within the inline size limit (~100 MB encoded).
+ * - "file_uri"    — reference to a file uploaded via the Gemini Files API (up to 2 GB).
+ *                   No producer exists yet; the type and payload path are reserved for
+ *                   a future phase when large-file support is wired up in drive.ts.
+ *
+ * Order within userParts[] is preserved through to the Gemini REST payload.
+ */
 export type GeminiUserPart =
   | { kind: "text"; text: string }
   | { kind: "inline_data"; data: GeminiInlineData }
@@ -119,6 +132,7 @@ export interface GeminiRequest {
   apiKey: string;
   modelName?: string; // defaults to CONFIG.MODEL_NAME if omitted
   systemPrompt?: string;
+  /** Ordered user-turn parts assembled by the caller. Maps 1:1 to contents[0].parts in the REST payload. */
   userParts: GeminiUserPart[];
   /** Tool IDs to enable. Resolved against TOOL_REGISTRY in buildGeminiPayload. */
   tools?: ToolId[];
