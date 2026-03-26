@@ -62,7 +62,7 @@ describe("buildGeminiPayload", () => {
     expect(parts[1].text).toBe("Context");
   });
 
-  it("appends inline_data as the final part when provided", () => {
+  it("includes an inline_data part in the REST output", () => {
     const req: GeminiRequest = {
       ...baseReq,
       parts: [
@@ -76,7 +76,7 @@ describe("buildGeminiPayload", () => {
     expect(parts[1].inline_data).toEqual({ mime_type: "application/pdf", data: "base64==" });
   });
 
-  it("appends multiple inline_data parts when inlineData has multiple items", () => {
+  it("maps multiple inline_data parts to the REST payload in order", () => {
     const req: GeminiRequest = {
       ...baseReq,
       parts: [
