@@ -397,70 +397,47 @@ export function runTool(functionName: string, jobId?: string): void {
 
 export function prepRecipe(params: PrepRecipeParams): PrepRecipeResult {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  const colNames: PrepRecipeResult["colNames"] = {};
   let numRows = 1;
 
-  if (params.driveFolder) {
-    const folderId = extractId(params.driveFolder.url);
-    const folder = DriveApp.getFolderById(folderId);
-    const files: { url: string }[] = [];
-    getAllFilesRecursive(folder, files);
-    numRows = files.length || 1;
-    const col = findOrCreateColumn(
-      sheet,
-      params.driveFolder.colTitle,
-      SpreadsheetApp.WrapStrategy.CLIP,
-    );
-    writeColumn(
-      sheet,
-      col,
-      files.map((f) => f.url),
-      SpreadsheetApp.WrapStrategy.CLIP,
-    );
-    colNames.driveLink = params.driveFolder.colTitle;
-  }
-
-  if (params.systemPrompt) {
-    const col = findOrCreateColumn(
-      sheet,
-      params.systemPrompt.colTitle,
-      SpreadsheetApp.WrapStrategy.CLIP,
-    );
-    writeColumn(
-      sheet,
-      col,
-      Array(numRows).fill(params.systemPrompt.value) as string[],
-      SpreadsheetApp.WrapStrategy.CLIP,
-    );
-    colNames.systemPrompt = params.systemPrompt.colTitle;
-  }
-
-  if (params.userPrompts) {
-    colNames.userPrompts = [];
-    for (const up of params.userPrompts) {
-      const col = findOrCreateColumn(sheet, up.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
-      writeColumn(
-        sheet,
-        col,
-        Array(numRows).fill(up.value) as string[],
-        SpreadsheetApp.WrapStrategy.CLIP,
-      );
-      colNames.userPrompts.push(up.colTitle);
+  // Pass 1: scan Drive folders, cache results, determine numRows
+  const folderCache = new Map<string, string[]>();
+  for (const col of params.cols) {
+    if (col.strategy.kind === "list-drive-folder") {
+      const url = col.strategy.url;
+      if (!folderCache.has(url)) {
+        const folder = DriveApp.getFolderById(extractId(url));
+        const files: { url: string }[] = [];
+        getAllFilesRecursive(folder, files);
+        folderCache.set(url, files.map((f) => f.url));
+      }
+      numRows = Math.max(numRows, folderCache.get(url)!.length || 1);
     }
   }
 
-  if (params.outputCol) {
-    findOrCreateColumn(sheet, params.outputCol.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
-    colNames.outputCol = params.outputCol.colTitle;
+  // Pass 2: write all columns
+  for (const col of params.cols) {
+    const colIdx = findOrCreateColumn(sheet, col.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
+    switch (col.strategy.kind) {
+      case "list-drive-folder": {
+        const urls = folderCache.get(col.strategy.url) ?? [];
+        writeColumn(sheet, colIdx, urls, SpreadsheetApp.WrapStrategy.CLIP);
+        break;
+      }
+      case "fill-value":
+        writeColumn(
+          sheet,
+          colIdx,
+          Array(numRows).fill(col.strategy.value) as string[],
+          SpreadsheetApp.WrapStrategy.CLIP,
+        );
+        break;
+      case "create-empty":
+        break;
+    }
   }
 
   SpreadsheetApp.flush();
-
-  return {
-    rowRange: { start: 2, end: 2 + numRows - 1 },
-    colNames,
-    tools: params.tools,
-  };
+  return { rowRange: { start: 2, end: 2 + numRows - 1 } };
 }
 
 // ==========================================
