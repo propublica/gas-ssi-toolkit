@@ -17,11 +17,22 @@
  */
 export type ToolId = "google_search" | "url_context" | "code_execution";
 
+// ── Prompt column spec ──────────────────────────────────────────
+
+/**
+ * A reference to a spreadsheet column together with its prompt kind.
+ * Crosses the RPC boundary in RunConfig.promptCols (Phase 2) and is
+ * echoed through PrepRecipeResult so the client never needs to infer kinds.
+ */
+export interface PromptColumnSpec {
+  col: string;
+  kind: "text" | "file";
+}
+
 // ── Configuration ───────────────────────────────────────────────
 
 export interface RunConfig {
-  userPromptCols: string[];
-  driveFileCols?: string[];
+  promptCols: PromptColumnSpec[];
   systemPromptCol?: string;
   outputCol: string;
   rowRange?: { start: number; end: number };
@@ -74,4 +85,15 @@ export interface ImportDriveLinksConfig {
   outputCol: string;
   /** MIME type prefix strings. Absent = import all files. */
   mimeTypes?: string[];
+}
+
+// ── Extract Text ────────────────────────────────────────────────
+
+export interface ExtractTextConfig {
+  /** Header of the column containing Drive links or file IDs to extract text from. */
+  sourceCol: string;
+  /** Header of the column where extracted text will be written. */
+  outputCol: string;
+  /** Inclusive row range (1-based data rows) over which extraction runs. Absent = use active sheet selection. */
+  rowRange?: { start: number; end: number };
 }

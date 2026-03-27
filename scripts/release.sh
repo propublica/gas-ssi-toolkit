@@ -19,6 +19,37 @@ if [ "$CURRENT_BRANCH" != "main" ]; then
   exit 1
 fi
 
+echo "→ Verifying main is up to date with origin..."
+git fetch origin main
+LOCAL=$(git rev-parse HEAD)
+REMOTE=$(git rev-parse origin/main)
+if [ "$LOCAL" != "$REMOTE" ]; then
+  echo "Error: local main is not in sync with origin/main."
+  echo "Run 'git pull origin main' and try again."
+  exit 1
+fi
+
+# `gh run list` returns all CI workflow runs for the current commit on main.
+# We require every run to have concluded with "success" — a failure, cancellation,
+# or still-in-progress run blocks the release.
+COMMIT_SHA=$(git rev-parse HEAD)
+CI_CONCLUSIONS=$(gh run list --branch main --commit "$COMMIT_SHA" --json conclusion --jq '.[].conclusion')
+if echo "$CI_CONCLUSIONS" | grep -qv "^success$"; then
+  echo "Error: one or more CI workflows have not passed for commit $COMMIT_SHA."
+  echo "Conclusions: $(echo "$CI_CONCLUSIONS" | tr '\n' ' ')"
+  echo "Wait for all checks to pass before releasing."
+  exit 1
+fi
+
+# `git diff --quiet` exits non-zero if there are unstaged changes to tracked files.
+# `git diff --cached --quiet` exits non-zero if there are staged (but uncommitted) changes.
+# Together they catch any dirty working tree state.
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "Error: working tree has uncommitted changes."
+  echo "Commit or stash them before releasing."
+  exit 1
+fi
+
 echo "→ Deploying to HEAD..."
 npm run deploy
 
@@ -34,6 +65,16 @@ if [ -z "$VERSION" ]; then
 fi
 
 echo "→ Repointing Marketplace deployment..."
-npx clasp update-deployment "$DEPLOYMENT_ID" --versionNumber "$VERSION" --description "$TIMESTAMP"
+npx clasp update-deployment "$DEPLOYMENT_ID" --versionNumber "$VERSION" --description "$TIMESTAMP ($COMMIT_SHA)"
 
-echo "✓ Released version $VERSION to deployment $DEPLOYMENT_ID"
+# Create an annotated git tag so there's a permanent record in git history of
+# exactly what commit was released and when. Push it to origin so it's visible
+# to all collaborators and can be referenced in GitHub's releases UI.
+TAG="v$VERSION"
+git tag -a "$TAG" -m "Release $TAG — deployed $TIMESTAMP"
+git push origin "$TAG"
+
+echo "→ Creating GitHub release..."
+gh release create "$TAG" --generate-notes --title "$TAG"
+
+echo "✓ Released version $VERSION to deployment $DEPLOYMENT_ID (tagged $TAG)"

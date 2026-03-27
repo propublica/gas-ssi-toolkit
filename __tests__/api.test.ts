@@ -34,7 +34,7 @@ function mockFetchResponse(body: unknown) {
 const baseReq: GeminiRequest = {
   apiKey: "key123",
   systemPrompt: "Be helpful",
-  userTexts: ["Summarize this"],
+  userParts: [{ text: "Summarize this" }],
 };
 
 // ── buildGeminiPayload tests ───────────────────────────────────
@@ -48,7 +48,10 @@ describe("buildGeminiPayload", () => {
   });
 
   it("assembles multiple text parts in order", () => {
-    const req: GeminiRequest = { ...baseReq, userTexts: ["Prompt", "Context"] };
+    const req: GeminiRequest = {
+      ...baseReq,
+      userParts: [{ text: "Prompt" }, { text: "Context" }],
+    };
     const payload = buildGeminiPayload(req);
     const parts = (payload.contents as any)[0].parts;
     expect(parts).toHaveLength(2);
@@ -56,11 +59,13 @@ describe("buildGeminiPayload", () => {
     expect(parts[1].text).toBe("Context");
   });
 
-  it("appends inline_data as the final part when provided", () => {
+  it("includes an inline_data part in the REST output", () => {
     const req: GeminiRequest = {
       ...baseReq,
-      userTexts: ["What is this?"],
-      inlineData: [{ mime_type: "application/pdf", data: "base64==" }],
+      userParts: [
+        { text: "What is this?" },
+        { inline_data: { mime_type: "application/pdf", data: "base64==" } },
+      ],
     };
     const payload = buildGeminiPayload(req);
     const parts = (payload.contents as any)[0].parts;
@@ -68,13 +73,13 @@ describe("buildGeminiPayload", () => {
     expect(parts[1].inline_data).toEqual({ mime_type: "application/pdf", data: "base64==" });
   });
 
-  it("appends multiple inline_data parts when inlineData has multiple items", () => {
+  it("maps multiple inline_data parts to the REST payload in order", () => {
     const req: GeminiRequest = {
       ...baseReq,
-      userTexts: ["Describe both files"],
-      inlineData: [
-        { mime_type: "application/pdf", data: "file1==" },
-        { mime_type: "image/jpeg", data: "file2==" },
+      userParts: [
+        { text: "Describe both files" },
+        { inline_data: { mime_type: "application/pdf", data: "file1==" } },
+        { inline_data: { mime_type: "image/jpeg", data: "file2==" } },
       ],
     };
     const payload = buildGeminiPayload(req);
@@ -85,7 +90,7 @@ describe("buildGeminiPayload", () => {
   });
 
   it("uses default system prompt when systemPrompt is omitted", () => {
-    const req: GeminiRequest = { apiKey: "k", userTexts: ["hi"] };
+    const req: GeminiRequest = { apiKey: "k", userParts: [{ text: "hi" }] };
     const payload = buildGeminiPayload(req);
     expect((payload.system_instruction as any).parts[0].text).toBe("You are a helpful assistant.");
   });
@@ -106,6 +111,69 @@ describe("buildGeminiPayload", () => {
       const tools = payload.tools as unknown[];
       expect(tools).toHaveLength(1);
       expect(tools[0]).toEqual({ google_search: {} });
+    });
+  });
+
+  describe("parts-based assembly", () => {
+    it("maps a text part to a REST text part", () => {
+      const payload = buildGeminiPayload({
+        apiKey: "k",
+        userParts: [{ text: "Hello" }],
+      });
+      const parts = (payload.contents as any)[0].parts;
+      expect(parts).toHaveLength(1);
+      expect(parts[0]).toEqual({ text: "Hello" });
+    });
+
+    it("maps an inline_data part to a REST inline_data part", () => {
+      const payload = buildGeminiPayload({
+        apiKey: "k",
+        userParts: [
+          { text: "Describe this" },
+          { inline_data: { mime_type: "application/pdf", data: "base64==" } },
+        ],
+      });
+      const parts = (payload.contents as any)[0].parts;
+      expect(parts).toHaveLength(2);
+      expect(parts[1]).toEqual({ inline_data: { mime_type: "application/pdf", data: "base64==" } });
+    });
+
+    it("maps a file_uri part to a REST file_data part", () => {
+      const payload = buildGeminiPayload({
+        apiKey: "k",
+        userParts: [
+          { text: "Describe this" },
+          {
+            file_data: {
+              mime_type: "application/pdf",
+              file_uri: "https://generativelanguage.googleapis.com/v1beta/files/abc123",
+            },
+          },
+        ],
+      });
+      const parts = (payload.contents as any)[0].parts;
+      expect(parts).toHaveLength(2);
+      expect(parts[1]).toEqual({
+        file_data: {
+          mime_type: "application/pdf",
+          file_uri: "https://generativelanguage.googleapis.com/v1beta/files/abc123",
+        },
+      });
+    });
+
+    it("preserves declared part order in the REST payload", () => {
+      const payload = buildGeminiPayload({
+        apiKey: "k",
+        userParts: [
+          { text: "First" },
+          { inline_data: { mime_type: "image/jpeg", data: "img==" } },
+          { text: "Last" },
+        ],
+      });
+      const parts = (payload.contents as any)[0].parts;
+      expect(parts[0]).toEqual({ text: "First" });
+      expect(parts[1]).toEqual({ inline_data: { mime_type: "image/jpeg", data: "img==" } });
+      expect(parts[2]).toEqual({ text: "Last" });
     });
   });
 
@@ -264,7 +332,7 @@ describe("invokeGemini", () => {
 
   it("returns a GeminiResponse with text from the first candidate", () => {
     mockFetchResponse({ candidates: [{ content: { parts: [{ text: "result" }] } }] });
-    const result = invokeGemini({ userTexts: ["hello"] });
+    const result = invokeGemini({ userParts: [{ text: "hello" }] });
     expect(result.text).toBe("result");
     const url = (UrlFetchApp.fetch as jest.Mock).mock.calls[0][0] as string;
     expect(url).toContain("test-api-key");
@@ -272,12 +340,12 @@ describe("invokeGemini", () => {
 
   it("throws when the API key property is not set", () => {
     (PropertiesService.getScriptProperties().getProperty as jest.Mock).mockReturnValueOnce(null);
-    expect(() => invokeGemini({ userTexts: ["hello"] })).toThrow(/GEMINI_API_KEY/);
+    expect(() => invokeGemini({ userParts: [{ text: "hello" }] })).toThrow(/GEMINI_API_KEY/);
   });
 
   it("passes systemPrompt through to the payload", () => {
     mockFetchResponse({ candidates: [{ content: { parts: [{ text: "ok" }] } }] });
-    invokeGemini({ systemPrompt: "Be concise", userTexts: ["hello"] });
+    invokeGemini({ systemPrompt: "Be concise", userParts: [{ text: "hello" }] });
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.system_instruction.parts[0].text).toBe("Be concise");
   });
@@ -285,8 +353,10 @@ describe("invokeGemini", () => {
   it("passes inlineData through to the payload", () => {
     mockFetchResponse({ candidates: [{ content: { parts: [{ text: "ok" }] } }] });
     invokeGemini({
-      userTexts: ["describe this"],
-      inlineData: [{ mime_type: "application/pdf", data: "base64==" }],
+      userParts: [
+        { text: "describe this" },
+        { inline_data: { mime_type: "application/pdf", data: "base64==" } },
+      ],
     });
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.contents[0].parts[1].inline_data.mime_type).toBe("application/pdf");

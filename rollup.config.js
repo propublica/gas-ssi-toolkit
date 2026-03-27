@@ -82,7 +82,7 @@ function runTool(fn, jobId) { _GASEntry.runTool(fn, jobId); }
 function getSheetHeaders() { return _GASEntry.getSheetHeaders(); }
 function runBatchAI(config, jobId) { _GASEntry.runBatchAI(config, jobId); }
 function importDriveLinks(config, jobId) { _GASEntry.importDriveLinks(config, jobId); }
-function extractTextFromSelection(jobId) { _GASEntry.extractTextFromSelection(jobId); }
+function extractText(config, jobId) { _GASEntry.extractText(config, jobId); }
 function sampleRowsToEvaluation(jobId) { _GASEntry.sampleRowsToEvaluation(jobId); }
 /**
  * Call the Gemini API from a spreadsheet cell.

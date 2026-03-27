@@ -9,26 +9,18 @@
 
 import { CONFIG } from "./config";
 import { TOOL_REGISTRY } from "./tools";
-import type { GeminiInlineData, GeminiRequest, GeminiResponse, GeminiCodePair } from "./types";
-
-interface GeminiPart {
-  text?: string;
-  inline_data?: GeminiInlineData;
-}
+import type { GeminiRequest, GeminiResponse, GeminiCodePair } from "./types";
 
 /**
  * Assemble the Gemini generateContent request payload from a GeminiRequest.
  * Pure function — no GAS globals. Independently testable.
  */
 export function buildGeminiPayload(req: GeminiRequest): Record<string, unknown> {
-  const parts: GeminiPart[] = req.userTexts.map((text) => ({ text }));
-  req.inlineData?.forEach((d) => parts.push({ inline_data: d }));
-
   const payload: Record<string, unknown> = {
     system_instruction: {
       parts: [{ text: req.systemPrompt || "You are a helpful assistant." }],
     },
-    contents: [{ role: "user", parts }],
+    contents: [{ role: "user", parts: req.userParts }],
   };
 
   payload.generationConfig = {

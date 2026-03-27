@@ -25,3 +25,6 @@ Thumbs.db
 
 # Git worktrees
 .worktrees/
+
+# Clasp project file (contains project ID and rootDir)
+.clasp.json

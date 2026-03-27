@@ -8,7 +8,7 @@
  * tools array, but with different structures.
  */
 
-import type { ToolId } from "../shared/types";
+import type { PromptColumnSpec, ToolId } from "../shared/types";
 
 export interface AppConfig {
   API_KEY_PROPERTY: string;
@@ -38,6 +38,30 @@ export interface GeminiInlineData {
   mime_type: string;
   data: string; // base64-encoded bytes
 }
+
+export interface GeminiFileApiData {
+  mime_type: string;
+  /** URI returned by the Gemini Files API after uploading a file. */
+  file_uri: string;
+}
+
+/**
+ * A single part of the user turn in a Gemini request.
+ * Shapes match the Gemini REST API directly — no translation needed in buildGeminiPayload.
+ *
+ * - { text }        — plain text content in the user turn.
+ * - { inline_data } — base64-encoded file bytes embedded in the request body; used when
+ *                     file size is within the inline limit (~100 MB encoded).
+ * - { file_data }   — reference to a file uploaded via the Gemini Files API (up to 2 GB);
+ *                     no producer exists yet. Type reserved for a future phase when
+ *                     large-file support is wired up in drive.ts.
+ *
+ * Order within userParts[] is preserved through to the Gemini REST payload.
+ */
+export type GeminiUserPart =
+  | { text: string }
+  | { inline_data: GeminiInlineData }
+  | { file_data: GeminiFileApiData };
 
 export interface GeminiFunctionDeclaration {
   name: string;
@@ -101,6 +125,17 @@ export type GeminiTool =
   | { kind: "grounding"; id: ToolId }
   | { kind: "function"; declaration: GeminiFunctionDeclaration };
 
+/**
+ * A single ordered prompt input from a spreadsheet row.
+ * Carries the raw cell value alongside the kind declared in PromptColumnSpec.
+ * Consumed by runInference, which resolves text values via flattenArg and
+ * file values via prepareDriveAttachments into an ordered GeminiUserPart[].
+ */
+export type PromptInput = {
+  kind: PromptColumnSpec["kind"];
+  value: unknown;
+};
+
 export interface DriveFileInfo {
   url: string;
 }
@@ -109,8 +144,8 @@ export interface GeminiRequest {
   apiKey: string;
   modelName?: string; // defaults to CONFIG.MODEL_NAME if omitted
   systemPrompt?: string;
-  userTexts: string[]; // assembled into parts: [{text}, {text}, ...]
-  inlineData?: GeminiInlineData[]; // each item appended as an inline_data part
+  /** Ordered user-turn parts assembled by the caller. Maps 1:1 to contents[0].parts in the REST payload. */
+  userParts: GeminiUserPart[];
   /** Tool IDs to enable. Resolved against TOOL_REGISTRY in buildGeminiPayload. */
   tools?: ToolId[];
   generationConfig?: GeminiGenerationConfig;

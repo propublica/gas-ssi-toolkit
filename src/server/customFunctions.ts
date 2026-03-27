@@ -15,6 +15,7 @@ import { invokeGemini } from "./api";
 import { flattenArg } from "./utils";
 import { TOOL_REGISTRY } from "./tools";
 import type { ToolId } from "../shared/types";
+import type { GeminiUserPart } from "./types";
 
 /**
  * Call the Gemini API from a spreadsheet cell.
@@ -38,7 +39,7 @@ export function SSI(userTexts: unknown, systemPrompt?: string, toolNames?: unkno
 
     return invokeGemini({
       systemPrompt: systemPrompt || undefined,
-      userTexts: flattenArg(userTexts),
+      userParts: flattenArg(userTexts).map((text): GeminiUserPart => ({ text })),
       tools: resolvedToolIds.length ? resolvedToolIds : undefined,
     }).text;
   } catch (e) {
