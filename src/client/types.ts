@@ -1,3 +1,5 @@
+import type { ToolId } from "../shared/types";
+
 // ── Loading / Progress types ─────────────────────────────────────────────────
 
 export type LoadingStatus = "idle" | "loading" | "progress" | "complete" | "error";
@@ -26,22 +28,46 @@ export interface RecipeFieldConfig {
   placeholder?: string;
 }
 
+export type ColStrategyKind = "list-drive-folder" | "fill-value" | "create-empty";
+export type ColRole = "userPrompt" | "systemPrompt" | "driveLink" | "output";
+
+export interface AppendField {
+  id: string;
+  label: string;
+  placeholder?: string;
+  /** Text injected before the reporter's value, e.g. "\n\nYou are looking for:\n\n" */
+  prefix?: string;
+}
+
+export interface RecipeSettings {
+  tools?: ToolId[];
+  applyMarkdown?: boolean;
+  includeGrounding?: boolean;
+}
+
+export interface ColumnDef {
+  /** UI section heading shown in the recipe panel */
+  label: string;
+  /** How this column maps into RunConfig after prep */
+  role: ColRole;
+  /** What PrepColSpec.strategy type to generate during prep */
+  strategyKind: ColStrategyKind;
+  /** Lockable column header field */
+  colTitle: RecipeFieldConfig;
+  /** Lockable prompt text — present for fill-value columns */
+  prompt?: RecipeFieldConfig;
+  /** Lockable URL input — present for drive columns */
+  url?: RecipeFieldConfig;
+  /** Extra reporter inputs composed into the prompt before prep */
+  appendFields?: AppendField[];
+  helperText?: string;
+  /** Show * in section heading */
+  required?: boolean;
+}
+
 export interface RecipeParams {
-  driveFolder?: {
-    colTitle: string;
-    helperText?: string;
-  };
-  systemPrompt?: {
-    colTitle: RecipeFieldConfig;
-    prompt: RecipeFieldConfig;
-  };
-  userPrompts?: Array<{
-    colTitle: RecipeFieldConfig;
-    prompt: RecipeFieldConfig;
-  }>;
-  outputCol?: {
-    colTitle: RecipeFieldConfig;
-  };
+  columns: ColumnDef[];
+  settings?: RecipeSettings;
 }
 
 /**

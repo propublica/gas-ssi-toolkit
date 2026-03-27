@@ -21,8 +21,7 @@ export type ToolId = "google_search" | "url_context" | "code_execution";
 
 /**
  * A reference to a spreadsheet column together with its prompt kind.
- * Crosses the RPC boundary in RunConfig.promptCols (Phase 2) and is
- * echoed through PrepRecipeResult so the client never needs to infer kinds.
+ * Crosses the RPC boundary in RunConfig.promptCols.
  */
 export interface PromptColumnSpec {
   col: string;
@@ -45,37 +44,30 @@ export interface RunConfig {
    * column. When false (default), result.text is written directly via setValue.
    * The grounding column is unaffected by this setting.
    *
-   * Future: recipes could pre-set this via PrepRecipeParams/PrepRecipeResult —
-   * follow the tools echo pattern if needed.
+   * Recipes pre-set this via RecipeSettings (client-only) — it flows into RunConfig
+   * through buildRunConfig() without any server echo.
    */
   applyMarkdown?: boolean;
 }
 
 // ── Recipes ─────────────────────────────────────────────────────
 
+export type ColStrategy =
+  | { kind: "list-drive-folder"; url: string }
+  | { kind: "fill-value"; value: string }
+  | { kind: "create-empty" };
+
+export interface PrepColSpec {
+  colTitle: string;
+  strategy: ColStrategy;
+}
+
 export interface PrepRecipeParams {
-  driveFolder?: { url: string; colTitle: string };
-  systemPrompt?: { colTitle: string; value: string };
-  userPrompts?: Array<{ colTitle: string; value: string }>;
-  outputCol?: { colTitle: string };
-  /**
-   * Tool IDs to pass through to PrepRecipeResult.
-   * The server does not process these during prep — they are echoed back
-   * to preserve the single-source-of-truth invariant for preppedRunConfig.
-   */
-  tools?: ToolId[];
+  cols: PrepColSpec[];
 }
 
 export interface PrepRecipeResult {
   rowRange: { start: number; end: number };
-  colNames: {
-    driveLink?: string;
-    systemPrompt?: string;
-    userPrompts?: string[];
-    outputCol?: string;
-  };
-  /** Echoed from PrepRecipeParams — no server-side processing. */
-  tools?: ToolId[];
 }
 
 // ── Import Drive Links ───────────────────────────────────────────
