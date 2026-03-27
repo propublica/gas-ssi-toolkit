@@ -21,8 +21,7 @@ export type ToolId = "google_search" | "url_context" | "code_execution";
 
 /**
  * A reference to a spreadsheet column together with its prompt kind.
- * Crosses the RPC boundary in RunConfig.promptCols (Phase 2) and is
- * echoed through PrepRecipeResult so the client never needs to infer kinds.
+ * Crosses the RPC boundary in RunConfig.promptCols.
  */
 export interface PromptColumnSpec {
   col: string;
@@ -45,8 +44,8 @@ export interface RunConfig {
    * column. When false (default), result.text is written directly via setValue.
    * The grounding column is unaffected by this setting.
    *
-   * Future: recipes could pre-set this via PrepRecipeParams/PrepRecipeResult —
-   * follow the tools echo pattern if needed.
+   * Recipes pre-set this via RecipeSettings (client-only) — it flows into RunConfig
+   * through buildRunConfig() without any server echo.
    */
   applyMarkdown?: boolean;
 }
