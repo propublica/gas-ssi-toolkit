@@ -9,21 +9,32 @@ export const RECIPES: RecipeDefinition[] = [
     description: "Summarize each file in a Google Drive folder",
     panelId: "recipe",
     params: {
-      driveFolder: {
-        colTitle: "Drive Link",
-        helperText: "Make sure you have access to this folder",
-      },
-      systemPrompt: {
-        colTitle: { value: "System Prompt", locked: true },
-        prompt: {
-          value:
-            "You are an expert document analyst. Produce clear, structured summaries " +
-            "focusing on key themes, main arguments, important data points, and actionable conclusions.",
-          locked: true,
-        },
-      },
-      userPrompts: [
+      columns: [
         {
+          label: "Drive Folder",
+          role: "driveLink",
+          strategyKind: "list-drive-folder",
+          colTitle: { value: "Drive Link", locked: true },
+          url: { value: "", locked: false, placeholder: "Paste Google Drive folder URL" },
+          helperText: "Make sure you have access to this folder",
+          required: true,
+        },
+        {
+          label: "System Prompt",
+          role: "systemPrompt",
+          strategyKind: "fill-value",
+          colTitle: { value: "System Prompt", locked: true },
+          prompt: {
+            value:
+              "You are an expert document analyst. Produce clear, structured summaries " +
+              "focusing on key themes, main arguments, important data points, and actionable conclusions.",
+            locked: true,
+          },
+        },
+        {
+          label: "User Prompt",
+          role: "userPrompt",
+          strategyKind: "fill-value",
           colTitle: { value: "User Prompt", locked: true },
           prompt: {
             value:
@@ -32,10 +43,13 @@ export const RECIPES: RecipeDefinition[] = [
             locked: true,
           },
         },
+        {
+          label: "Output Column",
+          role: "output",
+          strategyKind: "create-empty",
+          colTitle: { value: "AI_Summarization", locked: true },
+        },
       ],
-      outputCol: {
-        colTitle: { value: "AI_Summarization", locked: true },
-      },
     } satisfies RecipeParams,
   },
 ];
