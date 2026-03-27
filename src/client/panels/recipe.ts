@@ -1,5 +1,12 @@
 import type { NavigationContext, Panel, RecipeDefinition, ColumnDef } from "../types";
-import type { ColStrategy, PrepColSpec, PrepRecipeParams, PrepRecipeResult, RunConfig, PromptColumnSpec } from "../../shared/types";
+import type {
+  ColStrategy,
+  PrepColSpec,
+  PrepRecipeParams,
+  PrepRecipeResult,
+  RunConfig,
+  PromptColumnSpec,
+} from "../../shared/types";
 import { LockableField } from "../components/lockable-field";
 import { RecipePrepCook } from "../components/recipe-prep-cook";
 import { prepRecipe } from "../services";
@@ -55,9 +62,7 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
       prompt: f.prompt?.getValue(),
       url: f.urlInput?.value,
       appendValues: f.appendInputs
-        ? Object.fromEntries(
-            Object.entries(f.appendInputs).map(([id, el]) => [id, el.value]),
-          )
+        ? Object.fromEntries(Object.entries(f.appendInputs).map(([id, el]) => [id, el.value]))
         : undefined,
     }));
     return {
@@ -67,38 +72,28 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
     };
   }
 
-  private mountFields(
-    container: HTMLElement,
-    columns: ColumnDef[],
-    savedState?: SavedState,
-  ): void {
+  private mountFields(container: HTMLElement, columns: ColumnDef[], savedState?: SavedState): void {
     const reset = (): void => this.prepCook?.reset();
 
     columns.forEach((col, i) => {
       const saved = savedState?.colValues?.[i];
       const refs: ColFieldRefs = {};
 
-      refs.colTitle = new LockableField(
-        container.querySelector(`#col-${i}-title-container`)!,
-        {
-          label: "Column",
-          defaultValue: saved?.colTitle ?? col.colTitle.value,
-          locked: col.colTitle.locked,
-          onUnlock: reset,
-        },
-      );
+      refs.colTitle = new LockableField(container.querySelector(`#col-${i}-title-container`)!, {
+        label: "Column",
+        defaultValue: saved?.colTitle ?? col.colTitle.value,
+        locked: col.colTitle.locked,
+        onUnlock: reset,
+      });
 
       if (col.prompt !== undefined) {
-        refs.prompt = new LockableField(
-          container.querySelector(`#col-${i}-prompt-container`)!,
-          {
-            label: "Prompt",
-            defaultValue: saved?.prompt ?? col.prompt.value,
-            locked: col.prompt.locked,
-            multiline: true,
-            onUnlock: reset,
-          },
-        );
+        refs.prompt = new LockableField(container.querySelector(`#col-${i}-prompt-container`)!, {
+          label: "Prompt",
+          defaultValue: saved?.prompt ?? col.prompt.value,
+          locked: col.prompt.locked,
+          multiline: true,
+          onUnlock: reset,
+        });
       }
 
       if (col.url !== undefined) {
