@@ -1,3 +1,5 @@
+import type { ToolId } from "../shared/types";
+
 // ── Loading / Progress types ─────────────────────────────────────────────────
 
 export type LoadingStatus = "idle" | "loading" | "progress" | "complete" | "error";
@@ -16,8 +18,6 @@ export interface Job {
   startedAt: number;
   completedAt?: number;
 }
-
-import type { ToolId } from "../shared/types";
 
 // ── Recipe UI types ─────────────────────────────────────────────
 // These are client-only — they define sidebar form structure, not RPC payloads.
