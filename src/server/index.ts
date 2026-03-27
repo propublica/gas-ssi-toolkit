@@ -408,7 +408,10 @@ export function prepRecipe(params: PrepRecipeParams): PrepRecipeResult {
         const folder = DriveApp.getFolderById(extractId(url));
         const files: { url: string }[] = [];
         getAllFilesRecursive(folder, files);
-        folderCache.set(url, files.map((f) => f.url));
+        folderCache.set(
+          url,
+          files.map((f) => f.url),
+        );
       }
       numRows = Math.max(numRows, folderCache.get(url)!.length || 1);
     }
