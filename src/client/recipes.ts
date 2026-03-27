@@ -1,5 +1,4 @@
-import type { RecipeDefinition } from "./types";
-import type { RecipeParams } from "./types";
+import type { RecipeDefinition, RecipeParams } from "./types";
 
 export const RECIPES: RecipeDefinition[] = [
   {

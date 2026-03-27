@@ -33,7 +33,7 @@ function mount(params: RecipeParams, savedState?: unknown) {
     params,
   };
   panel.mount(container, nav, definition, savedState as never);
-  return { container, nav, panel, definition };
+  return { container, nav, panel };
 }
 
 async function flush() {
@@ -171,6 +171,21 @@ describe("Prep flow", () => {
           strategy: { kind: "fill-value", value: "Summarize.\n\nLooking for:\n\na signature" },
         },
       ],
+    });
+  });
+
+  it("does not append prefix when appendField input is empty", async () => {
+    mockPrepRecipe.mockResolvedValue(mockResult);
+    const colWithAppend: ColumnDef = {
+      ...fullColumns[2],
+      appendFields: [{ id: "search", label: "What?", prefix: "\n\nLooking for:\n\n" }],
+    };
+    const { container } = mount({ columns: [colWithAppend] });
+    // leave #col-0-append-search empty
+    container.querySelector<HTMLButtonElement>("#prep-btn")!.click();
+    await flush();
+    expect(mockPrepRecipe).toHaveBeenCalledWith({
+      cols: [{ colTitle: "User Prompt", strategy: { kind: "fill-value", value: "Summarize." } }],
     });
   });
 
