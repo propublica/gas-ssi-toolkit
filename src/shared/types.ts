@@ -53,29 +53,22 @@ export interface RunConfig {
 
 // ── Recipes ─────────────────────────────────────────────────────
 
+export type ColStrategy =
+  | { kind: "list-drive-folder"; url: string }
+  | { kind: "fill-value"; value: string }
+  | { kind: "create-empty" };
+
+export interface PrepColSpec {
+  colTitle: string;
+  strategy: ColStrategy;
+}
+
 export interface PrepRecipeParams {
-  driveFolder?: { url: string; colTitle: string };
-  systemPrompt?: { colTitle: string; value: string };
-  userPrompts?: Array<{ colTitle: string; value: string }>;
-  outputCol?: { colTitle: string };
-  /**
-   * Tool IDs to pass through to PrepRecipeResult.
-   * The server does not process these during prep — they are echoed back
-   * to preserve the single-source-of-truth invariant for preppedRunConfig.
-   */
-  tools?: ToolId[];
+  cols: PrepColSpec[];
 }
 
 export interface PrepRecipeResult {
   rowRange: { start: number; end: number };
-  colNames: {
-    driveLink?: string;
-    systemPrompt?: string;
-    userPrompts?: string[];
-    outputCol?: string;
-  };
-  /** Echoed from PrepRecipeParams — no server-side processing. */
-  tools?: ToolId[];
 }
 
 // ── Import Drive Links ───────────────────────────────────────────
