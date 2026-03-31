@@ -2,7 +2,7 @@ import type { ToolId } from "../shared/types";
 
 // ── Loading / Progress types ─────────────────────────────────────────────────
 
-export type LoadingStatus = "idle" | "loading" | "progress" | "complete" | "error";
+export type LoadingStatus = "idle" | "loading" | "progress" | "cancelling" | "complete" | "error";
 
 export interface LoadingState {
   status: LoadingStatus;
