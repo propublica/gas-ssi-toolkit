@@ -523,3 +523,24 @@
           overflow: hidden;
           text-overflow: ellipsis;
         }
+
+.job-strip__cancel {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.6;
+  padding: 0 2px;
+}
+
+.job-strip__cancel:hover {
+  opacity: 1;
+}
+
+.job-strip__cancelling {
+  font-size: 11px;
+  font-style: italic;
+  opacity: 0.6;
+}
