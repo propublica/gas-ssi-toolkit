@@ -207,9 +207,41 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     if (!config) return;
 
     const jobId = `batch-ai-${Date.now()}`;
-    jobStore.dispatch(jobId, "Batch AI Run", runBatchAI(config, jobId)).catch((err: Error) => {
-      globalThis.alert("Error: " + err.message);
-    });
+
+    if (config.rowRange) {
+      const rowCount = config.rowRange.end - config.rowRange.start + 1;
+      if (rowCount > CHUNK_SIZE) {
+        const chunkCount = Math.ceil(rowCount / CHUNK_SIZE);
+        const estimatedMins = Math.ceil((rowCount * 5) / 60);
+        const ok = globalThis.confirm(
+          `You're about to process ${rowCount} rows across ${chunkCount} chunks.\n\n` +
+            `This will take roughly ${estimatedMins} minutes. ` +
+            `The sidebar must remain open throughout — closing it will stop the run after the current chunk finishes.\n\n` +
+            `Continue?`,
+        );
+        if (!ok) return;
+      }
+    }
+
+    if (config.rowRange) {
+      const chunks = computeChunks(config.rowRange, CHUNK_SIZE);
+      const runChunks = async (): Promise<void> => {
+        for (let i = 0; i < chunks.length; i++) {
+          if (jobStore.isCancelled(jobId)) break;
+          jobStore.setProgress(jobId, `Chunk ${i + 1} of ${chunks.length}`);
+          await runBatchAI({ ...config, rowRange: chunks[i] }, jobId);
+        }
+      };
+      jobStore.dispatch(jobId, "Batch AI Run", runChunks()).catch((err: Error) => {
+        globalThis.alert("Error: " + err.message);
+      });
+    } else {
+      // No explicit row range — active sheet selection, resolved server-side.
+      // Fall back to single dispatch (no chunking, no warning).
+      jobStore.dispatch(jobId, "Batch AI Run", runBatchAI(config, jobId)).catch((err: Error) => {
+        globalThis.alert("Error: " + err.message);
+      });
+    }
 
     this.loadHeaders(container, this.currentPreset());
   }
