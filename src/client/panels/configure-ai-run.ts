@@ -8,6 +8,19 @@ import { getSheetHeaders, runBatchAI } from "../services";
 import { jobStore } from "../job-store";
 import { TOOL_CATALOG } from "../tools";
 
+export const CHUNK_SIZE = 50;
+
+export function computeChunks(
+  rowRange: { start: number; end: number },
+  chunkSize: number,
+): Array<{ start: number; end: number }> {
+  const chunks: Array<{ start: number; end: number }> = [];
+  for (let start = rowRange.start; start <= rowRange.end; start += chunkSize) {
+    chunks.push({ start, end: Math.min(start + chunkSize - 1, rowRange.end) });
+  }
+  return chunks;
+}
+
 export type SavedState = Required<
   Omit<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown">
 > &
