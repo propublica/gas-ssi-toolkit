@@ -28,9 +28,7 @@ describe("JobStore", () => {
     store.dispatch("job-1", "Test Job", promise);
 
     expect(listener).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({ id: "job-1", label: "Test Job" }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ id: "job-1", label: "Test Job" })]),
     );
   });
 
@@ -65,7 +63,10 @@ describe("JobStore", () => {
 
     await store.dispatch("job-4", "Test Job", rejected).catch(() => {});
 
-    const lastCall = listener.mock.calls[listener.mock.calls.length - 1][0] as Array<{ id: string; state: { status: string; message?: string } }>;
+    const lastCall = listener.mock.calls[listener.mock.calls.length - 1][0] as Array<{
+      id: string;
+      state: { status: string; message?: string };
+    }>;
     const job = lastCall.find((j) => j.id === "job-4");
     expect(job?.state.status).toBe("error");
     expect(job?.state.message).toBe("boom");
@@ -78,7 +79,9 @@ describe("JobStore", () => {
     await store.dispatch("job-5", "Test", Promise.resolve());
 
     const completedCalls = listener.mock.calls;
-    const lastCall = completedCalls[completedCalls.length - 1][0] as Array<{ completedAt?: number }>;
+    const lastCall = completedCalls[completedCalls.length - 1][0] as Array<{
+      completedAt?: number;
+    }>;
     expect(lastCall[0].completedAt).toBeDefined();
   });
 
@@ -110,7 +113,9 @@ describe("JobStore", () => {
 
     jest.advanceTimersByTime(5000);
 
-    const lastCall = listener.mock.calls[listener.mock.calls.length - 1][0] as Array<{ id: string }>;
+    const lastCall = listener.mock.calls[listener.mock.calls.length - 1][0] as Array<{
+      id: string;
+    }>;
     expect(lastCall.find((j) => j.id === "job-auto-remove")).toBeUndefined();
   });
 
@@ -124,5 +129,101 @@ describe("JobStore", () => {
     await Promise.resolve();
 
     expect(mockGetJobProgress).not.toHaveBeenCalled();
+  });
+
+  describe("cancel()", () => {
+    it("transitions a loading job to cancelling", () => {
+      const listener = jest.fn();
+      store.subscribe(listener);
+
+      store.dispatch("job-c1", "Test", new Promise(() => {}));
+      store.cancel("job-c1");
+
+      const lastJobs = listener.mock.calls[listener.mock.calls.length - 1][0] as Array<{
+        id: string;
+        state: { status: string };
+      }>;
+      const job = lastJobs.find((j) => j.id === "job-c1");
+      expect(job?.state.status).toBe("cancelling");
+    });
+
+    it("transitions a progress job to cancelling", () => {
+      const listener = jest.fn();
+      store.subscribe(listener);
+
+      store.dispatch("job-c2", "Test", new Promise(() => {}));
+      store.setProgress("job-c2", "Row 3 of 10");
+      store.cancel("job-c2");
+
+      const lastJobs = listener.mock.calls[listener.mock.calls.length - 1][0] as Array<{
+        id: string;
+        state: { status: string };
+      }>;
+      const job = lastJobs.find((j) => j.id === "job-c2");
+      expect(job?.state.status).toBe("cancelling");
+    });
+
+    it("is a no-op for unknown job id", () => {
+      expect(() => store.cancel("nonexistent")).not.toThrow();
+    });
+
+    it("is a no-op if job is already complete", async () => {
+      const listener = jest.fn();
+      store.subscribe(listener);
+
+      await store.dispatch("job-c3", "Test", Promise.resolve());
+      listener.mockClear();
+
+      store.cancel("job-c3");
+      expect(listener).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("isCancelled()", () => {
+    it("returns false before cancel is called", () => {
+      store.dispatch("job-ic1", "Test", new Promise(() => {}));
+      expect(store.isCancelled("job-ic1")).toBe(false);
+    });
+
+    it("returns true after cancel is called", () => {
+      store.dispatch("job-ic2", "Test", new Promise(() => {}));
+      store.cancel("job-ic2");
+      expect(store.isCancelled("job-ic2")).toBe(true);
+    });
+
+    it("returns false for unknown job id", () => {
+      expect(store.isCancelled("nonexistent")).toBe(false);
+    });
+
+    it("returns false after the job completes (flag cleaned up)", async () => {
+      store.dispatch("job-ic3", "Test", new Promise(() => {}));
+      store.cancel("job-ic3");
+      expect(store.isCancelled("job-ic3")).toBe(true);
+
+      await store.dispatch("job-ic4", "Cleanup test", Promise.resolve());
+      expect(store.isCancelled("job-ic4")).toBe(false);
+    });
+  });
+
+  describe("setProgress()", () => {
+    it("updates the job state message", () => {
+      const listener = jest.fn();
+      store.subscribe(listener);
+
+      store.dispatch("job-sp1", "Test", new Promise(() => {}));
+      store.setProgress("job-sp1", "Chunk 2 of 6");
+
+      const lastJobs = listener.mock.calls[listener.mock.calls.length - 1][0] as Array<{
+        id: string;
+        state: { status: string; message?: string };
+      }>;
+      const job = lastJobs.find((j) => j.id === "job-sp1");
+      expect(job?.state.status).toBe("progress");
+      expect(job?.state.message).toBe("Chunk 2 of 6");
+    });
+
+    it("is a no-op for unknown job id", () => {
+      expect(() => store.setProgress("nonexistent", "msg")).not.toThrow();
+    });
   });
 });

@@ -7,6 +7,7 @@ export class JobStore {
   private jobs: Map<string, Job> = new Map();
   private listeners: Set<JobListener> = new Set();
   private pollIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
+  private cancelFlags: Map<string, boolean> = new Map();
 
   subscribe(fn: JobListener): () => void {
     this.listeners.add(fn);
@@ -52,6 +53,29 @@ export class JobStore {
     );
   }
 
+  cancel(id: string): void {
+    const job = this.jobs.get(id);
+    if (!job) return;
+    if (job.state.status !== "loading" && job.state.status !== "progress") return;
+    this.cancelFlags.set(id, true);
+    this.jobs.set(id, {
+      ...job,
+      state: { status: "cancelling", message: "Stopping after current chunk..." },
+    });
+    this.notify();
+  }
+
+  isCancelled(id: string): boolean {
+    return this.cancelFlags.get(id) ?? false;
+  }
+
+  setProgress(id: string, message: string): void {
+    const job = this.jobs.get(id);
+    if (!job) return;
+    this.jobs.set(id, { ...job, state: { status: "progress", message } });
+    this.notify();
+  }
+
   getJobs(): Job[] {
     return Array.from(this.jobs.values());
   }
@@ -65,6 +89,7 @@ export class JobStore {
 
   private complete(id: string): void {
     this.stopPolling(id);
+    this.cancelFlags.delete(id);
     const job = this.jobs.get(id);
     if (!job) return;
     this.jobs.set(id, { ...job, state: { status: "complete" }, completedAt: Date.now() });
@@ -77,6 +102,7 @@ export class JobStore {
 
   private fail(id: string, message: string): void {
     this.stopPolling(id);
+    this.cancelFlags.delete(id);
     const job = this.jobs.get(id);
     if (!job) return;
     this.jobs.set(id, { ...job, state: { status: "error", message }, completedAt: Date.now() });
