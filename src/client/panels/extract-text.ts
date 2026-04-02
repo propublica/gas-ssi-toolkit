@@ -1,6 +1,6 @@
 import type { NavigationContext, Panel } from "../types";
 import type { ExtractTextConfig } from "../../shared/types";
-import { SingleTagList } from "../components/single-tag-list";
+import { TokenInput } from "../components/token-input";
 import { RowRange } from "../components/row-range";
 import { PanelLoader } from "../components/panel-loader";
 import { getSheetHeaders, extractText } from "../services";
@@ -14,8 +14,8 @@ type SavedState = {
 };
 
 export class ExtractTextPanel implements Panel<undefined, SavedState> {
-  private sourceColList: SingleTagList | null = null;
-  private outputColList: SingleTagList | null = null;
+  private sourceColList: TokenInput | null = null;
+  private outputColList: TokenInput | null = null;
   private rowRange: RowRange | null = null;
   private nav: NavigationContext | null = null;
 
@@ -32,17 +32,19 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
     const loader = new PanelLoader(container);
 
     const loadHeaders = (selectedSource?: string, selectedOutput?: string): Promise<void> => {
+      this.sourceColList?.destroy();
+      this.outputColList?.destroy();
       loader.setState({ status: "loading", message: "Loading columns..." });
       return getSheetHeaders().then(
         (headers) => {
-          this.sourceColList = new SingleTagList(container.querySelector("#source-col")!, headers, {
-            selected: selectedSource,
+          this.sourceColList = new TokenInput(container.querySelector("#source-col")!, headers, {
+            multi: false,
+            selected: selectedSource ? [selectedSource] : [],
           });
-          this.outputColList = new SingleTagList(container.querySelector("#output-col")!, headers, {
+          this.outputColList = new TokenInput(container.querySelector("#output-col")!, headers, {
+            multi: false,
             includeNew: true,
-            selected: selectedOutput,
-            newPlaceholder: "extracted_text",
-            newDefault: "",
+            selected: selectedOutput ? [selectedOutput] : [],
           });
           container.querySelector<HTMLElement>("#config-form")!.style.display = "block";
           loader.setState({ status: "idle" });
@@ -69,10 +71,12 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
       const btn = container.querySelector<HTMLButtonElement>("#refresh-btn")!;
       btn.classList.add("spinning");
       btn.disabled = true;
-      loadHeaders(this.sourceColList?.getValue(), this.outputColList?.getValue()).finally(() => {
-        btn.classList.remove("spinning");
-        btn.disabled = false;
-      });
+      loadHeaders(this.sourceColList?.getValue()[0], this.outputColList?.getValue()[0]).finally(
+        () => {
+          btn.classList.remove("spinning");
+          btn.disabled = false;
+        },
+      );
     });
 
     loadHeaders(savedState?.sourceCol, savedState?.outputCol);
@@ -80,9 +84,13 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
 
   unmount(): SavedState {
     const range = this.rowRange?.getValue();
+    const sourceCol = this.sourceColList?.getValue()[0] ?? "";
+    const outputCol = this.outputColList?.getValue()[0] ?? "";
+    this.sourceColList?.destroy();
+    this.outputColList?.destroy();
     return {
-      sourceCol: this.sourceColList?.getValue() ?? "",
-      outputCol: this.outputColList?.getValue() ?? "",
+      sourceCol,
+      outputCol,
       startRow: range?.start ?? 2,
       endRow: range?.end ?? 2,
     };
@@ -99,13 +107,13 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
   }
 
   private assembleConfig(): ExtractTextConfig | null {
-    const sourceCol = this.sourceColList?.getValue() ?? "";
+    const sourceCol = this.sourceColList?.getValue()[0] ?? "";
     if (!sourceCol) {
       globalThis.alert("Please select a source column.");
       return null;
     }
 
-    const outputCol = this.outputColList?.getValue() ?? "";
+    const outputCol = this.outputColList?.getValue()[0] ?? "";
     if (!outputCol) {
       globalThis.alert("Please select an output column.");
       return null;

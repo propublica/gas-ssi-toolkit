@@ -46,6 +46,19 @@ async function mountAndLoad(
   return { container, panel };
 }
 
+/** Selects a column in a TokenInput field by opening its dropdown and clicking the option. */
+function selectColumn(container: HTMLElement, fieldId: string, value: string): void {
+  container.querySelector<HTMLElement>(`#${fieldId} .token-add-btn`)!.click();
+  container.querySelector<HTMLElement>(`#${fieldId} .token-option[data-value="${value}"]`)!.click();
+}
+
+/** Returns data-value attributes of current chips in a TokenInput field. */
+function getChipValues(container: HTMLElement, fieldId: string): string[] {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(`#${fieldId} .token-chip[data-value]`),
+  ).map((el) => el.getAttribute("data-value") ?? "");
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   globalThis.alert = jest.fn();
@@ -84,9 +97,7 @@ describe("ConfigureAIRunPanel — mount", () => {
 
   it("pre-selects params on mount", async () => {
     const { container } = await mountAndLoad({ promptCols: [{ col: "col_a", kind: "text" }] });
-    const selected = container.querySelectorAll("#user-prompt-cols .tag.selected");
-    expect(selected).toHaveLength(1);
-    expect(selected[0].getAttribute("data-value")).toBe("col_a");
+    expect(getChipValues(container, "user-prompt-cols")).toContain("col_a");
   });
 
   it("restores savedState over params", async () => {
@@ -99,8 +110,7 @@ describe("ConfigureAIRunPanel — mount", () => {
       { promptCols: [{ col: "col_a", kind: "text" }] },
       savedState,
     );
-    const selected = container.querySelectorAll("#user-prompt-cols .tag.selected");
-    expect(selected[0].getAttribute("data-value")).toBe("col_b");
+    expect(getChipValues(container, "user-prompt-cols")).toContain("col_b");
   });
 });
 
@@ -114,7 +124,7 @@ describe("ConfigureAIRunPanel — Run AI", () => {
 
   it("alerts when no output column selected", async () => {
     const { container } = await mountAndLoad();
-    container.querySelector<HTMLButtonElement>('[data-value="col_a"]')!.click();
+    selectColumn(container, "user-prompt-cols", "col_a");
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     expect(globalThis.alert).toHaveBeenCalledWith("Please select an output column.");
   });
@@ -155,7 +165,7 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     );
   });
 
-  it("stays on panel after run is dispatched and refetches headers", async () => {
+  it("stays on panel after run is dispatched without reloading headers", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
     const { container } = await mountAndLoad({
       promptCols: [{ col: "col_a", kind: "text" }],
@@ -164,7 +174,7 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     await Promise.resolve();
     expect(mockNav.back).not.toHaveBeenCalled();
-    expect(services.getSheetHeaders).toHaveBeenCalledTimes(2); // initial load + refresh
+    expect(services.getSheetHeaders).toHaveBeenCalledTimes(1); // initial load only, no reload
   });
 
   it("alerts on failure via jobStore catch handler", async () => {
@@ -222,8 +232,7 @@ describe("ConfigureAIRunPanel — refresh", () => {
     await Promise.resolve();
     expect(services.getSheetHeaders).toHaveBeenCalledTimes(2);
     // selections preserved after refresh
-    const tags = container.querySelectorAll("#user-prompt-cols .tag.selected");
-    expect(tags.length).toBeGreaterThan(0);
+    expect(getChipValues(container, "user-prompt-cols")).toContain("col_a");
   });
 });
 
@@ -300,19 +309,17 @@ describe("includeGrounding checkbox", () => {
   it("unmount saves includeGrounding state", async () => {
     const { container, panel } = await mountAndLoad();
     container.querySelector<HTMLInputElement>("#include-grounding-cb")!.checked = true;
-    // Select at least one user-prompt column so unmount() returns a value (not undefined)
-    container.querySelectorAll<HTMLElement>("#user-prompt-cols .tag")[0]?.click();
+    selectColumn(container, "user-prompt-cols", "col_a");
     const saved = panel.unmount();
     expect(saved?.includeGrounding).toBe(true);
   });
 
   it("updates grounding column label when output column selection changes", async () => {
-    const { container } = await mountAndLoad(); // no pre-selected output column
-    const tag = container.querySelector<HTMLButtonElement>("#output-col .tag");
-    if (!tag) return; // guard against no tags in jsdom
-    tag.click();
+    const { container } = await mountAndLoad();
+    selectColumn(container, "output-col", "col_a");
+    await Promise.resolve(); // flush MutationObserver microtask
     const label = container.querySelector<HTMLElement>("#grounding-col-name");
-    expect(label?.textContent).toBe(`${tag.textContent}_grounding`);
+    expect(label?.textContent).toBe("col_a_grounding");
   });
 
   it("restores includeGrounding from savedState", async () => {
@@ -365,10 +372,8 @@ describe("includeGrounding checkbox", () => {
 describe("ConfigureAIRunPanel — unmount", () => {
   it("unmount() returns current form state as SavedState", async () => {
     const { container, panel } = await mountAndLoad();
-    container.querySelector<HTMLButtonElement>('[data-value="col_a"]')!.click(); // user-prompt
-    container
-      .querySelectorAll<HTMLButtonElement>("#output-col .tag")[1]! // ai_inference
-      .click();
+    selectColumn(container, "user-prompt-cols", "col_a");
+    selectColumn(container, "output-col", "ai_inference");
     const state = panel.unmount();
     expect(state).not.toBeUndefined();
     const typedState = state as { promptCols: Array<{ col: string; kind: string }> };
