@@ -235,11 +235,21 @@ describe("JobStore", () => {
     });
 
     it("returns false after the job completes (flag cleaned up)", async () => {
-      store.dispatch("job-ic3", "Test", new Promise(() => {}));
-      store.cancel("job-ic3");
-      expect(store.isCancelled("job-ic3")).toBe(true);
+      await store.dispatch("job-ic3", "Test", Promise.resolve());
+      store.cancel("job-ic3"); // no-op since already complete, but flag should still be absent
+      expect(store.isCancelled("job-ic3")).toBe(false);
+    });
 
-      await store.dispatch("job-ic4", "Cleanup test", Promise.resolve());
+    it("clears the cancel flag when a cancelled job finishes", async () => {
+      let resolve!: () => void;
+      const promise = new Promise<void>((r) => {
+        resolve = r;
+      });
+      store.dispatch("job-ic4", "Test", promise);
+      store.cancel("job-ic4");
+      expect(store.isCancelled("job-ic4")).toBe(true);
+      resolve();
+      await promise;
       expect(store.isCancelled("job-ic4")).toBe(false);
     });
   });
@@ -263,6 +273,18 @@ describe("JobStore", () => {
 
     it("is a no-op for unknown job id", () => {
       expect(() => store.setProgress("nonexistent", "msg")).not.toThrow();
+    });
+
+    it("is a no-op when job is cancelling", () => {
+      const listener = jest.fn();
+      store.subscribe(listener);
+
+      store.dispatch("job-sp2", "Test", new Promise(() => {}));
+      store.cancel("job-sp2");
+      listener.mockClear();
+
+      store.setProgress("job-sp2", "should be ignored");
+      expect(listener).not.toHaveBeenCalled();
     });
   });
 });

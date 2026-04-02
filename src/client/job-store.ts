@@ -77,7 +77,7 @@ export class JobStore {
     this.cancelFlags.set(id, true);
     this.jobs.set(id, {
       ...job,
-      state: { status: "cancelling", message: "Stopping after this chunk..." },
+      state: { status: "cancelling", message: "Stopping — finishing current chunk..." },
     });
     this.notify();
   }
@@ -86,9 +86,13 @@ export class JobStore {
     return this.cancelFlags.get(id) ?? false;
   }
 
+  // Only call this when the job is in loading or progress state.
+  // It will no-op for unknown jobs but does not guard against overwriting
+  // "cancelling" — callers must check isCancelled() before calling.
   setProgress(id: string, message: string): void {
     const job = this.jobs.get(id);
     if (!job) return;
+    if (job.state.status === "cancelling") return;
     this.jobs.set(id, { ...job, state: { status: "progress", message } });
     this.notify();
   }
