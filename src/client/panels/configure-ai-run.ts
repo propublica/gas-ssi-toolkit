@@ -215,6 +215,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       const rowCount = config.rowRange.end - config.rowRange.start + 1;
       if (rowCount > CHUNK_WARN_THRESHOLD) {
         const chunkCount = Math.ceil(rowCount / CHUNK_SIZE);
+        // ~5 s/row is a conservative estimate based on typical Gemini API latency.
         const estimatedMins = Math.ceil((rowCount * 5) / 60);
         const ok = globalThis.confirm(
           `You're about to process ${rowCount} rows across ${chunkCount} chunks.\n\n` +
@@ -229,18 +230,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     if (config.rowRange) {
       const chunks = computeChunks(config.rowRange, CHUNK_SIZE);
       jobStore
-        .dispatch(
-          jobId,
-          "Batch AI Run",
-          (async () => {
-            const lastRow = chunks[chunks.length - 1].end;
-            for (let i = 0; i < chunks.length; i++) {
-              if (jobStore.isCancelled(jobId)) break;
-              jobStore.setProgress(jobId, `Rows ${chunks[i].start}–${chunks[i].end} of ${lastRow}`);
-              await runBatchAI({ ...config, rowRange: chunks[i] }, jobId);
-            }
-          })(),
-        )
+        .dispatch(jobId, "Batch AI Run", this.runChunks(jobId, config, chunks))
         .catch((err: Error) => {
           globalThis.alert("Error: " + err.message);
         });
@@ -253,6 +243,19 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     }
 
     this.loadHeaders(container, this.currentPreset());
+  }
+
+  private async runChunks(
+    jobId: string,
+    config: RunConfig,
+    chunks: Array<{ start: number; end: number }>,
+  ): Promise<void> {
+    const lastRow = chunks[chunks.length - 1].end;
+    for (let i = 0; i < chunks.length; i++) {
+      if (jobStore.isCancelled(jobId)) break;
+      jobStore.setProgress(jobId, `Rows ${chunks[i].start}–${chunks[i].end} of ${lastRow}`);
+      await runBatchAI({ ...config, rowRange: chunks[i] }, jobId);
+    }
   }
 
   private assembleRunConfig(): RunConfig | null {
