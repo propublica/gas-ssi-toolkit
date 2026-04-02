@@ -30,6 +30,10 @@ export class JobStore {
       getJobProgress(id)
         .then((progress) => {
           if (!progress) return;
+          // Don't overwrite a cancelling state — the user has requested a stop
+          // and the message should stay visible until the chunk finishes.
+          const current = this.jobs.get(id);
+          if (!current || current.state.status === "cancelling") return;
           this.update(id, {
             status: "progress",
             message: progress.message,
@@ -60,7 +64,7 @@ export class JobStore {
     this.cancelFlags.set(id, true);
     this.jobs.set(id, {
       ...job,
-      state: { status: "cancelling", message: "Stopping after current chunk..." },
+      state: { status: "cancelling", message: "Stopping after this chunk..." },
     });
     this.notify();
   }

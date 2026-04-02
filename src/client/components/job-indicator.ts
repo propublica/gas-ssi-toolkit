@@ -53,7 +53,7 @@ export class JobIndicator {
     const msg = job.state.message ?? job.label;
     const isCancelling = job.state.status === "cancelling";
     const action = isCancelling
-      ? `<span class="job-strip__cancelling">Stopping...</span>`
+      ? ``
       : `<button class="job-strip__cancel" data-cancel-job="${this.escape(job.id)}" title="Stop after current chunk">&#x2715;</button>`;
     return `<span class="job-strip__item job-strip__item--active">
       <span class="job-strip__spinner"></span>
