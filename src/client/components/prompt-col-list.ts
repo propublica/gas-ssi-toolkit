@@ -134,15 +134,18 @@ export class PromptColList {
     const newIdx = idx + delta;
     if (newIdx < 0 || newIdx >= this.rows.length) return;
 
-    const elA = this.rows[idx].el;
-    const elB = this.rows[newIdx].el;
+    // Capture elements by their role before mutating the array
+    const elMoving = this.rows[idx].el;
+    const elDisplaced = this.rows[newIdx].el;
 
     [this.rows[idx], this.rows[newIdx]] = [this.rows[newIdx], this.rows[idx]];
 
+    // For move-up: insert the moving element before the displaced one
+    // For move-down: insert the displaced element before the moving one (same net swap)
     if (delta === -1) {
-      this.listEl.insertBefore(elA, elB);
+      this.listEl.insertBefore(elMoving, elDisplaced);
     } else {
-      this.listEl.insertBefore(elB, elA);
+      this.listEl.insertBefore(elDisplaced, elMoving);
     }
 
     this.updateArrows();
