@@ -104,6 +104,26 @@ describe("JobStore", () => {
     expect(job?.state.status).toBe("cancelling");
   });
 
+  it("surfaces server message prefixed with 'Stopping —' when cancelling and poll has progress", async () => {
+    mockGetJobProgress.mockResolvedValue({ message: "Row 3 of 10", current: 3, total: 10 });
+    const listener = jest.fn();
+    store.subscribe(listener);
+
+    store.dispatch("job-poll-cancel-msg", "Test", new Promise(() => {}));
+    store.cancel("job-poll-cancel-msg");
+
+    jest.advanceTimersByTime(2000);
+    await Promise.resolve();
+
+    const lastJobs = listener.mock.calls[listener.mock.calls.length - 1][0] as Array<{
+      id: string;
+      state: { status: string; message?: string };
+    }>;
+    const job = lastJobs.find((j) => j.id === "job-poll-cancel-msg");
+    expect(job?.state.status).toBe("cancelling");
+    expect(job?.state.message).toBe("Stopping — row 3 of 10");
+  });
+
   it("polls getJobProgress on interval while job is running", async () => {
     mockGetJobProgress.mockResolvedValue({ message: "Row 1 of 5", current: 1, total: 5 });
 

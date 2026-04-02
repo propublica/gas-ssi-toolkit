@@ -233,9 +233,10 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           jobId,
           "Batch AI Run",
           (async () => {
+            const lastRow = chunks[chunks.length - 1].end;
             for (let i = 0; i < chunks.length; i++) {
               if (jobStore.isCancelled(jobId)) break;
-              jobStore.setProgress(jobId, `Chunk ${i + 1} of ${chunks.length}`);
+              jobStore.setProgress(jobId, `Rows ${chunks[i].start}–${chunks[i].end} of ${lastRow}`);
               await runBatchAI({ ...config, rowRange: chunks[i] }, jobId);
             }
           })(),
