@@ -8,6 +8,22 @@ import { getSheetHeaders, runBatchAI } from "../services";
 import { jobStore } from "../job-store";
 import { TOOL_CATALOG } from "../tools";
 
+export const CHUNK_SIZE = 10;
+// Warn before dispatch when the batch exceeds this many rows, regardless of chunk count.
+// Kept separate from CHUNK_SIZE so small multi-chunk runs don't trigger the dialog.
+export const CHUNK_WARN_THRESHOLD = 50;
+
+export function computeChunks(
+  rowRange: { start: number; end: number },
+  chunkSize: number,
+): Array<{ start: number; end: number }> {
+  const chunks: Array<{ start: number; end: number }> = [];
+  for (let start = rowRange.start; start <= rowRange.end; start += chunkSize) {
+    chunks.push({ start, end: Math.min(start + chunkSize - 1, rowRange.end) });
+  }
+  return chunks;
+}
+
 export type SavedState = Required<
   Omit<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown">
 > &
@@ -194,9 +210,47 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     if (!config) return;
 
     const jobId = `batch-ai-${Date.now()}`;
-    jobStore.dispatch(jobId, "Batch AI Run", runBatchAI(config, jobId)).catch((err: Error) => {
-      globalThis.alert("Error: " + err.message);
-    });
+
+    if (config.rowRange) {
+      const rowCount = config.rowRange.end - config.rowRange.start + 1;
+      if (rowCount > CHUNK_WARN_THRESHOLD) {
+        const chunkCount = Math.ceil(rowCount / CHUNK_SIZE);
+        const estimatedMins = Math.ceil((rowCount * 5) / 60);
+        const ok = globalThis.confirm(
+          `You're about to process ${rowCount} rows across ${chunkCount} chunks.\n\n` +
+            `This will take roughly ${estimatedMins} minutes. ` +
+            `The sidebar must remain open throughout — closing it will stop the run after the current chunk finishes.\n\n` +
+            `Continue?`,
+        );
+        if (!ok) return;
+      }
+    }
+
+    if (config.rowRange) {
+      const chunks = computeChunks(config.rowRange, CHUNK_SIZE);
+      jobStore
+        .dispatch(
+          jobId,
+          "Batch AI Run",
+          (async () => {
+            const lastRow = chunks[chunks.length - 1].end;
+            for (let i = 0; i < chunks.length; i++) {
+              if (jobStore.isCancelled(jobId)) break;
+              jobStore.setProgress(jobId, `Rows ${chunks[i].start}–${chunks[i].end} of ${lastRow}`);
+              await runBatchAI({ ...config, rowRange: chunks[i] }, jobId);
+            }
+          })(),
+        )
+        .catch((err: Error) => {
+          globalThis.alert("Error: " + err.message);
+        });
+    } else {
+      // No explicit row range — active sheet selection, resolved server-side.
+      // Fall back to single dispatch (no chunking, no warning).
+      jobStore.dispatch(jobId, "Batch AI Run", runBatchAI(config, jobId)).catch((err: Error) => {
+        globalThis.alert("Error: " + err.message);
+      });
+    }
 
     this.loadHeaders(container, this.currentPreset());
   }

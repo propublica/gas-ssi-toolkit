@@ -8,15 +8,28 @@ import type { JobStore } from "../job-store";
  */
 export class JobIndicator {
   private el: HTMLElement;
+  private store: JobStore;
 
   constructor(container: HTMLElement, store: JobStore) {
     this.el = container;
+    this.store = store;
     store.subscribe((jobs) => this.render(jobs));
+    // Event delegation — survives innerHTML re-renders on each notify()
+    this.el.addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>("[data-cancel-job]");
+      if (btn) {
+        const jobId = btn.getAttribute("data-cancel-job");
+        if (jobId) this.store.cancel(jobId);
+      }
+    });
   }
 
   private render(jobs: Job[]): void {
     const active = jobs.filter(
-      (j) => j.state.status === "loading" || j.state.status === "progress",
+      (j) =>
+        j.state.status === "loading" ||
+        j.state.status === "progress" ||
+        j.state.status === "cancelling",
     );
     const failed = jobs.filter((j) => j.state.status === "error");
 
@@ -38,9 +51,14 @@ export class JobIndicator {
 
   private renderActive(job: Job): string {
     const msg = job.state.message ?? job.label;
+    const isCancelling = job.state.status === "cancelling";
+    const action = isCancelling
+      ? ``
+      : `<button class="job-strip__cancel" data-cancel-job="${this.escape(job.id)}" title="Stop after current chunk">&#x2715;</button>`;
     return `<span class="job-strip__item job-strip__item--active">
       <span class="job-strip__spinner"></span>
       <span class="job-strip__label">${this.escape(msg)}</span>
+      ${action}
     </span>`;
   }
 
@@ -51,6 +69,10 @@ export class JobIndicator {
   }
 
   private escape(str: string): string {
-    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
 }
