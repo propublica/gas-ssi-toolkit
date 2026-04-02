@@ -336,7 +336,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           </div>
         </div>
         <div class="field-group">
-          <span class="field-label">Rows to process</span>
+          <span class="field-label">Rows to process <span class="optional">(specify for large jobs)</span></span>
           <div id="row-range-container"></div>
         </div>
         <div class="panel-buttons">
