@@ -45,7 +45,10 @@ export class RowRange {
     rangeRadio.name = groupName;
     rangeRadio.value = "range";
     rangeRadio.checked = !!selected;
-    rangeLabel.append(rangeRadio, " Specify range");
+    const rangeHint = document.createElement("span");
+    rangeHint.className = "optional";
+    rangeHint.textContent = " (better for large jobs)";
+    rangeLabel.append(rangeRadio, " Specify range", rangeHint);
 
     const rangeInputs = document.createElement("div");
     rangeInputs.className = "range-inputs";

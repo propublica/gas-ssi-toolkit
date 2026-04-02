@@ -30,6 +30,23 @@ export class JobStore {
       getJobProgress(id)
         .then((progress) => {
           if (!progress) return;
+          const current = this.jobs.get(id);
+          if (!current) return;
+          if (current.state.status === "cancelling") {
+            // Keep cancelling status but surface the current row so the user
+            // can see how close the chunk is to finishing.
+            if (progress.message) {
+              this.jobs.set(id, {
+                ...current,
+                state: {
+                  status: "cancelling",
+                  message: `Stopping — ${progress.message.toLowerCase()}`,
+                },
+              });
+              this.notify();
+            }
+            return;
+          }
           this.update(id, {
             status: "progress",
             message: progress.message,
@@ -60,7 +77,7 @@ export class JobStore {
     this.cancelFlags.set(id, true);
     this.jobs.set(id, {
       ...job,
-      state: { status: "cancelling", message: "Stopping after current chunk..." },
+      state: { status: "cancelling", message: "Stopping after this chunk..." },
     });
     this.notify();
   }
