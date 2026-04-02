@@ -1,6 +1,6 @@
 import type { NavigationContext, Panel } from "../types";
 import type { ImportDriveLinksConfig } from "../../shared/types";
-import { SingleTagList } from "../components/single-tag-list";
+import { TokenInput } from "../components/token-input";
 import { TagList } from "../components/tag-list";
 import { PanelLoader } from "../components/panel-loader";
 import { getSheetHeaders, importDriveLinks } from "../services";
@@ -23,7 +23,7 @@ const MIME_TYPE_OPTIONS = [
 
 export class ImportDriveLinksPanel implements Panel<undefined, SavedState> {
   private folderUrlInput: HTMLInputElement | null = null;
-  private outputColList: SingleTagList | null = null;
+  private outputColList: TokenInput | null = null;
   private mimeTypeList: TagList | null = null;
   private nav: NavigationContext | null = null;
 
@@ -51,14 +51,15 @@ export class ImportDriveLinksPanel implements Panel<undefined, SavedState> {
     const loader = new PanelLoader(container);
 
     const loadHeaders = (selected?: string): Promise<void> => {
+      this.outputColList?.destroy();
       loader.setState({ status: "loading", message: "Loading columns..." });
       return getSheetHeaders().then(
         (headers) => {
-          this.outputColList = new SingleTagList(container.querySelector("#output-col")!, headers, {
+          this.outputColList = new TokenInput(container.querySelector("#output-col")!, headers, {
+            multi: false,
             includeNew: true,
-            selected,
-            newPlaceholder: "drive_links",
-            newDefault: "",
+            newDefault: "drive_links",
+            selected: selected ? [selected] : [],
           });
           container.querySelector<HTMLElement>("#config-form")!.style.display = "block";
           loader.setState({ status: "idle" });
@@ -78,7 +79,7 @@ export class ImportDriveLinksPanel implements Panel<undefined, SavedState> {
       const btn = container.querySelector<HTMLButtonElement>("#refresh-btn")!;
       btn.classList.add("spinning");
       btn.disabled = true;
-      loadHeaders(this.outputColList?.getValue()).finally(() => {
+      loadHeaders(this.outputColList?.getValue()[0]).finally(() => {
         btn.classList.remove("spinning");
         btn.disabled = false;
       });
@@ -88,9 +89,11 @@ export class ImportDriveLinksPanel implements Panel<undefined, SavedState> {
   }
 
   unmount(): SavedState {
+    const outputCol = this.outputColList?.getValue()[0] ?? "";
+    this.outputColList?.destroy();
     return {
       folderUrl: this.folderUrlInput?.value ?? "",
-      outputCol: this.outputColList?.getValue() ?? "",
+      outputCol,
       mimeTypes: this.mimeTypeList?.getValue() ?? [],
     };
   }
@@ -112,7 +115,7 @@ export class ImportDriveLinksPanel implements Panel<undefined, SavedState> {
       return null;
     }
 
-    const outputCol = this.outputColList?.getValue() ?? "";
+    const outputCol = this.outputColList?.getValue()[0] ?? "";
     if (!outputCol) {
       globalThis.alert("Please select an output column.");
       return null;

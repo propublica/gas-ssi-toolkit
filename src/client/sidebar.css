@@ -544,3 +544,100 @@
   font-style: italic;
   opacity: 0.6;
 }
+
+        /* ── Token Input ─────────────────────────────────────────────────────────── */
+
+        .token-field {
+            position: relative;
+            width: 100%;
+        }
+
+        .token-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .token-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .token-chip-remove {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #1a73e8;
+            font-size: 13px;
+            line-height: 1;
+            padding: 0 0 0 2px;
+            opacity: 0.7;
+        }
+
+        .token-chip-remove:hover {
+            opacity: 1;
+        }
+
+        .token-chip-input {
+            border: none;
+            outline: none;
+            font-size: 12px;
+            color: #1a73e8;
+            width: 120px;
+            background: transparent;
+        }
+
+        .token-add-btn {
+            color: var(--text-secondary) !important;
+        }
+
+        .token-search {
+            display: block;
+            width: 100%;
+            border: none;
+            outline: none;
+            border-bottom: 1px solid #dadce0;
+            padding: 6px 10px;
+            font-size: 13px;
+            color: #202124;
+            background: transparent;
+            box-sizing: border-box;
+        }
+
+        .token-search::placeholder {
+            color: #9aa0a6;
+        }
+
+        .token-dropdown {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            max-height: 220px;
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .token-option {
+            padding: 7px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            color: #202124;
+        }
+
+        .token-option:hover {
+            background: #f1f3f4;
+        }
+
+        .token-no-match {
+            padding: 7px 12px;
+            font-size: 13px;
+            color: #9aa0a6;
+            font-style: italic;
+        }

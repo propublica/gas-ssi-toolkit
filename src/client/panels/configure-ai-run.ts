@@ -1,7 +1,7 @@
 import type { NavigationContext, Panel } from "../types";
 import type { RunConfig, ToolId, PromptColumnSpec } from "../../shared/types";
 import { TagList } from "../components/tag-list";
-import { SingleTagList } from "../components/single-tag-list";
+import { TokenInput } from "../components/token-input";
 import { RowRange } from "../components/row-range";
 import { PanelLoader } from "../components/panel-loader";
 import { getSheetHeaders, runBatchAI } from "../services";
@@ -30,14 +30,15 @@ export type SavedState = Required<
   Pick<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown">;
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
-  private userPromptList: TagList | null = null;
-  private driveFileList: TagList | null = null;
-  private systemPromptList: SingleTagList | null = null;
-  private outputColList: SingleTagList | null = null;
+  private userPromptList: TokenInput | null = null;
+  private driveFileList: TokenInput | null = null;
+  private systemPromptList: TokenInput | null = null;
+  private outputColList: TokenInput | null = null;
   private rowRangeComp: RowRange | null = null;
   private toolsList: TagList | null = null;
   private includeGroundingCb: HTMLInputElement | null = null;
   private applyMarkdownCb: HTMLInputElement | null = null;
+  private outputColObserver: MutationObserver | null = null;
   private nav: NavigationContext | null = null;
   private headersLoaded = false;
 
@@ -96,6 +97,12 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   }
 
   private loadHeaders(container: HTMLElement, preset: Partial<RunConfig>): Promise<void> {
+    this.outputColObserver?.disconnect();
+    this.outputColObserver = null;
+    this.userPromptList?.destroy();
+    this.driveFileList?.destroy();
+    this.systemPromptList?.destroy();
+    this.outputColList?.destroy();
     return getSheetHeaders().then(
       (headers) => {
         if (headers.length === 0) {
@@ -107,26 +114,24 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           preset.promptCols?.filter((p) => p.kind === "text").map((p) => p.col) ?? [];
         const presetFileCols =
           preset.promptCols?.filter((p) => p.kind === "file").map((p) => p.col) ?? [];
-        this.userPromptList = new TagList(
+        this.userPromptList = new TokenInput(
           container.querySelector("#user-prompt-cols")!,
           headers,
-          presetTextCols,
+          { selected: presetTextCols },
         );
-        this.driveFileList = new TagList(
-          container.querySelector("#drive-file-cols")!,
-          headers,
-          presetFileCols,
-        );
-        this.systemPromptList = new SingleTagList(
+        this.driveFileList = new TokenInput(container.querySelector("#drive-file-cols")!, headers, {
+          selected: presetFileCols,
+        });
+        this.systemPromptList = new TokenInput(
           container.querySelector("#system-prompt-col")!,
           headers,
-          { selected: preset.systemPromptCol },
+          { multi: false, selected: preset.systemPromptCol ? [preset.systemPromptCol] : [] },
         );
-        this.outputColList = new SingleTagList(container.querySelector("#output-col")!, headers, {
+        this.outputColList = new TokenInput(container.querySelector("#output-col")!, headers, {
+          multi: false,
           includeNew: true,
-          selected: preset.outputCol,
-          newPlaceholder: "ai_column_name",
           newDefault: "ai_",
+          selected: preset.outputCol ? [preset.outputCol] : [],
         });
         this.rowRangeComp = new RowRange(
           container.querySelector("#row-range-container")!,
@@ -134,15 +139,17 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         );
 
         const updateGroundingLabel = (): void => {
-          const val = this.outputColList?.getValue() ?? "";
+          const val = this.outputColList?.getValue()[0] ?? "";
           const label = container.querySelector<HTMLElement>("#grounding-col-name");
           if (label) label.textContent = val ? `${val}_grounding` : "_grounding";
         };
         updateGroundingLabel();
-        container.querySelector("#output-col")?.addEventListener("click", updateGroundingLabel);
-        container
-          .querySelector("#output-col input")
-          ?.addEventListener("input", updateGroundingLabel);
+        const outputColEl = container.querySelector("#output-col");
+        if (outputColEl) {
+          const observer = new MutationObserver(updateGroundingLabel);
+          observer.observe(outputColEl, { childList: true, subtree: true });
+          this.outputColObserver = observer;
+        }
 
         if (!this.headersLoaded) {
           container.querySelector<HTMLElement>("#config-form")!.style.display = "block";
@@ -161,13 +168,18 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
 
   unmount(): SavedState | undefined {
     if (!this.userPromptList) return undefined;
+    this.outputColObserver?.disconnect();
+    this.userPromptList.destroy();
+    this.driveFileList?.destroy();
+    this.systemPromptList?.destroy();
+    this.outputColList?.destroy();
     return {
       promptCols: [
         ...this.userPromptList.getValue().map((col) => ({ col, kind: "text" as const })),
         ...(this.driveFileList?.getValue() ?? []).map((col) => ({ col, kind: "file" as const })),
       ],
-      systemPromptCol: this.systemPromptList?.getValue() ?? "",
-      outputCol: this.outputColList?.getValue() ?? "",
+      systemPromptCol: this.systemPromptList?.getValue()[0] ?? "",
+      outputCol: this.outputColList?.getValue()[0] ?? "",
       rowRange: this.rowRangeComp?.getValue(),
       tools: (this.toolsList?.getValue() ?? []) as ToolId[],
       includeGrounding: this.includeGroundingCb?.checked ?? false,
@@ -196,8 +208,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         ...textCols.map((col) => ({ col, kind: "text" as const })),
         ...fileCols.map((col) => ({ col, kind: "file" as const })),
       ],
-      systemPromptCol: this.systemPromptList?.getValue() || undefined,
-      outputCol: this.outputColList?.getValue() || undefined,
+      systemPromptCol: this.systemPromptList?.getValue()[0] || undefined,
+      outputCol: this.outputColList?.getValue()[0] || undefined,
       rowRange: this.rowRangeComp?.getValue(),
       tools: (this.toolsList?.getValue() ?? []) as ToolId[],
       includeGrounding: this.includeGroundingCb?.checked,
@@ -205,7 +217,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     };
   }
 
-  private handleRun(container: HTMLElement): void {
+  private handleRun(_container: HTMLElement): void {
     const config = this.assembleRunConfig();
     if (!config) return;
 
@@ -241,8 +253,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         globalThis.alert("Error: " + err.message);
       });
     }
-
-    this.loadHeaders(container, this.currentPreset());
+    // NOTE: loadHeaders() is intentionally NOT called here.
+    // Reloading after dispatch caused flicker and re-initialization mid-run.
   }
 
   private async runChunks(
@@ -269,8 +281,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       ...textCols.map((col) => ({ col, kind: "text" as const })),
       ...fileCols.map((col) => ({ col, kind: "file" as const })),
     ];
-    const systemPromptCol = this.systemPromptList?.getValue() || undefined;
-    const outputCol = this.outputColList?.getValue() ?? "";
+    const systemPromptCol = this.systemPromptList?.getValue()[0] || undefined;
+    const outputCol = this.outputColList?.getValue()[0] ?? "";
     if (!outputCol) {
       globalThis.alert("Please select an output column.");
       return null;

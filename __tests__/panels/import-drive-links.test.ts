@@ -30,6 +30,11 @@ function mountPanel(savedState?: unknown): HTMLElement {
   return container;
 }
 
+function selectColumn(container: HTMLElement, fieldId: string, value: string): void {
+  container.querySelector<HTMLElement>(`#${fieldId} .token-add-btn`)!.click();
+  container.querySelector<HTMLElement>(`#${fieldId} .token-option[data-value="${value}"]`)!.click();
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   (jobStoreModule.jobStore.dispatch as jest.Mock).mockResolvedValue(undefined);
@@ -75,8 +80,7 @@ describe("ImportDriveLinksPanel", () => {
 
     c.querySelector<HTMLInputElement>("#folder-url-input")!.value =
       "https://drive.google.com/drive/folders/abc123";
-    // select the output column tag
-    c.querySelector<HTMLElement>("#output-col .tag")?.click();
+    selectColumn(c, "output-col", "source_drive");
 
     c.querySelector<HTMLButtonElement>("#import-btn")!.click();
     expect(jobStoreModule.jobStore.dispatch).toHaveBeenCalledWith(
@@ -128,7 +132,7 @@ describe("ImportDriveLinksPanel", () => {
     await Promise.resolve();
     c.querySelector<HTMLInputElement>("#folder-url-input")!.value =
       "https://drive.google.com/drive/folders/abc123";
-    // do NOT click any output column tag — leave it unselected
+    // do NOT select any output column — leave it unselected
     c.querySelector<HTMLButtonElement>("#import-btn")!.click();
     expect(globalThis.alert).toHaveBeenCalledWith(expect.stringContaining("output column"));
   });
@@ -172,7 +176,7 @@ describe("ImportDriveLinksPanel", () => {
     await Promise.resolve();
     c.querySelector<HTMLInputElement>("#folder-url-input")!.value =
       "https://drive.google.com/drive/folders/abc123";
-    c.querySelector<HTMLElement>("#output-col .tag")?.click();
+    selectColumn(c, "output-col", "source_drive");
     c.querySelector<HTMLButtonElement>("#import-btn")!.click();
     await new Promise((r) => setTimeout(r, 0));
     expect(globalThis.alert).toHaveBeenCalledWith("Error: job failed");
