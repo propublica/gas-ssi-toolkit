@@ -1,7 +1,8 @@
 import type { NavigationContext, Panel } from "../types";
-import type { RunConfig, ToolId, PromptColumnSpec } from "../../shared/types";
+import type { RunConfig, ToolId } from "../../shared/types";
 import { TagList } from "../components/tag-list";
 import { TokenInput } from "../components/token-input";
+import { PromptColList } from "../components/prompt-col-list";
 import { RowRange } from "../components/row-range";
 import { PanelLoader } from "../components/panel-loader";
 import { getSheetHeaders, runBatchAI } from "../services";
@@ -30,8 +31,7 @@ export type SavedState = Required<
   Pick<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown">;
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
-  private userPromptList: TokenInput | null = null;
-  private driveFileList: TokenInput | null = null;
+  private promptColList: PromptColList | null = null;
   private systemPromptList: TokenInput | null = null;
   private outputColList: TokenInput | null = null;
   private rowRangeComp: RowRange | null = null;
@@ -49,7 +49,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     savedState?: SavedState,
   ): void {
     this.nav = nav;
-    this.userPromptList = null; // reset so unmount() guards correctly before load
+    this.promptColList = null; // reset so unmount() guards correctly before load
     this.headersLoaded = false;
     container.innerHTML = this.template();
     this.wireNavButtons(container);
@@ -99,8 +99,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private loadHeaders(container: HTMLElement, preset: Partial<RunConfig>): Promise<void> {
     this.outputColObserver?.disconnect();
     this.outputColObserver = null;
-    this.userPromptList?.destroy();
-    this.driveFileList?.destroy();
+    this.promptColList?.destroy();
+    this.promptColList = null;
     this.systemPromptList?.destroy();
     this.outputColList?.destroy();
     return getSheetHeaders().then(
@@ -110,18 +110,11 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           return;
         }
 
-        const presetTextCols =
-          preset.promptCols?.filter((p) => p.kind === "text").map((p) => p.col) ?? [];
-        const presetFileCols =
-          preset.promptCols?.filter((p) => p.kind === "file").map((p) => p.col) ?? [];
-        this.userPromptList = new TokenInput(
-          container.querySelector("#user-prompt-cols")!,
+        this.promptColList = new PromptColList(
+          container.querySelector("#prompt-col-list")!,
           headers,
-          { selected: presetTextCols },
+          preset.promptCols,
         );
-        this.driveFileList = new TokenInput(container.querySelector("#drive-file-cols")!, headers, {
-          selected: presetFileCols,
-        });
         this.systemPromptList = new TokenInput(
           container.querySelector("#system-prompt-col")!,
           headers,
@@ -167,17 +160,14 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   }
 
   unmount(): SavedState | undefined {
-    if (!this.userPromptList) return undefined;
+    if (!this.promptColList) return undefined;
     this.outputColObserver?.disconnect();
-    this.userPromptList.destroy();
-    this.driveFileList?.destroy();
+    const promptCols = this.promptColList.getValue();
+    this.promptColList.destroy();
     this.systemPromptList?.destroy();
     this.outputColList?.destroy();
     return {
-      promptCols: [
-        ...this.userPromptList.getValue().map((col) => ({ col, kind: "text" as const })),
-        ...(this.driveFileList?.getValue() ?? []).map((col) => ({ col, kind: "file" as const })),
-      ],
+      promptCols,
       systemPromptCol: this.systemPromptList?.getValue()[0] ?? "",
       outputCol: this.outputColList?.getValue()[0] ?? "",
       rowRange: this.rowRangeComp?.getValue(),
@@ -201,13 +191,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   }
 
   private currentPreset(): Partial<RunConfig> {
-    const textCols = this.userPromptList?.getValue() ?? [];
-    const fileCols = this.driveFileList?.getValue() ?? [];
     return {
-      promptCols: [
-        ...textCols.map((col) => ({ col, kind: "text" as const })),
-        ...fileCols.map((col) => ({ col, kind: "file" as const })),
-      ],
+      promptCols: this.promptColList?.getValue() ?? [],
       systemPromptCol: this.systemPromptList?.getValue()[0] || undefined,
       outputCol: this.outputColList?.getValue()[0] || undefined,
       rowRange: this.rowRangeComp?.getValue(),
@@ -271,16 +256,11 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   }
 
   private assembleRunConfig(): RunConfig | null {
-    const textCols = this.userPromptList?.getValue() ?? [];
-    if (textCols.length === 0) {
+    const promptCols = this.promptColList?.getValue() ?? [];
+    if (promptCols.length === 0) {
       globalThis.alert("Please select at least one User prompt column.");
       return null;
     }
-    const fileCols = this.driveFileList?.getValue() ?? [];
-    const promptCols: PromptColumnSpec[] = [
-      ...textCols.map((col) => ({ col, kind: "text" as const })),
-      ...fileCols.map((col) => ({ col, kind: "file" as const })),
-    ];
     const systemPromptCol = this.systemPromptList?.getValue()[0] || undefined;
     const outputCol = this.outputColList?.getValue()[0] ?? "";
     if (!outputCol) {
@@ -321,12 +301,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       </div>
       <div id="config-form" style="display:none">
         <div class="field-group">
-          <span class="field-label">User prompt columns <span class="required">*</span></span>
-          <div id="user-prompt-cols" class="tag-list"></div>
-        </div>
-        <div class="field-group">
-          <span class="field-label">Drive file columns <span class="optional">(optional)</span></span>
-          <div id="drive-file-cols" class="tag-list"></div>
+          <span class="field-label">Prompt columns <span class="required">*</span></span>
+          <div id="prompt-col-list"></div>
         </div>
         <div class="field-group">
           <span class="field-label">System prompt column <span class="optional">(optional)</span></span>
