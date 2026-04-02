@@ -130,6 +130,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         this.outputColList = new TokenInput(container.querySelector("#output-col")!, headers, {
           multi: false,
           includeNew: true,
+          newDefault: "ai_",
           selected: preset.outputCol ? [preset.outputCol] : [],
         });
         this.rowRangeComp = new RowRange(

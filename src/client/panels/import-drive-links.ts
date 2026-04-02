@@ -58,6 +58,7 @@ export class ImportDriveLinksPanel implements Panel<undefined, SavedState> {
           this.outputColList = new TokenInput(container.querySelector("#output-col")!, headers, {
             multi: false,
             includeNew: true,
+            newDefault: "drive_links",
             selected: selected ? [selected] : [],
           });
           container.querySelector<HTMLElement>("#config-form")!.style.display = "block";

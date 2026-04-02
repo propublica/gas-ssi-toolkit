@@ -44,6 +44,7 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
           this.outputColList = new TokenInput(container.querySelector("#output-col")!, headers, {
             multi: false,
             includeNew: true,
+            newDefault: "extracted_text",
             selected: selectedOutput ? [selectedOutput] : [],
           });
           container.querySelector<HTMLElement>("#config-form")!.style.display = "block";

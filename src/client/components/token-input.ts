@@ -25,6 +25,8 @@ export interface TokenInputOpts {
   multi?: boolean;
   /** Append a "+ New column" option for creating a new named column. */
   includeNew?: boolean;
+  /** Initial value pre-filled in the new-column chip input. Defaults to "". */
+  newDefault?: string;
 }
 
 export class TokenInput {
@@ -37,6 +39,7 @@ export class TokenInput {
   private readonly allItems: string[];
   private readonly multi: boolean;
   private readonly includeNew: boolean;
+  private readonly newDefault: string;
 
   /** Ordered list of currently selected values (preserves insertion order). */
   private selected: string[];
@@ -49,6 +52,7 @@ export class TokenInput {
     this.allItems = items;
     this.multi = opts.multi !== false;
     this.includeNew = opts.includeNew === true;
+    this.newDefault = opts.newDefault ?? "";
     this.selected = [];
 
     // Build DOM
@@ -241,7 +245,7 @@ export class TokenInput {
     }
 
     this.closeDropdown();
-    this.addNewChip("ai_");
+    this.addNewChip(this.newDefault);
     this.updateAddBtn();
   }
 
