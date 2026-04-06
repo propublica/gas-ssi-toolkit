@@ -46,17 +46,37 @@ async function mountAndLoad(
   return { container, panel };
 }
 
-/** Selects a column in a TokenInput field by opening its dropdown and clicking the option. */
+/** Clicks "+ Add column" and selects value in the newly appended PromptColList row. */
+function addPromptCol(
+  container: HTMLElement,
+  value: string,
+  kind: "text" | "file" = "text",
+): void {
+  container.querySelector<HTMLElement>(".pcol-add-btn")!.click();
+  const rows = container.querySelectorAll(".pcol-row");
+  const row = rows[rows.length - 1] as HTMLElement;
+  row.querySelector<HTMLElement>(".token-add-btn")!.click();
+  row.querySelector<HTMLElement>(`.token-option[data-value="${value}"]`)!.click();
+  if (kind === "file") {
+    const pills = row.querySelectorAll<HTMLElement>(".pcol-kind-pills .tag");
+    pills[1].click();
+  }
+}
+
+/** Returns column chip values from all filled rows in the PromptColList. */
+function getPromptColValues(container: HTMLElement): string[] {
+  return Array.from(container.querySelectorAll(".pcol-row"))
+    .map(
+      (row) =>
+        row.querySelector<HTMLElement>(".token-chip[data-value]")?.getAttribute("data-value") ?? "",
+    )
+    .filter(Boolean);
+}
+
+/** Selects a column in a non-PromptColList TokenInput field (e.g. system-prompt-col, output-col). */
 function selectColumn(container: HTMLElement, fieldId: string, value: string): void {
   container.querySelector<HTMLElement>(`#${fieldId} .token-add-btn`)!.click();
   container.querySelector<HTMLElement>(`#${fieldId} .token-option[data-value="${value}"]`)!.click();
-}
-
-/** Returns data-value attributes of current chips in a TokenInput field. */
-function getChipValues(container: HTMLElement, fieldId: string): string[] {
-  return Array.from(
-    container.querySelectorAll<HTMLElement>(`#${fieldId} .token-chip[data-value]`),
-  ).map((el) => el.getAttribute("data-value") ?? "");
 }
 
 beforeEach(() => {
@@ -97,7 +117,7 @@ describe("ConfigureAIRunPanel — mount", () => {
 
   it("pre-selects params on mount", async () => {
     const { container } = await mountAndLoad({ promptCols: [{ col: "col_a", kind: "text" }] });
-    expect(getChipValues(container, "user-prompt-cols")).toContain("col_a");
+    expect(getPromptColValues(container)).toContain("col_a");
   });
 
   it("restores savedState over params", async () => {
@@ -110,7 +130,7 @@ describe("ConfigureAIRunPanel — mount", () => {
       { promptCols: [{ col: "col_a", kind: "text" }] },
       savedState,
     );
-    expect(getChipValues(container, "user-prompt-cols")).toContain("col_b");
+    expect(getPromptColValues(container)).toContain("col_b");
   });
 });
 
@@ -124,7 +144,7 @@ describe("ConfigureAIRunPanel — Run AI", () => {
 
   it("alerts when no output column selected", async () => {
     const { container } = await mountAndLoad();
-    selectColumn(container, "user-prompt-cols", "col_a");
+    addPromptCol(container, "col_a");
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     expect(globalThis.alert).toHaveBeenCalledWith("Please select an output column.");
   });
@@ -232,7 +252,7 @@ describe("ConfigureAIRunPanel — refresh", () => {
     await Promise.resolve();
     expect(services.getSheetHeaders).toHaveBeenCalledTimes(2);
     // selections preserved after refresh
-    expect(getChipValues(container, "user-prompt-cols")).toContain("col_a");
+    expect(getPromptColValues(container)).toContain("col_a");
   });
 });
 
@@ -309,7 +329,7 @@ describe("includeGrounding checkbox", () => {
   it("unmount saves includeGrounding state", async () => {
     const { container, panel } = await mountAndLoad();
     container.querySelector<HTMLInputElement>("#include-grounding-cb")!.checked = true;
-    selectColumn(container, "user-prompt-cols", "col_a");
+    addPromptCol(container, "col_a");
     const saved = panel.unmount();
     expect(saved?.includeGrounding).toBe(true);
   });
@@ -372,7 +392,7 @@ describe("includeGrounding checkbox", () => {
 describe("ConfigureAIRunPanel — unmount", () => {
   it("unmount() returns current form state as SavedState", async () => {
     const { container, panel } = await mountAndLoad();
-    selectColumn(container, "user-prompt-cols", "col_a");
+    addPromptCol(container, "col_a");
     selectColumn(container, "output-col", "ai_inference");
     const state = panel.unmount();
     expect(state).not.toBeUndefined();

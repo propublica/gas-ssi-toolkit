@@ -641,3 +641,55 @@
             color: #9aa0a6;
             font-style: italic;
         }
+
+        /* ── Prompt Column List ──────────────────────────────────────────────────── */
+
+        .pcol-list { display: flex; flex-direction: column; gap: 8px; }
+
+        .pcol-row { display: flex; flex-direction: column; gap: 4px; }
+
+        .pcol-row-line1 { width: 100%; }
+
+        .pcol-row-line2 {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .pcol-kind-pills { display: flex; gap: 4px; }
+
+        .pcol-spacer { flex: 1; }
+
+        .pcol-btn-up,
+        .pcol-btn-down,
+        .pcol-btn-remove {
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: var(--text-secondary);
+          font-size: 13px;
+          padding: 2px 4px;
+          line-height: 1;
+        }
+
+        .pcol-btn-up:hover,
+        .pcol-btn-down:hover { color: var(--primary-blue); }
+        .pcol-btn-remove:hover { color: #d93025; }
+        .pcol-btn-up:disabled,
+        .pcol-btn-down:disabled { opacity: 0.25; cursor: default; }
+
+        .pcol-add-btn {
+          width: 100%;
+          margin-top: 4px;
+          background: none;
+          border: 1px solid var(--border-color);
+          border-radius: 4px;
+          color: var(--text-secondary);
+          font-size: 12px;
+          padding: 5px 8px;
+          cursor: pointer;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+          box-sizing: border-box;
+        }
+
+        .pcol-add-btn:hover { border-color: var(--primary-blue); color: var(--primary-blue); }
