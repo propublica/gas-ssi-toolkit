@@ -59,40 +59,28 @@ export class PromptColList {
     const el = document.createElement("div");
     el.className = "pcol-row";
 
-    // Line 1: TokenInput for column selection
-    const line1 = document.createElement("div");
-    line1.className = "pcol-row-line1";
-    const tokenInput = new TokenInput(line1, this.headers, {
+    const pickerWrap = document.createElement("div");
+    pickerWrap.className = "pcol-col-picker";
+    const tokenInput = new TokenInput(pickerWrap, this.headers, {
       multi: false,
       selected: initialCol ? [initialCol] : [],
     });
-    el.appendChild(line1);
-
-    // Line 2: kind pills + spacer + action buttons
-    const line2 = document.createElement("div");
-    line2.className = "pcol-row-line2";
+    el.appendChild(pickerWrap);
 
     const pillsWrap = document.createElement("div");
     pillsWrap.className = "pcol-kind-pills";
-
     const textPill = this.makePill("Text", kind === "text");
     const filePill = this.makePill("File", kind === "file");
     pillsWrap.appendChild(textPill);
     pillsWrap.appendChild(filePill);
-
-    const spacer = document.createElement("div");
-    spacer.className = "pcol-spacer";
+    el.appendChild(pillsWrap);
 
     const upBtn = this.makeBtn("↑", "pcol-btn-up");
     const downBtn = this.makeBtn("↓", "pcol-btn-down");
     const removeBtn = this.makeBtn("×", "pcol-btn-remove");
-
-    line2.appendChild(pillsWrap);
-    line2.appendChild(spacer);
-    line2.appendChild(upBtn);
-    line2.appendChild(downBtn);
-    line2.appendChild(removeBtn);
-    el.appendChild(line2);
+    el.appendChild(upBtn);
+    el.appendChild(downBtn);
+    el.appendChild(removeBtn);
 
     const row: PromptRow = { kind, tokenInput, el };
 

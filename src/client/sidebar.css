@@ -646,23 +646,28 @@
 
         .pcol-list { display: flex; flex-direction: column; gap: 8px; }
 
-        .pcol-row { display: flex; flex-direction: column; gap: 4px; }
-
-        .pcol-row-line1 { width: 100%; }
-
-        .pcol-row-line2 {
+        .pcol-row {
           display: flex;
           align-items: center;
           gap: 4px;
+          margin-bottom: 4px;
         }
 
-        .pcol-kind-pills { display: flex; gap: 4px; }
+        .pcol-col-picker {
+          flex: 0 0 55%;
+          min-width: 0;
+        }
 
-        .pcol-spacer { flex: 1; }
+        .pcol-kind-pills {
+          display: flex;
+          gap: 2px;
+          flex-shrink: 0;
+        }
 
         .pcol-btn-up,
         .pcol-btn-down,
         .pcol-btn-remove {
+          flex-shrink: 0;
           background: none;
           border: none;
           cursor: pointer;
