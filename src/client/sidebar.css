@@ -416,9 +416,8 @@
 
         .field-helper {
             font-size: 11px;
-            font-style: italic;
             color: var(--text-secondary);
-            margin: 0 0 8px 0;
+            margin: 2px 0 8px 0;
             line-height: 1.4;
         }
 
@@ -698,13 +697,6 @@
         }
 
         .pcol-add-btn:hover { border-color: var(--primary-blue); color: var(--primary-blue); }
-
-        .field-helper {
-            font-size: 11px;
-            color: var(--text-secondary);
-            margin: 2px 0 8px 0;
-            line-height: 1.4;
-        }
 
         .collapsible-header {
             display: flex;
