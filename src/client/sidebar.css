@@ -698,3 +698,61 @@
         }
 
         .pcol-add-btn:hover { border-color: var(--primary-blue); color: var(--primary-blue); }
+
+        .field-helper {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin: 2px 0 8px 0;
+            line-height: 1.4;
+        }
+
+        .collapsible-header {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            text-align: left;
+            gap: 6px;
+            margin-bottom: 0;
+        }
+
+        .collapsible-header:hover .collapsible-label {
+            color: var(--primary-blue);
+        }
+
+        .collapsible-label {
+            font-size: 11px;
+            font-style: italic;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .collapsible-summary {
+            flex: 1;
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-style: italic;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .collapsible-chevron {
+            font-size: 10px;
+            color: var(--text-secondary);
+            transition: transform 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .collapsible-header[aria-expanded="true"] .collapsible-chevron {
+            transform: rotate(90deg);
+        }
+
+        .collapsible-content {
+            padding-top: 8px;
+        }
