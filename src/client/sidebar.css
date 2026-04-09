@@ -702,6 +702,7 @@
             display: flex;
             align-items: center;
             width: 100%;
+            box-sizing: border-box;
             background: none;
             border: none;
             padding: 0;
@@ -726,12 +727,13 @@
 
         .collapsible-summary {
             flex: 1;
+            min-width: 0;
             font-size: 11px;
             color: var(--text-secondary);
             font-style: italic;
-            white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .collapsible-chevron {
