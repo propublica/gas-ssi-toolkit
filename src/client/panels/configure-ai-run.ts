@@ -28,7 +28,9 @@ export function computeChunks(
 export type SavedState = Required<
   Omit<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown">
 > &
-  Pick<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown">;
+  Pick<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown"> & {
+    toolsExpanded?: boolean;
+  };
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
   private promptColList: PromptColList | null = null;
@@ -41,6 +43,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private outputColObserver: MutationObserver | null = null;
   private nav: NavigationContext | null = null;
   private headersLoaded = false;
+  private toolsExpanded = false;
 
   mount(
     container: HTMLElement,
@@ -90,6 +93,31 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     };
     updateGroundingVisibility();
     container.querySelector("#tools-list")?.addEventListener("click", updateGroundingVisibility);
+
+    // Restore and wire collapsible Tools section
+    this.toolsExpanded = savedState?.toolsExpanded ?? false;
+    this.applyToolsExpandState(container);
+    container.querySelector("#tools-toggle")?.addEventListener("click", () => {
+      this.toolsExpanded = !this.toolsExpanded;
+      this.applyToolsExpandState(container);
+    });
+
+    const updateToolsSummary = (): void => {
+      const summary = container.querySelector<HTMLElement>("#tools-summary");
+      if (!summary) return;
+      const selected = this.toolsList?.getValue() ?? [];
+      if (selected.length === 0) {
+        summary.textContent = "No tools selected";
+      } else {
+        const names = selected.map((id) => {
+          const entry = TOOL_CATALOG.find((t) => t.id === id);
+          return entry?.name ?? id;
+        });
+        summary.textContent = names.join(", ");
+      }
+    };
+    updateToolsSummary();
+    container.querySelector("#tools-list")?.addEventListener("click", updateToolsSummary);
 
     const loader = new PanelLoader(container);
     loader.setState({ status: "loading", message: "Loading columns..." });
@@ -174,7 +202,15 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       tools: (this.toolsList?.getValue() ?? []) as ToolId[],
       includeGrounding: this.includeGroundingCb?.checked ?? false,
       applyMarkdown: this.applyMarkdownCb?.checked ?? false,
+      toolsExpanded: this.toolsExpanded,
     };
+  }
+
+  private applyToolsExpandState(container: HTMLElement): void {
+    const content = container.querySelector<HTMLElement>("#tools-content");
+    const toggle = container.querySelector<HTMLButtonElement>("#tools-toggle");
+    if (content) content.hidden = !this.toolsExpanded;
+    if (toggle) toggle.setAttribute("aria-expanded", String(this.toolsExpanded));
   }
 
   private wireNavButtons(container: HTMLElement): void {
