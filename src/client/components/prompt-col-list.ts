@@ -94,7 +94,7 @@ export class PromptColList {
   }
 
   private kindLabel(kind: PromptColumnSpec["kind"]): string {
-    return kind.charAt(0).toUpperCase() + kind.slice(1);
+    return kind.charAt(0).toUpperCase() + kind.slice(1) + " ⇄";
   }
 
   private makeBtn(label: string, className: string): HTMLButtonElement {

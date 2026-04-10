@@ -643,13 +643,12 @@
 
         /* ── Prompt Column List ──────────────────────────────────────────────────── */
 
-        .pcol-list { display: flex; flex-direction: column; gap: 8px; }
+        .pcol-list { display: flex; flex-direction: column; gap: 4px; }
 
         .pcol-row {
           display: flex;
           align-items: center;
           gap: 4px;
-          margin-bottom: 4px;
         }
 
         .pcol-col-picker {

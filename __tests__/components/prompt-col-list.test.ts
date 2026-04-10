@@ -68,8 +68,8 @@ describe("PromptColList — construction", () => {
     const rows = container.querySelectorAll(".pcol-row");
     const toggleRow0 = rows[0].querySelector<HTMLElement>(".pcol-kind-toggle");
     const toggleRow1 = rows[1].querySelector<HTMLElement>(".pcol-kind-toggle");
-    expect(toggleRow0?.textContent).toBe("Text");
-    expect(toggleRow1?.textContent).toBe("File");
+    expect(toggleRow0?.textContent).toBe("Text ⇄");
+    expect(toggleRow1?.textContent).toBe("File ⇄");
     list.destroy();
   });
 });
@@ -137,7 +137,7 @@ describe("PromptColList — add row", () => {
     container.querySelector<HTMLElement>(".pcol-add-btn")!.click();
     const rows = container.querySelectorAll(".pcol-row");
     const toggle = rows[0].querySelector<HTMLElement>(".pcol-kind-toggle");
-    expect(toggle?.textContent).toBe("Text");
+    expect(toggle?.textContent).toBe("Text ⇄");
     list.destroy();
   });
 });
