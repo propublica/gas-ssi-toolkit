@@ -1,6 +1,8 @@
 import type { PromptColumnSpec } from "../../shared/types";
 import { TokenInput } from "./token-input";
 
+const PROMPT_KINDS: PromptColumnSpec["kind"][] = ["text", "file"];
+
 interface PromptRow {
   kind: "text" | "file";
   tokenInput: TokenInput;
@@ -67,13 +69,8 @@ export class PromptColList {
     });
     el.appendChild(pickerWrap);
 
-    const pillsWrap = document.createElement("div");
-    pillsWrap.className = "pcol-kind-pills";
-    const textPill = this.makePill("Text", kind === "text");
-    const filePill = this.makePill("File", kind === "file");
-    pillsWrap.appendChild(textPill);
-    pillsWrap.appendChild(filePill);
-    el.appendChild(pillsWrap);
+    const kindToggle = this.makeBtn(this.kindLabel(kind), "pcol-kind-toggle");
+    el.appendChild(kindToggle);
 
     const upBtn = this.makeBtn("↑", "pcol-btn-up");
     const downBtn = this.makeBtn("↓", "pcol-btn-down");
@@ -84,15 +81,10 @@ export class PromptColList {
 
     const row: PromptRow = { kind, tokenInput, el };
 
-    textPill.addEventListener("click", () => {
-      row.kind = "text";
-      textPill.classList.add("selected");
-      filePill.classList.remove("selected");
-    });
-    filePill.addEventListener("click", () => {
-      row.kind = "file";
-      filePill.classList.add("selected");
-      textPill.classList.remove("selected");
+    kindToggle.addEventListener("click", () => {
+      const nextIdx = (PROMPT_KINDS.indexOf(row.kind) + 1) % PROMPT_KINDS.length;
+      row.kind = PROMPT_KINDS[nextIdx];
+      kindToggle.textContent = this.kindLabel(row.kind);
     });
     upBtn.addEventListener("click", () => this.moveRow(row, -1));
     downBtn.addEventListener("click", () => this.moveRow(row, 1));
@@ -101,12 +93,8 @@ export class PromptColList {
     return row;
   }
 
-  private makePill(label: string, selected: boolean): HTMLButtonElement {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "tag" + (selected ? " selected" : "");
-    btn.textContent = label;
-    return btn;
+  private kindLabel(kind: PromptColumnSpec["kind"]): string {
+    return kind.charAt(0).toUpperCase() + kind.slice(1);
   }
 
   private makeBtn(label: string, className: string): HTMLButtonElement {

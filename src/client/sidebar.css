@@ -655,17 +655,23 @@
         .pcol-col-picker {
           flex: 1 1 0;
           min-width: 0;
-          overflow-x: auto;
         }
 
-        .pcol-col-picker .token-chips {
-          flex-wrap: nowrap;
-        }
-
-        .pcol-kind-pills {
-          display: flex;
-          gap: 2px;
+        .pcol-kind-toggle {
           flex-shrink: 0;
+          background: none;
+          border: 1px solid var(--border-color);
+          border-radius: 12px;
+          padding: 2px 8px;
+          font-size: 11px;
+          color: var(--text-secondary);
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .pcol-kind-toggle:hover {
+          border-color: var(--primary-blue);
+          color: var(--primary-blue);
         }
 
         .pcol-btn-up,
