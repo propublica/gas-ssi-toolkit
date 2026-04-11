@@ -185,6 +185,11 @@
 
         .field-group { margin-bottom: 16px; }
 
+        .field-group + .field-group {
+            border-top: 1px solid var(--border-color);
+            padding-top: 16px;
+        }
+
         .field-label {
             display: block;
             font-size: 11px;
@@ -416,9 +421,8 @@
 
         .field-helper {
             font-size: 11px;
-            font-style: italic;
             color: var(--text-secondary);
-            margin: 0 0 8px 0;
+            margin: 2px 0 8px 0;
             line-height: 1.4;
         }
 
@@ -644,25 +648,40 @@
 
         /* ── Prompt Column List ──────────────────────────────────────────────────── */
 
-        .pcol-list { display: flex; flex-direction: column; gap: 8px; }
+        .pcol-list { display: flex; flex-direction: column; gap: 4px; }
 
-        .pcol-row { display: flex; flex-direction: column; gap: 4px; }
-
-        .pcol-row-line1 { width: 100%; }
-
-        .pcol-row-line2 {
+        .pcol-row {
           display: flex;
           align-items: center;
           gap: 4px;
         }
 
-        .pcol-kind-pills { display: flex; gap: 4px; }
+        .pcol-col-picker {
+          flex: 1 1 0;
+          min-width: 0;
+        }
 
-        .pcol-spacer { flex: 1; }
+        .pcol-kind-toggle {
+          flex-shrink: 0;
+          background: none;
+          border: 1px solid var(--border-color);
+          border-radius: 12px;
+          padding: 2px 8px;
+          font-size: 11px;
+          color: var(--text-secondary);
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .pcol-kind-toggle:hover {
+          border-color: var(--primary-blue);
+          color: var(--primary-blue);
+        }
 
         .pcol-btn-up,
         .pcol-btn-down,
         .pcol-btn-remove {
+          flex-shrink: 0;
           background: none;
           border: none;
           cursor: pointer;
@@ -693,3 +712,56 @@
         }
 
         .pcol-add-btn:hover { border-color: var(--primary-blue); color: var(--primary-blue); }
+
+        .collapsible-header {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            box-sizing: border-box;
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            text-align: left;
+            gap: 6px;
+            margin-bottom: 0;
+        }
+
+        .collapsible-header:hover .collapsible-label {
+            color: var(--primary-blue);
+        }
+
+        .collapsible-label {
+            font-size: 11px;
+            font-style: italic;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .collapsible-summary {
+            flex: 1;
+            min-width: 0;
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-style: italic;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .collapsible-chevron {
+            font-size: 10px;
+            color: var(--text-secondary);
+            transition: transform 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .collapsible-header[aria-expanded="true"] .collapsible-chevron {
+            transform: rotate(90deg);
+        }
+
+        .collapsible-content {
+            padding-top: 8px;
+        }

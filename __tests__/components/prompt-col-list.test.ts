@@ -23,7 +23,9 @@ function selectColInRow(container: HTMLElement, rowIndex: number, value: string)
 function getColInRow(container: HTMLElement, rowIndex: number): string {
   const rows = container.querySelectorAll(".pcol-row");
   const row = rows[rowIndex] as HTMLElement;
-  return row.querySelector<HTMLElement>(".token-chip[data-value]")?.getAttribute("data-value") ?? "";
+  return (
+    row.querySelector<HTMLElement>(".token-chip[data-value]")?.getAttribute("data-value") ?? ""
+  );
 }
 
 afterEach(() => {
@@ -57,17 +59,17 @@ describe("PromptColList — construction", () => {
     list.destroy();
   });
 
-  it("pre-selects the correct kind pill for each initialValue entry", () => {
+  it("pre-selects the correct kind for each initialValue entry", () => {
     const container = makeContainer();
     const list = new PromptColList(container, HEADERS, [
       { col: "col_a", kind: "text" },
       { col: "col_b", kind: "file" },
     ]);
     const rows = container.querySelectorAll(".pcol-row");
-    const textPillRow0 = rows[0].querySelector<HTMLElement>(".pcol-kind-pills .tag:first-child");
-    const filePillRow1 = rows[1].querySelector<HTMLElement>(".pcol-kind-pills .tag:last-child");
-    expect(textPillRow0?.classList.contains("selected")).toBe(true);
-    expect(filePillRow1?.classList.contains("selected")).toBe(true);
+    const toggleRow0 = rows[0].querySelector<HTMLElement>(".pcol-kind-toggle");
+    const toggleRow1 = rows[1].querySelector<HTMLElement>(".pcol-kind-toggle");
+    expect(toggleRow0?.textContent).toBe("Text ⇄");
+    expect(toggleRow1?.textContent).toBe("File ⇄");
     list.destroy();
   });
 });
@@ -134,8 +136,8 @@ describe("PromptColList — add row", () => {
     const list = new PromptColList(container, HEADERS);
     container.querySelector<HTMLElement>(".pcol-add-btn")!.click();
     const rows = container.querySelectorAll(".pcol-row");
-    const textPill = rows[0].querySelector<HTMLElement>(".pcol-kind-pills .tag:first-child");
-    expect(textPill?.classList.contains("selected")).toBe(true);
+    const toggle = rows[0].querySelector<HTMLElement>(".pcol-kind-toggle");
+    expect(toggle?.textContent).toBe("Text ⇄");
     list.destroy();
   });
 });
@@ -155,20 +157,22 @@ describe("PromptColList — remove row", () => {
 });
 
 describe("PromptColList — kind toggle", () => {
-  it("clicking File pill changes kind to file in getValue()", () => {
+  it("clicking toggle changes kind to file in getValue()", () => {
     const container = makeContainer();
     const list = new PromptColList(container, HEADERS, [{ col: "col_a", kind: "text" }]);
     const row = container.querySelector<HTMLElement>(".pcol-row")!;
-    row.querySelector<HTMLElement>(".pcol-kind-pills .tag:last-child")!.click(); // File
+    row.querySelector<HTMLElement>(".pcol-kind-toggle")!.click();
     expect(list.getValue()).toEqual([{ col: "col_a", kind: "file" }]);
     list.destroy();
   });
 
-  it("clicking Text pill after File restores text kind", () => {
+  it("clicking toggle twice cycles back to text kind", () => {
     const container = makeContainer();
-    const list = new PromptColList(container, HEADERS, [{ col: "col_a", kind: "file" }]);
+    const list = new PromptColList(container, HEADERS, [{ col: "col_a", kind: "text" }]);
     const row = container.querySelector<HTMLElement>(".pcol-row")!;
-    row.querySelector<HTMLElement>(".pcol-kind-pills .tag:first-child")!.click(); // Text
+    const toggle = row.querySelector<HTMLElement>(".pcol-kind-toggle")!;
+    toggle.click();
+    toggle.click();
     expect(list.getValue()).toEqual([{ col: "col_a", kind: "text" }]);
     list.destroy();
   });

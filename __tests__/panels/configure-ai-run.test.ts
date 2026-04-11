@@ -47,11 +47,7 @@ async function mountAndLoad(
 }
 
 /** Clicks "+ Add column" and selects value in the newly appended PromptColList row. */
-function addPromptCol(
-  container: HTMLElement,
-  value: string,
-  kind: "text" | "file" = "text",
-): void {
+function addPromptCol(container: HTMLElement, value: string, kind: "text" | "file" = "text"): void {
   container.querySelector<HTMLElement>(".pcol-add-btn")!.click();
   const rows = container.querySelectorAll(".pcol-row");
   const row = rows[rows.length - 1] as HTMLElement;
@@ -420,5 +416,76 @@ describe("ConfigureAIRunPanel — unmount", () => {
     expect(state).not.toBeUndefined();
     const typedState = state as { promptCols: Array<{ col: string; kind: string }> };
     expect(typedState.promptCols).toContainEqual({ col: "col_b", kind: "file" });
+  });
+});
+
+describe("ConfigureAIRunPanel — collapsible Tools section", () => {
+  it("tools content is hidden on mount by default", async () => {
+    const { container } = await mountAndLoad();
+    expect(container.querySelector<HTMLElement>("#tools-content")!.hidden).toBe(true);
+  });
+
+  it("clicking tools toggle expands tools content", async () => {
+    const { container } = await mountAndLoad();
+    container.querySelector<HTMLButtonElement>("#tools-toggle")!.click();
+    expect(container.querySelector<HTMLElement>("#tools-content")!.hidden).toBe(false);
+  });
+
+  it("clicking tools toggle again collapses tools content", async () => {
+    const { container } = await mountAndLoad();
+    const toggle = container.querySelector<HTMLButtonElement>("#tools-toggle")!;
+    toggle.click();
+    toggle.click();
+    expect(container.querySelector<HTMLElement>("#tools-content")!.hidden).toBe(true);
+  });
+
+  it("summary shows 'No tools selected' when no tools are active", async () => {
+    const { container } = await mountAndLoad();
+    expect(container.querySelector<HTMLElement>("#tools-summary")!.textContent).toBe(
+      "No tools selected",
+    );
+  });
+
+  it("summary updates to tool names when a tool is selected", async () => {
+    const { container } = await mountAndLoad();
+    container.querySelector<HTMLButtonElement>('[data-value="google_search"]')!.click();
+    expect(container.querySelector<HTMLElement>("#tools-summary")!.textContent).toBe(
+      "Google Search",
+    );
+  });
+
+  it("summary reverts to 'No tools selected' when all tools deselected", async () => {
+    const { container } = await mountAndLoad();
+    const tag = container.querySelector<HTMLButtonElement>('[data-value="google_search"]')!;
+    tag.click(); // select
+    tag.click(); // deselect
+    expect(container.querySelector<HTMLElement>("#tools-summary")!.textContent).toBe(
+      "No tools selected",
+    );
+  });
+
+  it("toolsExpanded: true in savedState expands section on mount", async () => {
+    const { container } = await mountAndLoad(undefined, {
+      promptCols: [],
+      systemPromptCol: "",
+      outputCol: "",
+      toolsExpanded: true,
+    });
+    expect(container.querySelector<HTMLElement>("#tools-content")!.hidden).toBe(false);
+  });
+
+  it("unmount() saves toolsExpanded: true when section is open", async () => {
+    const { container, panel } = await mountAndLoad();
+    container.querySelector<HTMLButtonElement>("#tools-toggle")!.click();
+    const state = panel.unmount();
+    expect((state as { toolsExpanded?: boolean })?.toolsExpanded).toBe(true);
+  });
+
+  it("unmount() saves toolsExpanded: false when section is closed", async () => {
+    const { container, panel } = await mountAndLoad();
+    // default is closed — add a prompt col so unmount() returns state
+    addPromptCol(container, "col_a");
+    const state = panel.unmount();
+    expect((state as { toolsExpanded?: boolean })?.toolsExpanded).toBe(false);
   });
 });

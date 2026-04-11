@@ -28,7 +28,9 @@ export function computeChunks(
 export type SavedState = Required<
   Omit<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown">
 > &
-  Pick<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown">;
+  Pick<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown"> & {
+    toolsExpanded?: boolean;
+  };
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
   private promptColList: PromptColList | null = null;
@@ -41,6 +43,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private outputColObserver: MutationObserver | null = null;
   private nav: NavigationContext | null = null;
   private headersLoaded = false;
+  private toolsExpanded = false;
 
   mount(
     container: HTMLElement,
@@ -90,6 +93,31 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     };
     updateGroundingVisibility();
     container.querySelector("#tools-list")?.addEventListener("click", updateGroundingVisibility);
+
+    // Restore and wire collapsible Tools section
+    this.toolsExpanded = savedState?.toolsExpanded ?? false;
+    this.applyToolsExpandState(container);
+    container.querySelector("#tools-toggle")?.addEventListener("click", () => {
+      this.toolsExpanded = !this.toolsExpanded;
+      this.applyToolsExpandState(container);
+    });
+
+    const updateToolsSummary = (): void => {
+      const summary = container.querySelector<HTMLElement>("#tools-summary");
+      if (!summary) return;
+      const selected = this.toolsList?.getValue() ?? [];
+      if (selected.length === 0) {
+        summary.textContent = "No tools selected";
+      } else {
+        const names = selected.map((id) => {
+          const entry = TOOL_CATALOG.find((t) => t.id === id);
+          return entry?.name ?? id;
+        });
+        summary.textContent = names.join(", ");
+      }
+    };
+    updateToolsSummary();
+    container.querySelector("#tools-list")?.addEventListener("click", updateToolsSummary);
 
     const loader = new PanelLoader(container);
     loader.setState({ status: "loading", message: "Loading columns..." });
@@ -174,7 +202,15 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       tools: (this.toolsList?.getValue() ?? []) as ToolId[],
       includeGrounding: this.includeGroundingCb?.checked ?? false,
       applyMarkdown: this.applyMarkdownCb?.checked ?? false,
+      toolsExpanded: this.toolsExpanded,
     };
+  }
+
+  private applyToolsExpandState(container: HTMLElement): void {
+    const content = container.querySelector<HTMLElement>("#tools-content");
+    const toggle = container.querySelector<HTMLButtonElement>("#tools-toggle");
+    if (content) content.hidden = !this.toolsExpanded;
+    if (toggle) toggle.setAttribute("aria-expanded", String(this.toolsExpanded));
   }
 
   private wireNavButtons(container: HTMLElement): void {
@@ -284,40 +320,49 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
 
   private template(): string {
     return `
-      <div class="panel-header">
-        <button id="back-btn" class="back-btn">← Back</button>
-        <span class="panel-title">▶️ Run AI Inference</span>
-        <button id="refresh-btn" class="refresh-btn" title="Refresh columns">↻</button>
+    <div class="panel-header">
+      <button id="back-btn" class="back-btn">← Back</button>
+      <span class="panel-title">▶️ Run AI Inference</span>
+      <button id="refresh-btn" class="refresh-btn" title="Refresh columns">↻</button>
+    </div>
+    <div id="panel-loader" class="panel-loader" hidden>
+      <div class="panel-loader__bar-wrap" hidden>
+        <div class="panel-loader__bar-fill"></div>
       </div>
-      <div id="panel-loader" class="panel-loader" hidden>
-        <div class="panel-loader__bar-wrap" hidden>
-          <div class="panel-loader__bar-fill"></div>
-        </div>
-        <div class="panel-loader__spinner" hidden></div>
-        <p class="panel-loader__message"></p>
+      <div class="panel-loader__spinner" hidden></div>
+      <p class="panel-loader__message"></p>
+    </div>
+    <div id="no-headers-msg" class="no-headers-msg" style="display:none">
+      No columns found — add headers to your sheet first.
+    </div>
+    <div id="config-form" style="display:none">
+      <div class="field-group">
+        <span class="field-label">System prompt column <span class="optional">(optional)</span></span>
+        <p class="field-helper">Sets the AI's role and behavior — what it should do and how it should respond — before it sees any data.</p>
+        <div id="system-prompt-col" class="tag-list"></div>
       </div>
-      <div id="no-headers-msg" class="no-headers-msg" style="display:none">
-        No columns found — add headers to your sheet first.
+      <div class="field-group">
+        <span class="field-label">User prompt columns <span class="required">*</span></span>
+        <p class="field-helper">The content the AI acts on — what it reads, summarizes, classifies, or answers, one row at a time.</p>
+        <div id="prompt-col-list"></div>
       </div>
-      <div id="config-form" style="display:none">
-        <div class="field-group">
-          <span class="field-label">Prompt columns <span class="required">*</span></span>
-          <div id="prompt-col-list"></div>
-        </div>
-        <div class="field-group">
-          <span class="field-label">System prompt column <span class="optional">(optional)</span></span>
-          <div id="system-prompt-col" class="tag-list"></div>
-        </div>
-        <div class="field-group">
-          <span class="field-label">Output column <span class="required">*</span></span>
-          <div id="output-col" class="tag-list"></div>
-          <label class="checkbox-option">
-            <input type="checkbox" id="apply-markdown-cb" />
-            <span>Apply markdown formatting</span>
-          </label>
-        </div>
-        <div class="field-group">
-          <span class="field-label">Tools <span class="optional">(optional)</span></span>
+      <div class="field-group">
+        <span class="field-label">Output column <span class="required">*</span></span>
+        <p class="field-helper">Where the AI's response will be written. Select an existing column or create a new one.</p>
+        <div id="output-col" class="tag-list"></div>
+        <label class="checkbox-option">
+          <input type="checkbox" id="apply-markdown-cb" />
+          <span>Apply markdown formatting</span>
+        </label>
+      </div>
+      <div class="field-group">
+        <button type="button" id="tools-toggle" class="collapsible-header">
+          <span class="collapsible-label">TOOLS <span class="optional">(optional)</span></span>
+          <span id="tools-summary" class="collapsible-summary">No tools selected</span>
+          <span class="collapsible-chevron">▶</span>
+        </button>
+        <div id="tools-content" class="collapsible-content" hidden>
+          <p class="field-helper">Give the AI extra capabilities. Google Search lets it look up current information; URL Context lets it read web pages you provide; Code Execution lets it run and verify calculations.</p>
           <div id="tools-list" class="tag-list"></div>
           <div id="include-grounding-group" style="display:none">
             <label class="checkbox-option">
@@ -326,14 +371,15 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
             </label>
           </div>
         </div>
-        <div class="field-group">
-          <span class="field-label">Rows to process</span>
-          <div id="row-range-container"></div>
-        </div>
-        <div class="panel-buttons">
-          <button id="run-btn" class="btn-run">Run AI</button>
-        </div>
       </div>
-    `;
+      <div class="field-group">
+        <span class="field-label">Rows to process</span>
+        <div id="row-range-container"></div>
+      </div>
+      <div class="panel-buttons">
+        <button id="run-btn" class="btn-run">Run AI</button>
+      </div>
+    </div>
+  `;
   }
 }

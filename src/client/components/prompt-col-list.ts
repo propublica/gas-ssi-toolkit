@@ -1,6 +1,8 @@
 import type { PromptColumnSpec } from "../../shared/types";
 import { TokenInput } from "./token-input";
 
+const PROMPT_KINDS: PromptColumnSpec["kind"][] = ["text", "file"];
+
 interface PromptRow {
   kind: "text" | "file";
   tokenInput: TokenInput;
@@ -59,52 +61,30 @@ export class PromptColList {
     const el = document.createElement("div");
     el.className = "pcol-row";
 
-    // Line 1: TokenInput for column selection
-    const line1 = document.createElement("div");
-    line1.className = "pcol-row-line1";
-    const tokenInput = new TokenInput(line1, this.headers, {
+    const pickerWrap = document.createElement("div");
+    pickerWrap.className = "pcol-col-picker";
+    const tokenInput = new TokenInput(pickerWrap, this.headers, {
       multi: false,
       selected: initialCol ? [initialCol] : [],
     });
-    el.appendChild(line1);
+    el.appendChild(pickerWrap);
 
-    // Line 2: kind pills + spacer + action buttons
-    const line2 = document.createElement("div");
-    line2.className = "pcol-row-line2";
-
-    const pillsWrap = document.createElement("div");
-    pillsWrap.className = "pcol-kind-pills";
-
-    const textPill = this.makePill("Text", kind === "text");
-    const filePill = this.makePill("File", kind === "file");
-    pillsWrap.appendChild(textPill);
-    pillsWrap.appendChild(filePill);
-
-    const spacer = document.createElement("div");
-    spacer.className = "pcol-spacer";
+    const kindToggle = this.makeBtn(this.kindLabel(kind), "pcol-kind-toggle");
+    el.appendChild(kindToggle);
 
     const upBtn = this.makeBtn("↑", "pcol-btn-up");
     const downBtn = this.makeBtn("↓", "pcol-btn-down");
     const removeBtn = this.makeBtn("×", "pcol-btn-remove");
-
-    line2.appendChild(pillsWrap);
-    line2.appendChild(spacer);
-    line2.appendChild(upBtn);
-    line2.appendChild(downBtn);
-    line2.appendChild(removeBtn);
-    el.appendChild(line2);
+    el.appendChild(upBtn);
+    el.appendChild(downBtn);
+    el.appendChild(removeBtn);
 
     const row: PromptRow = { kind, tokenInput, el };
 
-    textPill.addEventListener("click", () => {
-      row.kind = "text";
-      textPill.classList.add("selected");
-      filePill.classList.remove("selected");
-    });
-    filePill.addEventListener("click", () => {
-      row.kind = "file";
-      filePill.classList.add("selected");
-      textPill.classList.remove("selected");
+    kindToggle.addEventListener("click", () => {
+      const nextIdx = (PROMPT_KINDS.indexOf(row.kind) + 1) % PROMPT_KINDS.length;
+      row.kind = PROMPT_KINDS[nextIdx];
+      kindToggle.textContent = this.kindLabel(row.kind);
     });
     upBtn.addEventListener("click", () => this.moveRow(row, -1));
     downBtn.addEventListener("click", () => this.moveRow(row, 1));
@@ -113,12 +93,8 @@ export class PromptColList {
     return row;
   }
 
-  private makePill(label: string, selected: boolean): HTMLButtonElement {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "tag" + (selected ? " selected" : "");
-    btn.textContent = label;
-    return btn;
+  private kindLabel(kind: PromptColumnSpec["kind"]): string {
+    return kind.charAt(0).toUpperCase() + kind.slice(1) + " ⇄";
   }
 
   private makeBtn(label: string, className: string): HTMLButtonElement {
