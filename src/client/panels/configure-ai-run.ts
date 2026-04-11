@@ -356,10 +356,6 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         </label>
       </div>
       <div class="field-group">
-        <span class="field-label">Rows to process</span>
-        <div id="row-range-container"></div>
-      </div>
-      <div class="field-group">
         <button type="button" id="tools-toggle" class="collapsible-header">
           <span class="collapsible-label">TOOLS <span class="optional">(optional)</span></span>
           <span id="tools-summary" class="collapsible-summary">No tools selected</span>
@@ -375,6 +371,10 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
             </label>
           </div>
         </div>
+      </div>
+      <div class="field-group">
+        <span class="field-label">Rows to process</span>
+        <div id="row-range-container"></div>
       </div>
       <div class="panel-buttons">
         <button id="run-btn" class="btn-run">Run AI</button>
