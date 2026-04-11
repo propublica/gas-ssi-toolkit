@@ -185,6 +185,11 @@
 
         .field-group { margin-bottom: 16px; }
 
+        .field-group + .field-group {
+            border-top: 1px solid var(--border-color);
+            padding-top: 16px;
+        }
+
         .field-label {
             display: block;
             font-size: 11px;
