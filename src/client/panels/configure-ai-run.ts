@@ -26,9 +26,12 @@ export function computeChunks(
 }
 
 export type SavedState = Required<
-  Omit<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown">
+  Omit<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "prefixWithColName">
 > &
-  Pick<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown"> & {
+  Pick<
+    RunConfig,
+    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "prefixWithColName"
+  > & {
     toolsExpanded?: boolean;
   };
 
