@@ -359,6 +359,10 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <span class="field-label">User prompt columns <span class="required">*</span></span>
         <p class="field-helper">The content the AI acts on — what it reads, summarizes, classifies, or answers, one row at a time.</p>
         <div id="prompt-col-list"></div>
+        <label class="checkbox-option">
+          <input type="checkbox" id="prefix-col-name-cb" />
+          <span>Prefix with column name</span>
+        </label>
       </div>
       <div class="field-group">
         <span class="field-label">Output column <span class="required">*</span></span>
@@ -367,10 +371,6 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <label class="checkbox-option">
           <input type="checkbox" id="apply-markdown-cb" />
           <span>Apply markdown formatting</span>
-        </label>
-        <label class="checkbox-option">
-          <input type="checkbox" id="prefix-col-name-cb" />
-          <span>Prefix parts with column name</span>
         </label>
       </div>
       <div class="field-group">
