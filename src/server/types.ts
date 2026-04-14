@@ -134,6 +134,8 @@ export type GeminiTool =
 export type PromptInput = {
   kind: PromptColumnSpec["kind"];
   value: unknown;
+  /** Optional label prepended to text parts as "<label>: <value>". If absent or empty, no prefix is applied. Ignored for file inputs. */
+  label?: string;
 };
 
 export interface DriveFileInfo {

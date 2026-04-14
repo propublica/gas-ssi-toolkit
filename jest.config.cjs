@@ -12,6 +12,7 @@ module.exports = {
     // since it never references DOM globals.
     "^.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
   },
+  cacheDirectory: "<rootDir>/.jest-cache",
   roots: ["<rootDir>/__tests__"],
   testPathIgnorePatterns: ["/node_modules/", "/__tests__/helpers/"],
   moduleNameMapper: {

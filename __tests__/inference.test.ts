@@ -155,4 +155,39 @@ describe("runInference", () => {
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.tools).toBeUndefined();
   });
+
+  describe("label prefix", () => {
+    it("prefixes a text part with the label and a colon-space separator", () => {
+      mockOkResponse("ok");
+      runInference([{ kind: "text", value: "hello", label: "Summary" }]);
+      const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
+      expect(payload.contents[0].parts[0].text).toBe("Summary: hello");
+    });
+
+    it("prefixes every part when a labeled input flattens to multiple texts", () => {
+      mockOkResponse("ok");
+      runInference([{ kind: "text", value: [["first"], ["second"]], label: "Notes" }]);
+      const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
+      expect(payload.contents[0].parts[0].text).toBe("Notes: first");
+      expect(payload.contents[0].parts[1].text).toBe("Notes: second");
+    });
+
+    it("does not prefix text parts when label is absent", () => {
+      mockOkResponse("ok");
+      runInference([{ kind: "text", value: "hello" }]);
+      const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
+      expect(payload.contents[0].parts[0].text).toBe("hello");
+    });
+
+    it("does not prefix file parts when label is set", () => {
+      mockOkResponse("ok");
+      runInference([
+        { kind: "file", value: "https://drive.google.com/file/d/abc123/view", label: "Attachment" },
+      ]);
+      const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
+      expect(payload.contents[0].parts).toHaveLength(1);
+      expect(payload.contents[0].parts[0].inline_data).toBeDefined();
+      expect(payload.contents[0].parts[0].text).toBeUndefined();
+    });
+  });
 });
