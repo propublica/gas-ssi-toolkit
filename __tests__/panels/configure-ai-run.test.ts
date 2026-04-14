@@ -489,3 +489,54 @@ describe("ConfigureAIRunPanel — collapsible Tools section", () => {
     expect((state as { toolsExpanded?: boolean })?.toolsExpanded).toBe(false);
   });
 });
+
+describe("prefixWithColName checkbox", () => {
+  it("renders the prefix-col-name checkbox", async () => {
+    const { container } = await mountAndLoad();
+    expect(container.querySelector("#prefix-col-name-cb")).not.toBeNull();
+  });
+
+  it("assembleRunConfig includes prefixWithColName: true when checkbox is checked", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+    });
+    container.querySelector<HTMLInputElement>("#prefix-col-name-cb")!.checked = true;
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    await Promise.resolve();
+    const config = (services.runBatchAI as jest.Mock).mock.calls[0]?.[0] as RunConfig | undefined;
+    expect(config?.prefixWithColName).toBe(true);
+  });
+
+  it("assembleRunConfig omits prefixWithColName when checkbox is unchecked", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+    });
+    container.querySelector<HTMLInputElement>("#prefix-col-name-cb")!.checked = false;
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    await Promise.resolve();
+    const config = (services.runBatchAI as jest.Mock).mock.calls[0]?.[0] as RunConfig | undefined;
+    expect(config?.prefixWithColName).toBeUndefined();
+  });
+
+  it("unmount saves prefixWithColName state", async () => {
+    const { container, panel } = await mountAndLoad();
+    container.querySelector<HTMLInputElement>("#prefix-col-name-cb")!.checked = true;
+    addPromptCol(container, "col_a");
+    const saved = panel.unmount();
+    expect(saved?.prefixWithColName).toBe(true);
+  });
+
+  it("restores prefixWithColName from savedState", async () => {
+    const { container } = await mountAndLoad(undefined, {
+      promptCols: [{ col: "col_a", kind: "text" as const }],
+      systemPromptCol: "",
+      outputCol: "ai_inference",
+      prefixWithColName: true,
+    });
+    expect(container.querySelector<HTMLInputElement>("#prefix-col-name-cb")!.checked).toBe(true);
+  });
+});

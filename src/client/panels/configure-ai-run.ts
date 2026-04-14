@@ -43,6 +43,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private toolsList: TagList | null = null;
   private includeGroundingCb: HTMLInputElement | null = null;
   private applyMarkdownCb: HTMLInputElement | null = null;
+  private prefixWithColNameCb: HTMLInputElement | null = null;
   private outputColObserver: MutationObserver | null = null;
   private nav: NavigationContext | null = null;
   private headersLoaded = false;
@@ -69,6 +70,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           tools: savedState.tools,
           includeGrounding: savedState.includeGrounding,
           applyMarkdown: savedState.applyMarkdown,
+          prefixWithColName: savedState.prefixWithColName,
         }
       : (params ?? {});
 
@@ -86,6 +88,11 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     this.applyMarkdownCb = container.querySelector<HTMLInputElement>("#apply-markdown-cb");
     if (this.applyMarkdownCb && preset.applyMarkdown) {
       this.applyMarkdownCb.checked = true;
+    }
+
+    this.prefixWithColNameCb = container.querySelector<HTMLInputElement>("#prefix-col-name-cb");
+    if (this.prefixWithColNameCb && preset.prefixWithColName) {
+      this.prefixWithColNameCb.checked = true;
     }
 
     const updateGroundingVisibility = (): void => {
@@ -205,6 +212,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       tools: (this.toolsList?.getValue() ?? []) as ToolId[],
       includeGrounding: this.includeGroundingCb?.checked ?? false,
       applyMarkdown: this.applyMarkdownCb?.checked ?? false,
+      prefixWithColName: this.prefixWithColNameCb?.checked ?? false,
       toolsExpanded: this.toolsExpanded,
     };
   }
@@ -238,6 +246,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       tools: (this.toolsList?.getValue() ?? []) as ToolId[],
       includeGrounding: this.includeGroundingCb?.checked,
       applyMarkdown: this.applyMarkdownCb?.checked,
+      prefixWithColName: this.prefixWithColNameCb?.checked,
     };
   }
 
@@ -310,6 +319,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     const tools = (this.toolsList?.getValue() ?? []) as ToolId[];
     const includeGrounding = this.includeGroundingCb?.checked ?? false;
     const applyMarkdown = this.applyMarkdownCb?.checked ?? false;
+    const prefixWithColName = this.prefixWithColNameCb?.checked ?? false;
     return {
       promptCols,
       systemPromptCol,
@@ -318,6 +328,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       tools: tools.length > 0 ? tools : undefined,
       includeGrounding: includeGrounding || undefined,
       applyMarkdown: applyMarkdown || undefined,
+      prefixWithColName: prefixWithColName || undefined,
     };
   }
 
@@ -356,6 +367,10 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <label class="checkbox-option">
           <input type="checkbox" id="apply-markdown-cb" />
           <span>Apply markdown formatting</span>
+        </label>
+        <label class="checkbox-option">
+          <input type="checkbox" id="prefix-col-name-cb" />
+          <span>Prefix parts with column name</span>
         </label>
       </div>
       <div class="field-group">
