@@ -38,7 +38,10 @@ export function runInference(
     for (const input of promptInputs) {
       if (input.kind === "text") {
         const texts = flattenArg(input.value);
-        userParts.push(...texts.map((text) => ({ text })));
+        const parts = input.label
+          ? texts.map((text) => ({ text: `${input.label}: ${text}` }))
+          : texts.map((text) => ({ text }));
+        userParts.push(...parts);
       } else {
         const fileIds = flattenArg(input.value).filter(isValidDriveLink).map(extractId);
         if (fileIds.length > 0) {

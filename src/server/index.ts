@@ -345,6 +345,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
     const promptInputs: PromptInput[] = config.promptCols.map((pc, i) => ({
       kind: pc.kind,
       value: row[promptIdxs[i]],
+      ...(config.prefixWithColName ? { label: pc.col } : {}),
     }));
     const systemPrompt = systemPromptIdx >= 0 ? row[systemPromptIdx] : undefined;
 

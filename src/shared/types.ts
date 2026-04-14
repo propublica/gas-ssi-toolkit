@@ -48,6 +48,8 @@ export interface RunConfig {
    * through buildRunConfig() without any server echo.
    */
   applyMarkdown?: boolean;
+  /** When true, each text prompt part is prefixed with its source column name as "<col>: <value>". */
+  prefixWithColName?: boolean;
 }
 
 // ── Recipes ─────────────────────────────────────────────────────
