@@ -1,4 +1,4 @@
-import type { ToolId } from "../shared/types";
+import type { PrepColSpec, RunConfig } from "../shared/types";
 
 // ── Loading / Progress types ─────────────────────────────────────────────────
 
@@ -20,54 +20,21 @@ export interface Job {
 }
 
 // ── Recipe UI types ─────────────────────────────────────────────
-// These are client-only — they define sidebar form structure, not RPC payloads.
+// These are client-only — they define the journalist-facing form, not RPC payloads.
 
-export interface RecipeFieldConfig {
-  value: string;
-  locked?: boolean; // defaults to true
-  placeholder?: string;
-}
-
-export type ColStrategyKind = "list-drive-folder" | "fill-value" | "create-empty";
-export type ColRole = "userPrompt" | "systemPrompt" | "driveLink" | "output";
-
-export interface AppendField {
+export interface UserInput {
+  /**
+   * Unique identifier for this input. Used as the key in template interpolation
+   * (e.g. a fill strategy of `{{folder}}` resolves from `inputValues["folder"]`).
+   *
+   * Must be camelCase or underscore_separated — no hyphens. The interpolation
+   * regex uses `\w+` which does not match `-`.
+   */
   id: string;
   label: string;
-  placeholder?: string;
-  /** Text injected before the reporter's value, e.g. "\n\nYou are looking for:\n\n" */
-  prefix?: string;
-}
-
-export interface RecipeSettings {
-  tools?: ToolId[];
-  applyMarkdown?: boolean;
-  includeGrounding?: boolean;
-}
-
-export interface ColumnDef {
-  /** UI section heading shown in the recipe panel */
-  label: string;
-  /** How this column maps into RunConfig after prep */
-  role: ColRole;
-  /** What PrepColSpec.strategy type to generate during prep */
-  strategyKind: ColStrategyKind;
-  /** Lockable column header field */
-  colTitle: RecipeFieldConfig;
-  /** Lockable prompt text — present for fill-value columns */
-  prompt?: RecipeFieldConfig;
-  /** Lockable URL input — present for drive columns */
-  url?: RecipeFieldConfig;
-  /** Extra reporter inputs composed into the prompt before prep */
-  appendFields?: AppendField[];
-  helperText?: string;
-  /** Show * in section heading */
   required?: boolean;
-}
-
-export interface RecipeParams {
-  columns: ColumnDef[];
-  settings?: RecipeSettings;
+  helperText?: string;
+  placeholder?: string;
 }
 
 /**
@@ -106,6 +73,10 @@ export interface RecipeDefinition {
   name: string;
   icon: string;
   description: string;
-  panelId: PanelId;
-  params?: RecipeParams;
+  /** Journalist-facing form fields. Drives RecipePanel rendering. */
+  inputs: UserInput[];
+  /** Column template passed to prepRecipe(). Strategies may reference input IDs. */
+  prepTemplate: PrepColSpec[];
+  /** Partial RunConfig passed to ConfigureAIRunPanel after cook. rowRange is filled in by prep result. */
+  runTemplate: Partial<RunConfig>;
 }
