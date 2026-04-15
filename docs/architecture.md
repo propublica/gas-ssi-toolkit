@@ -36,7 +36,7 @@ HtmlService can only serve `.html` files. A custom Rollup plugin inlines all JS 
 
 ## `google.d.ts` — Hand-Maintained
 
-`src/client/google.d.ts` is the TypeScript declaration for `google.script.run`. It is **not auto-generated** — it must be manually updated whenever a server function is added or removed. If you skip this, the client will typecheck against stale declarations and only fail at runtime.
+`src/client/google.d.ts` is the TypeScript declaration for `google.script.run`. It is **not auto-generated** — it must be manually updated whenever a server function that is callable from the client is added or removed. Not every server function belongs here: only functions invoked via `google.script.run` from the sidebar need a declaration. If you skip this for a client-callable function, the client will typecheck against stale declarations and only fail at runtime.
 
 ## Tool System
 
@@ -49,11 +49,21 @@ The Gemini tool system spans three layers, linked by `ToolId` (a string union in
 
 `GeminiTool` is a discriminated union: `{ kind: "grounding" }` produces `{ [id]: {} }` in the Gemini REST payload; `{ kind: "function" }` produces `{ function_declarations: [...] }`.
 
+## `RunConfig` — The AI Run Descriptor
+
+`RunConfig` (in `src/shared/types.ts`) is the central data type for an AI run. It crosses the `google.script.run` boundary when the client calls `runBatchAI`, and it's the output both `ConfigureAIRunPanel` and `RecipePanel` produce.
+
+The key field is `promptCols: PromptColumnSpec[]` — an **ordered** list of `{ col: string; kind: "text" | "file" }` entries. Order matters: parts are assembled into the Gemini request in the sequence they appear, allowing a recipe or user to interleave text and file columns arbitrarily (e.g. file first, then a text instruction column). Each entry's `kind` determines whether the column value is sent as inline text or fetched and base64-encoded as a Drive file.
+
+Other fields: `systemPromptCol` (optional system instruction column), `outputCol` (where results are written), `tools?: ToolId[]`, `includeGrounding`, `applyMarkdown`, `prefixWithColName` (prepends `"<col>: "` to each text part), and `rowRange`.
+
 ## Panel / Router System
 
 The client uses a lightweight navigation system: `Router` (`src/client/router.ts`) manages a push/pop navigation stack, and each `Panel` implementation handles its own render and state.
 
-**Recipes** are a workflow layer built on top of Run AI. Each `RecipeDefinition` in `src/client/recipes.ts` describes display metadata, the form fields shown during prep, and how those fields map to a `RunConfig`. The generic `RecipePanel` drives a four-state prep/cook machine: the user fills in parameters (prep), the server writes any required columns and returns a fully assembled `RunConfig` (prep-complete), and the user launches the AI run (cooking). The `preppedRunConfig` comes entirely from the server response — not from client form state — making it the single source of truth for what gets executed.
+**Recipes** are a workflow layer built on top of Run AI. Each `RecipeDefinition` in `src/client/recipes.ts` has four parts: journalist-facing `inputs` (form fields), a `prepTemplate` of `RecipeColumn` entries (column definitions with fill strategies and AI roles), optional `settings` (non-column `RunConfig` fields like tools or markdown), and display metadata. The generic `RecipePanel` drives a four-state prep/cook machine: the user fills in inputs (prep), the server writes the required columns and returns a `rowRange` (prep-complete), and the user launches the AI run (cooking).
+
+The `preppedRunConfig` is assembled client-side at prep-complete time from three sources: `buildRunTemplate(prepTemplate)` derives `promptCols`, `systemPromptCol`, and `outputCol` from each `RecipeColumn.role`; `definition.settings` contributes non-column options; and `result.rowRange` comes from the server. The server never constructs or returns a `RunConfig` — it only writes spreadsheet columns and reports back the populated row range.
 
 ## TypeScript Configuration
 
