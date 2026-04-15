@@ -1,4 +1,20 @@
-import type { ToolId } from "../shared/types";
+import type { PrepColSpec, RunConfig } from "../shared/types";
+
+// ── Recipe column types ──────────────────────────────────────────
+
+/**
+ * The AI inference role this column plays at run time.
+ * Lives client-side only — the server never reads it.
+ */
+export type ColumnRole = "file-prompt" | "text-prompt" | "system-prompt" | "output";
+
+/**
+ * What recipe authors write: the RPC-crossing PrepColSpec plus the
+ * client-only role that determines the column's place in the AI call.
+ */
+export interface RecipeColumn extends PrepColSpec {
+  role?: ColumnRole;
+}
 
 // ── Loading / Progress types ─────────────────────────────────────────────────
 
@@ -20,54 +36,31 @@ export interface Job {
 }
 
 // ── Recipe UI types ─────────────────────────────────────────────
-// These are client-only — they define sidebar form structure, not RPC payloads.
+// These are client-only — they define the journalist-facing form, not RPC payloads.
 
-export interface RecipeFieldConfig {
-  value: string;
-  locked?: boolean; // defaults to true
-  placeholder?: string;
-}
+/**
+ * Non-column AI settings a recipe can pre-configure.
+ * These flow into RunConfig at cook time alongside the derived column references.
+ * Typed as a Pick so it stays in sync with RunConfig automatically.
+ */
+export type RecipeSettings = Pick<
+  RunConfig,
+  "tools" | "applyMarkdown" | "includeGrounding" | "prefixWithColName"
+>;
 
-export type ColStrategyKind = "list-drive-folder" | "fill-value" | "create-empty";
-export type ColRole = "userPrompt" | "systemPrompt" | "driveLink" | "output";
-
-export interface AppendField {
+export interface RecipeInput {
+  /**
+   * Unique identifier for this input. Used as the key in template interpolation
+   * (e.g. a fill strategy of `{{folder}}` resolves from `inputValues["folder"]`).
+   *
+   * Must be camelCase or underscore_separated — no hyphens. The interpolation
+   * regex uses `\w+` which does not match `-`.
+   */
   id: string;
   label: string;
-  placeholder?: string;
-  /** Text injected before the reporter's value, e.g. "\n\nYou are looking for:\n\n" */
-  prefix?: string;
-}
-
-export interface RecipeSettings {
-  tools?: ToolId[];
-  applyMarkdown?: boolean;
-  includeGrounding?: boolean;
-}
-
-export interface ColumnDef {
-  /** UI section heading shown in the recipe panel */
-  label: string;
-  /** How this column maps into RunConfig after prep */
-  role: ColRole;
-  /** What PrepColSpec.strategy type to generate during prep */
-  strategyKind: ColStrategyKind;
-  /** Lockable column header field */
-  colTitle: RecipeFieldConfig;
-  /** Lockable prompt text — present for fill-value columns */
-  prompt?: RecipeFieldConfig;
-  /** Lockable URL input — present for drive columns */
-  url?: RecipeFieldConfig;
-  /** Extra reporter inputs composed into the prompt before prep */
-  appendFields?: AppendField[];
-  helperText?: string;
-  /** Show * in section heading */
   required?: boolean;
-}
-
-export interface RecipeParams {
-  columns: ColumnDef[];
-  settings?: RecipeSettings;
+  helperText?: string;
+  placeholder?: string;
 }
 
 /**
@@ -106,6 +99,14 @@ export interface RecipeDefinition {
   name: string;
   icon: string;
   description: string;
-  panelId: PanelId;
-  params?: RecipeParams;
+  /** Journalist-facing form fields. Drives RecipePanel rendering. */
+  inputs: RecipeInput[];
+  /**
+   * Column template passed to prepRecipe(). Each column's role field determines
+   * its place in the AI call — promptCols, systemPromptCol, outputCol are derived
+   * from these roles at cook time via buildRunTemplate().
+   */
+  prepTemplate: RecipeColumn[];
+  /** Non-column AI settings (tools, markdown, grounding, etc.). */
+  settings?: RecipeSettings;
 }

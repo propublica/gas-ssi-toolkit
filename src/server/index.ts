@@ -26,6 +26,7 @@ import {
   findOrCreateColumn,
   writeColumn,
   writeJobProgress,
+  interpolateTemplate,
 } from "./utils";
 import type {
   RunConfig,
@@ -396,15 +397,15 @@ export function runTool(functionName: string, jobId?: string): void {
 // RECIPE PREP
 // ==========================================
 
-export function prepRecipe(params: PrepRecipeParams): PrepRecipeResult {
+export function prepRecipe({ cols, inputValues }: PrepRecipeParams): PrepRecipeResult {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   let numRows = 1;
 
   // Pass 1: scan Drive folders, cache results, determine numRows
   const folderCache = new Map<string, string[]>();
-  for (const col of params.cols) {
-    if (col.strategy.kind === "list-drive-folder") {
-      const url = col.strategy.url;
+  for (const col of cols) {
+    if (col.fillStrategy.kind === "list-drive-folder") {
+      const url = inputValues[col.fillStrategy.inputId] ?? "";
       if (!folderCache.has(url)) {
         const folder = DriveApp.getFolderById(extractId(url));
         const files: { url: string }[] = [];
@@ -419,11 +420,11 @@ export function prepRecipe(params: PrepRecipeParams): PrepRecipeResult {
   }
 
   // Pass 2: write all columns
-  for (const col of params.cols) {
+  for (const col of cols) {
     const colIdx = findOrCreateColumn(sheet, col.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
-    switch (col.strategy.kind) {
+    switch (col.fillStrategy.kind) {
       case "list-drive-folder": {
-        const urls = folderCache.get(col.strategy.url) ?? [];
+        const urls = folderCache.get(inputValues[col.fillStrategy.inputId] ?? "") ?? [];
         writeColumn(sheet, colIdx, urls, SpreadsheetApp.WrapStrategy.CLIP);
         break;
       }
@@ -431,10 +432,20 @@ export function prepRecipe(params: PrepRecipeParams): PrepRecipeResult {
         writeColumn(
           sheet,
           colIdx,
-          Array(numRows).fill(col.strategy.value) as string[],
+          Array(numRows).fill(col.fillStrategy.value) as string[],
           SpreadsheetApp.WrapStrategy.CLIP,
         );
         break;
+      case "template": {
+        const resolved = interpolateTemplate(col.fillStrategy.template, inputValues);
+        writeColumn(
+          sheet,
+          colIdx,
+          Array(numRows).fill(resolved) as string[],
+          SpreadsheetApp.WrapStrategy.CLIP,
+        );
+        break;
+      }
       case "create-empty":
         break;
     }

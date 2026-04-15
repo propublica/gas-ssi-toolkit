@@ -18,6 +18,7 @@ import {
   findOrCreateColumn,
   writeColumn,
   writeJobProgress,
+  interpolateTemplate,
 } from "../src/server/utils";
 import type { DriveFileInfo } from "../src/server/types";
 
@@ -427,5 +428,29 @@ describe("writeColumn", () => {
     const wrapStrategy = "CLIP" as unknown as GoogleAppsScript.Spreadsheet.WrapStrategy;
     writeColumn(sheet, 3, ["a", "b"], wrapStrategy);
     expect(setWrapStrategyMock).toHaveBeenCalledWith(wrapStrategy);
+  });
+});
+
+describe("interpolateTemplate", () => {
+  it("replaces a single {{inputId}} with the corresponding value", () => {
+    expect(interpolateTemplate("Hello {{name}}", { name: "world" })).toBe("Hello world");
+  });
+
+  it("replaces multiple placeholders in one string", () => {
+    expect(
+      interpolateTemplate("{{a}} and {{b}}", { a: "foo", b: "bar" }),
+    ).toBe("foo and bar");
+  });
+
+  it("replaces the same placeholder multiple times", () => {
+    expect(interpolateTemplate("{{x}} {{x}}", { x: "hi" })).toBe("hi hi");
+  });
+
+  it("leaves unknown placeholders as empty string", () => {
+    expect(interpolateTemplate("{{missing}}", {})).toBe("");
+  });
+
+  it("returns the string unchanged when no placeholders present", () => {
+    expect(interpolateTemplate("no placeholders", { x: "y" })).toBe("no placeholders");
   });
 });
