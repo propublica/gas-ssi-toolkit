@@ -166,11 +166,14 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
       })
       .join("");
 
+    const introHtml = definition?.intro ? `<p class="recipe-intro">${definition.intro}</p>` : "";
+
     return `
       <div class="panel-header">
         <button id="back-btn" class="back-btn">← Back</button>
         <span class="panel-title">${title}</span>
       </div>
+      ${introHtml}
       ${inputsHtml}
       <div id="prep-cook-container"></div>
     `;

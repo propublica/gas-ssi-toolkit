@@ -6,12 +6,16 @@ export const RECIPES: RecipeDefinition[] = [
     name: "Document Summarization",
     icon: "📄",
     description: "Summarize files in a Google Drive folder",
+    intro:
+      "This recipe reads every file in a Drive folder and generates a tight, scannable summary for each one — designed to help you triage a large document set quickly. " +
+      "For best results, point it at a folder of similar documents (e.g. all court filings from one case, or a set of FOIA responses). " +
+      "Specifying a document type helps the AI parse the format correctly; specifying an area of interest focuses the summary on what matters for your story.",
     inputs: [
       {
         id: "folder",
         label: "Drive Folder",
         required: true,
-        helperText: "Make sure you have access to this folder",
+        helperText: "The folder of documents to summarize. Make sure you have access.",
         placeholder: "Paste Google Drive folder URL",
       },
       {
@@ -19,7 +23,7 @@ export const RECIPES: RecipeDefinition[] = [
         label: "Document Type",
         required: false,
         helperText:
-          "Helps the AI read the document correctly — legal language reads differently than a financial disclosure",
+          "Helps the AI read the document — legal language reads differently than a financial disclosure",
         placeholder: "e.g. court docket, FOIA response, annual report",
       },
       {

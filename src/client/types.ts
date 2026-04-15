@@ -99,6 +99,8 @@ export interface RecipeDefinition {
   name: string;
   icon: string;
   description: string;
+  /** Optional longer description rendered at the top of the recipe panel. */
+  intro?: string;
   /** Journalist-facing form fields. Drives RecipePanel rendering. */
   inputs: RecipeInput[];
   /**
