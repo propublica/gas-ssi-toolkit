@@ -43,7 +43,7 @@ export const RECIPES: RecipeDefinition[] = [
             'Tone: Objective, professional, and dense with information but sparse with "fluff" words.\n\n' +
             "Guidelines:\n" +
             '  - Prioritize Utility: Focus on information that helps a user decide: "Do I need to open the full file?"\n' +
-            '  - Structure: Always start with a 1-sentence "Bottom Line Up Front" (BLUF). Follow with 3-5 high-impact bullet points.\n' +
+            "  - Structure: Always start with a 1-sentence bottom line (no label or prefix — just the sentence). Follow with 3-5 high-impact bullet points.\n" +
             "  - Constraint: Keep the entire output under 150 words.\n" +
             "{{#docType}}  - Document type: {{docType}}\n{{/docType}}" +
             "{{#focus}}  - Area of interest: {{focus}} — prioritize this above all else.\n{{/focus}}",
