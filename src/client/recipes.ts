@@ -18,11 +18,11 @@ export const RECIPES: RecipeDefinition[] = [
     prepTemplate: [
       {
         colTitle: "Drive Link",
-        strategy: { kind: "list-drive-folder", inputId: "folder" },
+        fillStrategy: { kind: "list-drive-folder", inputId: "folder" },
       },
       {
         colTitle: "System Prompt",
-        strategy: {
+        fillStrategy: {
           kind: "fill-value",
           value:
             "You are an expert document analyst. Produce clear, structured summaries " +
@@ -31,7 +31,7 @@ export const RECIPES: RecipeDefinition[] = [
       },
       {
         colTitle: "User Prompt",
-        strategy: {
+        fillStrategy: {
           kind: "fill-value",
           value:
             "Please summarize the attached document. Include the main topics, key findings, " +
@@ -40,7 +40,7 @@ export const RECIPES: RecipeDefinition[] = [
       },
       {
         colTitle: "AI_Summarization",
-        strategy: { kind: "create-empty" },
+        fillStrategy: { kind: "create-empty" },
       },
     ],
     runTemplate: {

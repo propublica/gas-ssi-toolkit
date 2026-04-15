@@ -30,13 +30,16 @@ const baseDefinition: RecipeDefinition = {
     { id: "question", label: "What are you looking for?" },
   ],
   prepTemplate: [
-    { colTitle: "Drive Link",  strategy: { kind: "list-drive-folder", inputId: "folder" } },
-    { colTitle: "User Prompt", strategy: { kind: "template", template: "Summarize. Focus on: {{question}}" } },
-    { colTitle: "Output",      strategy: { kind: "create-empty" } },
+    { colTitle: "Drive Link", fillStrategy: { kind: "list-drive-folder", inputId: "folder" } },
+    {
+      colTitle: "User Prompt",
+      fillStrategy: { kind: "template", template: "Summarize. Focus on: {{question}}" },
+    },
+    { colTitle: "Output", fillStrategy: { kind: "create-empty" } },
   ],
   runTemplate: {
     promptCols: [
-      { col: "Drive Link",  kind: "file" },
+      { col: "Drive Link", kind: "file" },
       { col: "User Prompt", kind: "text" },
     ],
     outputCol: "Output",
@@ -104,7 +107,10 @@ describe("Prep flow", () => {
     await flush();
     expect(mockPrepRecipe).toHaveBeenCalledWith({
       cols: baseDefinition.prepTemplate,
-      inputValues: { folder: "https://drive.google.com/drive/folders/abc", question: "fraud patterns" },
+      inputValues: {
+        folder: "https://drive.google.com/drive/folders/abc",
+        question: "fraud patterns",
+      },
     });
   });
 
@@ -157,9 +163,9 @@ describe("unmount / saved state", () => {
       prepComplete: false,
     };
     const { container } = mount(baseDefinition, savedState);
-    expect(
-      container.querySelector<HTMLInputElement>('[data-input-id="folder"]')!.value,
-    ).toBe("restored-url");
+    expect(container.querySelector<HTMLInputElement>('[data-input-id="folder"]')!.value).toBe(
+      "restored-url",
+    );
   });
 
   it("mounts with savedState prepComplete: true — Cook is enabled", () => {

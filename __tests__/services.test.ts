@@ -108,8 +108,8 @@ describe("prepRecipe", () => {
     const handlers = captureHandlers();
     const params: import("../src/shared/types").PrepRecipeParams = {
       cols: [
-        { colTitle: "Drive Link", strategy: { kind: "list-drive-folder", inputId: "folder" } },
-        { colTitle: "AI_Summarization", strategy: { kind: "create-empty" } },
+        { colTitle: "Drive Link", fillStrategy: { kind: "list-drive-folder", inputId: "folder" } },
+        { colTitle: "AI_Summarization", fillStrategy: { kind: "create-empty" } },
       ],
       inputValues: { folder: "https://drive.google.com/drive/folders/abc123" },
     };

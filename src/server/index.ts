@@ -404,8 +404,8 @@ export function prepRecipe({ cols, inputValues }: PrepRecipeParams): PrepRecipeR
   // Pass 1: scan Drive folders, cache results, determine numRows
   const folderCache = new Map<string, string[]>();
   for (const col of cols) {
-    if (col.strategy.kind === "list-drive-folder") {
-      const url = inputValues[col.strategy.inputId] ?? "";
+    if (col.fillStrategy.kind === "list-drive-folder") {
+      const url = inputValues[col.fillStrategy.inputId] ?? "";
       if (!folderCache.has(url)) {
         const folder = DriveApp.getFolderById(extractId(url));
         const files: { url: string }[] = [];
@@ -422,9 +422,9 @@ export function prepRecipe({ cols, inputValues }: PrepRecipeParams): PrepRecipeR
   // Pass 2: write all columns
   for (const col of cols) {
     const colIdx = findOrCreateColumn(sheet, col.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
-    switch (col.strategy.kind) {
+    switch (col.fillStrategy.kind) {
       case "list-drive-folder": {
-        const urls = folderCache.get(inputValues[col.strategy.inputId] ?? "") ?? [];
+        const urls = folderCache.get(inputValues[col.fillStrategy.inputId] ?? "") ?? [];
         writeColumn(sheet, colIdx, urls, SpreadsheetApp.WrapStrategy.CLIP);
         break;
       }
@@ -432,12 +432,12 @@ export function prepRecipe({ cols, inputValues }: PrepRecipeParams): PrepRecipeR
         writeColumn(
           sheet,
           colIdx,
-          Array(numRows).fill(col.strategy.value) as string[],
+          Array(numRows).fill(col.fillStrategy.value) as string[],
           SpreadsheetApp.WrapStrategy.CLIP,
         );
         break;
       case "template": {
-        const resolved = interpolateTemplate(col.strategy.template, inputValues);
+        const resolved = interpolateTemplate(col.fillStrategy.template, inputValues);
         writeColumn(
           sheet,
           colIdx,
