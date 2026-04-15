@@ -1,32 +1,10 @@
-import type { NavigationContext, Panel, RecipeDefinition, ColumnDef } from "../types";
-import type {
-  ColStrategy,
-  PrepColSpec,
-  PrepRecipeParams,
-  PrepRecipeResult,
-  RunConfig,
-  PromptColumnSpec,
-} from "../../shared/types";
-import { LockableField } from "../components/lockable-field";
+import type { NavigationContext, Panel, RecipeDefinition, UserInput } from "../types";
+import type { PrepRecipeParams, PrepRecipeResult, RunConfig } from "../../shared/types";
 import { RecipePrepCook } from "../components/recipe-prep-cook";
 import { prepRecipe } from "../services";
 
-type ColFieldRefs = {
-  colTitle?: LockableField;
-  prompt?: LockableField;
-  urlInput?: HTMLInputElement;
-  appendInputs?: Record<string, HTMLInputElement>;
-};
-
-type ColSavedValues = {
-  colTitle?: string;
-  prompt?: string;
-  url?: string;
-  appendValues?: Record<string, string>;
-};
-
 type SavedState = {
-  colValues: ColSavedValues[];
+  inputValues: Record<string, string>;
   prepComplete: boolean;
   preppedRunConfig?: Partial<RunConfig>;
 };
@@ -36,7 +14,7 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
   private definition: RecipeDefinition | null = null;
   private prepCook: RecipePrepCook | null = null;
   private preppedRunConfig: Partial<RunConfig> | null = null;
-  private fields: ColFieldRefs[] = [];
+  private container: HTMLElement | null = null;
 
   mount(
     container: HTMLElement,
@@ -46,78 +24,40 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
   ): void {
     this.nav = nav;
     this.definition = definition ?? null;
-    this.fields = [];
+    this.container = container;
     this.preppedRunConfig = savedState?.preppedRunConfig ?? null;
 
     container.innerHTML = this.template(definition);
     container.querySelector("#back-btn")?.addEventListener("click", () => nav.back());
 
-    this.mountFields(container, definition?.params?.columns ?? [], savedState);
+    this.restoreInputValues(container, definition?.inputs ?? [], savedState?.inputValues ?? {});
     this.mountPrepCook(container, savedState?.prepComplete ?? false);
   }
 
   unmount(): SavedState {
-    const colValues: ColSavedValues[] = this.fields.map((f) => ({
-      colTitle: f.colTitle?.getValue(),
-      prompt: f.prompt?.getValue(),
-      url: f.urlInput?.value,
-      appendValues: f.appendInputs
-        ? Object.fromEntries(Object.entries(f.appendInputs).map(([id, el]) => [id, el.value]))
-        : undefined,
-    }));
+    const inputs = this.definition?.inputs ?? [];
+    const inputValues: Record<string, string> = {};
+    for (const input of inputs) {
+      const el = this.container?.querySelector<HTMLInputElement>(`[data-input-id="${input.id}"]`);
+      inputValues[input.id] = el?.value ?? "";
+    }
     return {
-      colValues,
+      inputValues,
       prepComplete: this.prepCook?.isPrepComplete() ?? false,
       preppedRunConfig: this.preppedRunConfig ?? undefined,
     };
   }
 
-  private mountFields(container: HTMLElement, columns: ColumnDef[], savedState?: SavedState): void {
-    const reset = (): void => this.prepCook?.reset();
-
-    columns.forEach((col, i) => {
-      const saved = savedState?.colValues?.[i];
-      const refs: ColFieldRefs = {};
-
-      refs.colTitle = new LockableField(container.querySelector(`#col-${i}-title-container`)!, {
-        label: "Column",
-        defaultValue: saved?.colTitle ?? col.colTitle.value,
-        locked: col.colTitle.locked,
-        onUnlock: reset,
-      });
-
-      if (col.prompt !== undefined) {
-        refs.prompt = new LockableField(container.querySelector(`#col-${i}-prompt-container`)!, {
-          label: "Prompt",
-          defaultValue: saved?.prompt ?? col.prompt.value,
-          locked: col.prompt.locked,
-          multiline: true,
-          onUnlock: reset,
-        });
-      }
-
-      if (col.url !== undefined) {
-        const urlEl = container.querySelector<HTMLInputElement>(`#col-${i}-url-input`);
-        if (urlEl) {
-          if (saved?.url) urlEl.value = saved.url;
-          urlEl.addEventListener("input", reset);
-          refs.urlInput = urlEl;
-        }
-      }
-
-      if (col.appendFields?.length) {
-        refs.appendInputs = {};
-        for (const af of col.appendFields) {
-          const el = container.querySelector<HTMLInputElement>(`#col-${i}-append-${af.id}`);
-          if (el) {
-            if (saved?.appendValues?.[af.id]) el.value = saved.appendValues[af.id];
-            refs.appendInputs[af.id] = el;
-          }
-        }
-      }
-
-      this.fields[i] = refs;
-    });
+  private restoreInputValues(
+    container: HTMLElement,
+    inputs: UserInput[],
+    savedValues: Record<string, string>,
+  ): void {
+    for (const input of inputs) {
+      const el = container.querySelector<HTMLInputElement>(`[data-input-id="${input.id}"]`);
+      if (el && savedValues[input.id]) el.value = savedValues[input.id];
+      el?.addEventListener("input", () => this.prepCook?.reset());
+    }
   }
 
   private mountPrepCook(container: HTMLElement, prepComplete: boolean): void {
@@ -138,113 +78,52 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
   }
 
   private buildPrepParams(): PrepRecipeParams | null {
-    const columns = this.definition?.params?.columns ?? [];
-    const cols: PrepColSpec[] = [];
+    const inputs = this.definition?.inputs ?? [];
+    const inputValues: Record<string, string> = {};
 
-    for (let i = 0; i < columns.length; i++) {
-      const col = columns[i];
-      const colTitle = this.fields[i]?.colTitle?.getValue() ?? col.colTitle.value;
-
-      let strategy: ColStrategy;
-      switch (col.strategyKind) {
-        case "list-drive-folder": {
-          const url = this.fields[i]?.urlInput?.value.trim() ?? "";
-          if (!url) {
-            globalThis.alert(`Please enter a URL for "${col.label}".`);
-            return null;
-          }
-          strategy = { kind: "list-drive-folder", url };
-          break;
-        }
-        case "fill-value": {
-          const base = this.fields[i]?.prompt?.getValue() ?? col.prompt?.value ?? "";
-          const appended = (col.appendFields ?? [])
-            .map((af) => {
-              const v = this.fields[i]?.appendInputs?.[af.id]?.value.trim() ?? "";
-              return v ? (af.prefix ?? "") + v : "";
-            })
-            .join("");
-          strategy = { kind: "fill-value", value: base + appended };
-          break;
-        }
-        case "create-empty":
-          strategy = { kind: "create-empty" };
-          break;
+    for (const input of inputs) {
+      const el = this.container?.querySelector<HTMLInputElement>(`[data-input-id="${input.id}"]`);
+      const value = el?.value.trim() ?? "";
+      if (input.required && !value) {
+        globalThis.alert(`Please fill in "${input.label}".`);
+        return null;
       }
-
-      cols.push({ colTitle, strategy });
+      inputValues[input.id] = value;
     }
 
-    return { cols };
+    return {
+      cols: this.definition?.prepTemplate ?? [],
+      inputValues,
+    };
   }
 
   private buildRunConfig(result: PrepRecipeResult): Partial<RunConfig> {
-    const columns = this.definition?.params?.columns ?? [];
-    const settings = this.definition?.params?.settings ?? {};
-    const promptCols: PromptColumnSpec[] = [];
-    let systemPromptCol: string | undefined;
-    let outputCol = "";
-
-    for (let i = 0; i < columns.length; i++) {
-      const col = columns[i];
-      const resolvedTitle = this.fields[i]?.colTitle?.getValue() ?? col.colTitle.value;
-
-      switch (col.role) {
-        case "userPrompt":
-          promptCols.push({ col: resolvedTitle, kind: "text" });
-          break;
-        case "driveLink":
-          promptCols.push({ col: resolvedTitle, kind: "file" });
-          break;
-        case "systemPrompt":
-          systemPromptCol = resolvedTitle;
-          break;
-        case "output":
-          outputCol = resolvedTitle;
-          break;
-      }
-    }
-
-    return { promptCols, systemPromptCol, outputCol, rowRange: result.rowRange, ...settings };
+    return {
+      ...this.definition?.runTemplate,
+      rowRange: result.rowRange,
+    };
   }
 
   private template(definition: RecipeDefinition | undefined | null): string {
-    const columns = definition?.params?.columns ?? [];
+    const inputs = definition?.inputs ?? [];
     const title = definition ? `${definition.icon} ${definition.name}` : "Recipe";
 
-    const columnSections = columns
-      .map((col, i) => {
-        const requiredMark = col.required ? ` <span class="required">*</span>` : "";
-        const helperHtml = col.helperText ? `<p class="field-helper">${col.helperText}</p>` : "";
-
-        const urlInputHtml =
-          col.url !== undefined
-            ? `<input id="col-${i}-url-input" type="text" class="text-input"
-                placeholder="${col.url.placeholder ?? "Paste Google Drive URL"}" />`
-            : "";
-
-        const promptContainerHtml =
-          col.prompt !== undefined ? `<div id="col-${i}-prompt-container"></div>` : "";
-
-        const appendFieldsHtml = (col.appendFields ?? [])
-          .map(
-            (af) =>
-              `<div class="append-field">
-                <label class="field-label">${af.label}</label>
-                <input id="col-${i}-append-${af.id}" type="text" class="text-input"
-                  placeholder="${af.placeholder ?? ""}" />
-              </div>`,
-          )
-          .join("");
-
+    const inputsHtml = inputs
+      .map((input) => {
+        const requiredMark = input.required ? `<span class="required"> *</span>` : "";
+        const helperHtml = input.helperText
+          ? `<p class="field-helper">${input.helperText}</p>`
+          : "";
         return `
-          <div class="recipe-section-card">
-            <div class="recipe-section-card-title">${col.label}${requiredMark}</div>
+          <div class="recipe-input-field">
+            <label class="recipe-input-label">${input.label}</label>${requiredMark}
             ${helperHtml}
-            <div id="col-${i}-title-container"></div>
-            ${urlInputHtml}
-            ${promptContainerHtml}
-            ${appendFieldsHtml}
+            <input
+              data-input-id="${input.id}"
+              type="text"
+              class="text-input"
+              placeholder="${input.placeholder ?? ""}"
+            />
           </div>`;
       })
       .join("");
@@ -254,7 +133,7 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
         <button id="back-btn" class="back-btn">← Back</button>
         <span class="panel-title">${title}</span>
       </div>
-      ${columnSections}
+      ${inputsHtml}
       <div id="prep-cook-container"></div>
     `;
   }
