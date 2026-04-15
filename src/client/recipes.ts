@@ -18,21 +18,16 @@ export const RECIPES: RecipeDefinition[] = [
         id: "docType",
         label: "Document Type",
         required: false,
-        placeholder: "e.g. court filing, FOIA response, annual report",
+        placeholder: "e.g. court docket, FOIA response, annual report",
       },
       {
         id: "focus",
         label: "Area of Interest",
         required: false,
-        placeholder: "e.g. financial fraud, conflicts of interest",
+        placeholder: "e.g. relationships between people, financial fraud",
       },
     ],
     prepTemplate: [
-      {
-        colTitle: "Drive Link",
-        fillStrategy: { kind: "list-drive-folder", inputId: "folder" },
-        role: "file-prompt",
-      },
       {
         colTitle: "System Prompt",
         fillStrategy: {
@@ -50,12 +45,9 @@ export const RECIPES: RecipeDefinition[] = [
         role: "system-prompt",
       },
       {
-        colTitle: "User Prompt",
-        fillStrategy: {
-          kind: "fill-value",
-          value: "Summarize the attached document.",
-        },
-        role: "text-prompt",
+        colTitle: "Drive Link",
+        fillStrategy: { kind: "list-drive-folder", inputId: "folder" },
+        role: "file-prompt",
       },
       {
         colTitle: "AI_Summarization",
