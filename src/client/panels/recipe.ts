@@ -153,7 +153,7 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
           ? `<p class="field-helper">${input.helperText}</p>`
           : "";
         return `
-          <div class="recipe-input-field">
+          <div class="field-group">
             <span class="field-label">${input.label}${optionalityMark}</span>
             ${helperHtml}
             <input

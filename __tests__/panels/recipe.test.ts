@@ -65,7 +65,7 @@ async function flush() {
 describe("rendering", () => {
   it("renders one input field per RecipeInput", () => {
     const { container } = mount();
-    expect(container.querySelectorAll(".recipe-input-field")).toHaveLength(2);
+    expect(container.querySelectorAll(".field-group")).toHaveLength(2);
   });
 
   it("renders the label for each input", () => {
