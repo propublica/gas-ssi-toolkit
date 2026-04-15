@@ -70,11 +70,11 @@ describe("rendering", () => {
 
   it("renders the label for each input", () => {
     const { container } = mount();
-    const labels = Array.from(container.querySelectorAll(".recipe-input-label")).map(
+    const labels = Array.from(container.querySelectorAll(".field-label")).map(
       (el) => el.textContent,
     );
-    expect(labels).toContain("Drive Folder");
-    expect(labels).toContain("What are you looking for?");
+    expect(labels).toContain("Drive Folder *");
+    expect(labels).toContain("What are you looking for? (optional)");
   });
 
   it("renders placeholder on the input element", () => {

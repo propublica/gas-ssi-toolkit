@@ -146,13 +146,15 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
 
     const inputsHtml = inputs
       .map((input) => {
-        const requiredMark = input.required ? `<span class="required"> *</span>` : "";
+        const optionalityMark = input.required
+          ? `<span class="required"> *</span>`
+          : `<span class="optional"> (optional)</span>`;
         const helperHtml = input.helperText
           ? `<p class="field-helper">${input.helperText}</p>`
           : "";
         return `
           <div class="recipe-input-field">
-            <label class="recipe-input-label">${input.label}</label>${requiredMark}
+            <span class="field-label">${input.label}${optionalityMark}</span>
             ${helperHtml}
             <input
               data-input-id="${input.id}"

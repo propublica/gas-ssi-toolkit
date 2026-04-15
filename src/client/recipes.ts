@@ -18,12 +18,15 @@ export const RECIPES: RecipeDefinition[] = [
         id: "docType",
         label: "Document Type",
         required: false,
+        helperText:
+          "Helps the AI read the document correctly — legal language reads differently than a financial disclosure",
         placeholder: "e.g. court docket, FOIA response, annual report",
       },
       {
         id: "focus",
         label: "Area of Interest",
         required: false,
+        helperText: "The AI will prioritize this above all else in the summary",
         placeholder: "e.g. relationships between people, financial fraud",
       },
     ],
