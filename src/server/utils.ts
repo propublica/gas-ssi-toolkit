@@ -143,11 +143,21 @@ export function writeJobProgress(
 }
 
 /**
- * Replace {{inputId}} placeholders in a template string with values from a map.
- * Unknown placeholders are replaced with an empty string.
+ * Replace {{inputId}} placeholders and {{#key}}...{{/key}} conditional blocks
+ * in a template string with values from a map.
+ *
+ * Conditional blocks: content is included only when the named key has a non-empty value.
+ * Simple placeholders: unknown keys are replaced with an empty string.
+ * Nesting conditional blocks is not supported.
  */
 export function interpolateTemplate(template: string, inputValues: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, id: string) => inputValues[id] ?? "");
+  // Pass 1: conditional blocks — include content only if value is non-empty
+  const withBlocks = template.replace(
+    /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
+    (_, id: string, content: string) => ((inputValues[id] ?? "") ? content : ""),
+  );
+  // Pass 2: simple interpolations
+  return withBlocks.replace(/\{\{(\w+)\}\}/g, (_, id: string) => inputValues[id] ?? "");
 }
 
 /**

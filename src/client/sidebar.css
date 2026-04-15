@@ -426,6 +426,13 @@
             line-height: 1.4;
         }
 
+        .recipe-intro {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin: 0 0 16px 0;
+        }
+
         /* ── LockableField layouts ── */
 
         .lockable-field-header {

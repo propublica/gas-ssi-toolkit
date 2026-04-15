@@ -65,16 +65,16 @@ async function flush() {
 describe("rendering", () => {
   it("renders one input field per RecipeInput", () => {
     const { container } = mount();
-    expect(container.querySelectorAll(".recipe-input-field")).toHaveLength(2);
+    expect(container.querySelectorAll(".field-group")).toHaveLength(2);
   });
 
   it("renders the label for each input", () => {
     const { container } = mount();
-    const labels = Array.from(container.querySelectorAll(".recipe-input-label")).map(
+    const labels = Array.from(container.querySelectorAll(".field-label")).map(
       (el) => el.textContent,
     );
-    expect(labels).toContain("Drive Folder");
-    expect(labels).toContain("What are you looking for?");
+    expect(labels).toContain("Drive Folder *");
+    expect(labels).toContain("What are you looking for? (optional)");
   });
 
   it("renders placeholder on the input element", () => {
