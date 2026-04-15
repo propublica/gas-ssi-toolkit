@@ -489,4 +489,12 @@ describe("interpolateTemplate", () => {
       "before\nline1\nline2\nafter",
     );
   });
+
+  it("handles two conditional blocks with the same key", () => {
+    expect(interpolateTemplate("{{#x}}first{{/x}}{{#x}}second{{/x}}", { x: "yes" })).toBe(
+      "firstsecond",
+    );
+
+    expect(interpolateTemplate("{{#x}}first{{/x}}{{#x}}second{{/x}}", { x: "" })).toBe("");
+  });
 });

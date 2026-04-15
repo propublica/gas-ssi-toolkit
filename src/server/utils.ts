@@ -148,6 +148,7 @@ export function writeJobProgress(
  *
  * Conditional blocks: content is included only when the named key has a non-empty value.
  * Simple placeholders: unknown keys are replaced with an empty string.
+ * Nesting conditional blocks is not supported.
  */
 export function interpolateTemplate(template: string, inputValues: Record<string, string>): string {
   // Pass 1: conditional blocks — include content only if value is non-empty
