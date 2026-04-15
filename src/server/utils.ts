@@ -146,10 +146,7 @@ export function writeJobProgress(
  * Replace {{inputId}} placeholders in a template string with values from a map.
  * Unknown placeholders are replaced with an empty string.
  */
-export function interpolateTemplate(
-  template: string,
-  inputValues: Record<string, string>,
-): string {
+export function interpolateTemplate(template: string, inputValues: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, id: string) => inputValues[id] ?? "");
 }
 
