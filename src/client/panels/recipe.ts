@@ -1,6 +1,11 @@
-import type { NavigationContext, Panel, RecipeDefinition, UserInput } from "../types";
 import type {
-  PrepColSpec,
+  NavigationContext,
+  Panel,
+  RecipeColumn,
+  RecipeDefinition,
+  RecipeInput,
+} from "../types";
+import type {
   PrepRecipeParams,
   PrepRecipeResult,
   PromptColumnSpec,
@@ -9,7 +14,7 @@ import type {
 import { RecipePrepCook } from "../components/recipe-prep-cook";
 import { prepRecipe } from "../services";
 
-function buildRunTemplate(cols: PrepColSpec[]): Partial<RunConfig> {
+function buildRunTemplate(cols: RecipeColumn[]): Partial<RunConfig> {
   const promptCols: PromptColumnSpec[] = [];
   let systemPromptCol: string | undefined;
   let outputCol: string | undefined;
@@ -80,7 +85,7 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
 
   private restoreInputValues(
     container: HTMLElement,
-    inputs: UserInput[],
+    inputs: RecipeInput[],
     savedValues: Record<string, string>,
   ): void {
     for (const input of inputs) {

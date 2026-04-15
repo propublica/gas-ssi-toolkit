@@ -1,5 +1,21 @@
 import type { PrepColSpec, RunConfig } from "../shared/types";
 
+// ── Recipe column types ──────────────────────────────────────────
+
+/**
+ * The AI inference role this column plays at run time.
+ * Lives client-side only — the server never reads it.
+ */
+export type ColumnRole = "file-prompt" | "text-prompt" | "system-prompt" | "output";
+
+/**
+ * What recipe authors write: the RPC-crossing PrepColSpec plus the
+ * client-only role that determines the column's place in the AI call.
+ */
+export interface RecipeColumn extends PrepColSpec {
+  role?: ColumnRole;
+}
+
 // ── Loading / Progress types ─────────────────────────────────────────────────
 
 export type LoadingStatus = "idle" | "loading" | "progress" | "cancelling" | "complete" | "error";
@@ -32,7 +48,7 @@ export type RecipeSettings = Pick<
   "tools" | "applyMarkdown" | "includeGrounding" | "prefixWithColName"
 >;
 
-export interface UserInput {
+export interface RecipeInput {
   /**
    * Unique identifier for this input. Used as the key in template interpolation
    * (e.g. a fill strategy of `{{folder}}` resolves from `inputValues["folder"]`).
@@ -84,13 +100,13 @@ export interface RecipeDefinition {
   icon: string;
   description: string;
   /** Journalist-facing form fields. Drives RecipePanel rendering. */
-  inputs: UserInput[];
+  inputs: RecipeInput[];
   /**
    * Column template passed to prepRecipe(). Each column's role field determines
    * its place in the AI call — promptCols, systemPromptCol, outputCol are derived
    * from these roles at cook time via buildRunTemplate().
    */
-  prepTemplate: PrepColSpec[];
+  prepTemplate: RecipeColumn[];
   /** Non-column AI settings (tools, markdown, grounding, etc.). */
   settings?: RecipeSettings;
 }

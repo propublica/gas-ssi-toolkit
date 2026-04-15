@@ -63,7 +63,7 @@ async function flush() {
 // ── rendering ──────────────────────────────────────────────────
 
 describe("rendering", () => {
-  it("renders one input field per UserInput", () => {
+  it("renders one input field per RecipeInput", () => {
     const { container } = mount();
     expect(container.querySelectorAll(".recipe-input-field")).toHaveLength(2);
   });
