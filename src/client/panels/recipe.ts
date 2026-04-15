@@ -15,7 +15,7 @@ function buildRunTemplate(cols: PrepColSpec[]): Partial<RunConfig> {
   let outputCol: string | undefined;
 
   for (const col of cols) {
-    switch (col.role?.kind) {
+    switch (col.role) {
       case "file-prompt":
         promptCols.push({ col: col.colTitle, kind: "file" });
         break;

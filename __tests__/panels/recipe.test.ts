@@ -33,14 +33,14 @@ const baseDefinition: RecipeDefinition = {
     {
       colTitle: "Drive Link",
       fillStrategy: { kind: "list-drive-folder", inputId: "folder" },
-      role: { kind: "file-prompt" },
+      role: "file-prompt",
     },
     {
       colTitle: "User Prompt",
       fillStrategy: { kind: "template", template: "Summarize. Focus on: {{question}}" },
-      role: { kind: "text-prompt" },
+      role: "text-prompt",
     },
-    { colTitle: "Output", fillStrategy: { kind: "create-empty" }, role: { kind: "output" } },
+    { colTitle: "Output", fillStrategy: { kind: "create-empty" }, role: "output" },
   ],
   settings: { tools: ["google_search"] },
 };

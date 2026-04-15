@@ -64,11 +64,7 @@ export type FillStrategy =
  * The AI inference role this column plays at run time.
  * Absent = prep-only column (no role in the AI call).
  */
-export type ColumnRole =
-  | { kind: "file-prompt" }
-  | { kind: "text-prompt" }
-  | { kind: "system-prompt" }
-  | { kind: "output" };
+export type ColumnRole = "file-prompt" | "text-prompt" | "system-prompt" | "output";
 
 export interface PrepColSpec {
   colTitle: string;

@@ -1,4 +1,4 @@
-import type { PrepColSpec, ToolId } from "../shared/types";
+import type { PrepColSpec, RunConfig } from "../shared/types";
 
 // ── Loading / Progress types ─────────────────────────────────────────────────
 
@@ -25,13 +25,12 @@ export interface Job {
 /**
  * Non-column AI settings a recipe can pre-configure.
  * These flow into RunConfig at cook time alongside the derived column references.
+ * Typed as a Pick so it stays in sync with RunConfig automatically.
  */
-export interface RecipeSettings {
-  tools?: ToolId[];
-  applyMarkdown?: boolean;
-  includeGrounding?: boolean;
-  prefixWithColName?: boolean;
-}
+export type RecipeSettings = Pick<
+  RunConfig,
+  "tools" | "applyMarkdown" | "includeGrounding" | "prefixWithColName"
+>;
 
 export interface UserInput {
   /**
