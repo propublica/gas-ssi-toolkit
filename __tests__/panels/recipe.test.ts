@@ -7,7 +7,7 @@ jest.mock("../../src/client/services", () => ({
 
 import { RecipePanel } from "../../src/client/panels/recipe";
 import * as services from "../../src/client/services";
-import type { PrepRecipeResult, RunConfig } from "../../src/shared/types";
+import type { PrepRecipeResult } from "../../src/shared/types";
 import type { RecipeDefinition, NavigationContext } from "../../src/client/types";
 
 const mockPrepRecipe = services.prepRecipe as jest.Mock;
@@ -30,21 +30,19 @@ const baseDefinition: RecipeDefinition = {
     { id: "question", label: "What are you looking for?" },
   ],
   prepTemplate: [
-    { colTitle: "Drive Link", fillStrategy: { kind: "list-drive-folder", inputId: "folder" } },
+    {
+      colTitle: "Drive Link",
+      fillStrategy: { kind: "list-drive-folder", inputId: "folder" },
+      role: { kind: "file-prompt" },
+    },
     {
       colTitle: "User Prompt",
       fillStrategy: { kind: "template", template: "Summarize. Focus on: {{question}}" },
+      role: { kind: "text-prompt" },
     },
-    { colTitle: "Output", fillStrategy: { kind: "create-empty" } },
+    { colTitle: "Output", fillStrategy: { kind: "create-empty" }, role: { kind: "output" } },
   ],
-  runTemplate: {
-    promptCols: [
-      { col: "Drive Link", kind: "file" },
-      { col: "User Prompt", kind: "text" },
-    ],
-    outputCol: "Output",
-    tools: ["google_search"],
-  },
+  settings: { tools: ["google_search"] },
 };
 
 const mockResult: PrepRecipeResult = { rowRange: { start: 2, end: 11 } };
@@ -129,7 +127,7 @@ describe("Prep flow", () => {
 // ── cook flow ──────────────────────────────────────────────────
 
 describe("Cook flow", () => {
-  it("navigates to configure-ai-run with runTemplate merged with rowRange", async () => {
+  it("navigates to configure-ai-run with RunConfig derived from roles + settings + rowRange", async () => {
     mockPrepRecipe.mockResolvedValue({ rowRange: { start: 2, end: 5 } });
     const { container, nav } = mount();
     container.querySelector<HTMLInputElement>('[data-input-id="folder"]')!.value =
@@ -138,7 +136,13 @@ describe("Cook flow", () => {
     await flush();
     container.querySelector<HTMLButtonElement>("#cook-btn")!.click();
     expect(nav.navigate).toHaveBeenCalledWith("configure-ai-run", {
-      ...baseDefinition.runTemplate,
+      promptCols: [
+        { col: "Drive Link", kind: "file" },
+        { col: "User Prompt", kind: "text" },
+      ],
+      systemPromptCol: undefined,
+      outputCol: "Output",
+      tools: ["google_search"],
       rowRange: { start: 2, end: 5 },
     });
   });
@@ -172,7 +176,7 @@ describe("unmount / saved state", () => {
     const savedState = {
       inputValues: {},
       prepComplete: true,
-      preppedRunConfig: { outputCol: "Output", promptCols: [] } as Partial<RunConfig>,
+      preppedRunConfig: { outputCol: "Output", promptCols: [] },
     };
     const { container } = mount(baseDefinition, savedState);
     expect(container.querySelector<HTMLButtonElement>("#cook-btn")!.disabled).toBe(false);

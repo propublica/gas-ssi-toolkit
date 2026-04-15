@@ -19,6 +19,7 @@ export const RECIPES: RecipeDefinition[] = [
       {
         colTitle: "Drive Link",
         fillStrategy: { kind: "list-drive-folder", inputId: "folder" },
+        role: { kind: "file-prompt" },
       },
       {
         colTitle: "System Prompt",
@@ -28,6 +29,7 @@ export const RECIPES: RecipeDefinition[] = [
             "You are an expert document analyst. Produce clear, structured summaries " +
             "focusing on key themes, main arguments, important data points, and actionable conclusions.",
         },
+        role: { kind: "system-prompt" },
       },
       {
         colTitle: "User Prompt",
@@ -37,19 +39,13 @@ export const RECIPES: RecipeDefinition[] = [
             "Please summarize the attached document. Include the main topics, key findings, " +
             "and important conclusions. The document file will be attached as inline data.",
         },
+        role: { kind: "text-prompt" },
       },
       {
         colTitle: "AI_Summarization",
         fillStrategy: { kind: "create-empty" },
+        role: { kind: "output" },
       },
     ],
-    runTemplate: {
-      promptCols: [
-        { col: "Drive Link", kind: "file" },
-        { col: "User Prompt", kind: "text" },
-      ],
-      systemPromptCol: "System Prompt",
-      outputCol: "AI_Summarization",
-    },
   },
 ];

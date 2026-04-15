@@ -1,7 +1,37 @@
 import type { NavigationContext, Panel, RecipeDefinition, UserInput } from "../types";
-import type { PrepRecipeParams, PrepRecipeResult, RunConfig } from "../../shared/types";
+import type {
+  PrepColSpec,
+  PrepRecipeParams,
+  PrepRecipeResult,
+  PromptColumnSpec,
+  RunConfig,
+} from "../../shared/types";
 import { RecipePrepCook } from "../components/recipe-prep-cook";
 import { prepRecipe } from "../services";
+
+function buildRunTemplate(cols: PrepColSpec[]): Partial<RunConfig> {
+  const promptCols: PromptColumnSpec[] = [];
+  let systemPromptCol: string | undefined;
+  let outputCol: string | undefined;
+
+  for (const col of cols) {
+    switch (col.role?.kind) {
+      case "file-prompt":
+        promptCols.push({ col: col.colTitle, kind: "file" });
+        break;
+      case "text-prompt":
+        promptCols.push({ col: col.colTitle, kind: "text" });
+        break;
+      case "system-prompt":
+        systemPromptCol = col.colTitle;
+        break;
+      case "output":
+        outputCol = col.colTitle;
+        break;
+    }
+  }
+  return { promptCols, systemPromptCol, outputCol };
+}
 
 type SavedState = {
   inputValues: Record<string, string>;
@@ -99,7 +129,8 @@ export class RecipePanel implements Panel<RecipeDefinition, SavedState> {
 
   private buildRunConfig(result: PrepRecipeResult): Partial<RunConfig> {
     return {
-      ...this.definition?.runTemplate,
+      ...buildRunTemplate(this.definition?.prepTemplate ?? []),
+      ...this.definition?.settings,
       rowRange: result.rowRange,
     };
   }

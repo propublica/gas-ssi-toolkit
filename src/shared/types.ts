@@ -60,9 +60,20 @@ export type FillStrategy =
   | { kind: "template"; template: string }
   | { kind: "create-empty" };
 
+/**
+ * The AI inference role this column plays at run time.
+ * Absent = prep-only column (no role in the AI call).
+ */
+export type ColumnRole =
+  | { kind: "file-prompt" }
+  | { kind: "text-prompt" }
+  | { kind: "system-prompt" }
+  | { kind: "output" };
+
 export interface PrepColSpec {
   colTitle: string;
   fillStrategy: FillStrategy;
+  role?: ColumnRole;
 }
 
 export interface PrepRecipeParams {

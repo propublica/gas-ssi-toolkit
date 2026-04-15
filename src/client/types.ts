@@ -1,4 +1,4 @@
-import type { PrepColSpec, RunConfig } from "../shared/types";
+import type { PrepColSpec, ToolId } from "../shared/types";
 
 // ── Loading / Progress types ─────────────────────────────────────────────────
 
@@ -21,6 +21,17 @@ export interface Job {
 
 // ── Recipe UI types ─────────────────────────────────────────────
 // These are client-only — they define the journalist-facing form, not RPC payloads.
+
+/**
+ * Non-column AI settings a recipe can pre-configure.
+ * These flow into RunConfig at cook time alongside the derived column references.
+ */
+export interface RecipeSettings {
+  tools?: ToolId[];
+  applyMarkdown?: boolean;
+  includeGrounding?: boolean;
+  prefixWithColName?: boolean;
+}
 
 export interface UserInput {
   /**
@@ -75,8 +86,12 @@ export interface RecipeDefinition {
   description: string;
   /** Journalist-facing form fields. Drives RecipePanel rendering. */
   inputs: UserInput[];
-  /** Column template passed to prepRecipe(). Strategies may reference input IDs. */
+  /**
+   * Column template passed to prepRecipe(). Each column's role field determines
+   * its place in the AI call — promptCols, systemPromptCol, outputCol are derived
+   * from these roles at cook time via buildRunTemplate().
+   */
   prepTemplate: PrepColSpec[];
-  /** Partial RunConfig passed to ConfigureAIRunPanel after cook. rowRange is filled in by prep result. */
-  runTemplate: Partial<RunConfig>;
+  /** Non-column AI settings (tools, markdown, grounding, etc.). */
+  settings?: RecipeSettings;
 }
