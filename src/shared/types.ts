@@ -55,8 +55,9 @@ export interface RunConfig {
 // ── Recipes ─────────────────────────────────────────────────────
 
 export type ColStrategy =
-  | { kind: "list-drive-folder"; url: string }
+  | { kind: "list-drive-folder"; inputId: string }
   | { kind: "fill-value"; value: string }
+  | { kind: "template"; template: string }
   | { kind: "create-empty" };
 
 export interface PrepColSpec {
@@ -66,6 +67,7 @@ export interface PrepColSpec {
 
 export interface PrepRecipeParams {
   cols: PrepColSpec[];
+  inputValues: Record<string, string>;
 }
 
 export interface PrepRecipeResult {
