@@ -8,8 +8,7 @@ export const RECIPES: RecipeDefinition[] = [
     description: "Summarize files in a Google Drive folder",
     intro:
       "This recipe reads every file in a Drive folder and generates a tight, scannable summary for each one — designed to help you triage a large document set quickly. " +
-      "For best results, point it at a folder of similar documents (e.g. all court filings from one case, or a set of FOIA responses). " +
-      "Specifying a document type helps the AI parse the format correctly; specifying an area of interest focuses the summary on what matters for your story.",
+      "For best results, point it at a folder of similar documents (e.g. all court filings from one case, or a set of FOIA responses).",
     inputs: [
       {
         id: "folder",
