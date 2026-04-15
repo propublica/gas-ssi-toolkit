@@ -108,9 +108,10 @@ describe("prepRecipe", () => {
     const handlers = captureHandlers();
     const params: import("../src/shared/types").PrepRecipeParams = {
       cols: [
-        { colTitle: "Drive Link", strategy: { kind: "list-drive-folder", url: "https://drive.google.com/folder/abc" } },
+        { colTitle: "Drive Link", strategy: { kind: "list-drive-folder", inputId: "folder" } },
         { colTitle: "AI_Summarization", strategy: { kind: "create-empty" } },
       ],
+      inputValues: { folder: "https://drive.google.com/drive/folders/abc123" },
     };
     const result: import("../src/shared/types").PrepRecipeResult = {
       rowRange: { start: 2, end: 5 },
@@ -123,7 +124,7 @@ describe("prepRecipe", () => {
 
   it("rejects on failure", async () => {
     const handlers = captureHandlers();
-    const promise = services.prepRecipe({ cols: [] });
+    const promise = services.prepRecipe({ cols: [], inputValues: {} });
     handlers.reject(new Error("prep error"));
     await expect(promise).rejects.toThrow("prep error");
   });
