@@ -5,7 +5,7 @@ export const RECIPES: RecipeDefinition[] = [
     id: "document-summarization",
     name: "Document Summarization",
     icon: "📄",
-    description: "Summarize each file in a Google Drive folder",
+    description: "Summarize files in a Google Drive folder",
     inputs: [
       {
         id: "folder",
@@ -13,6 +13,18 @@ export const RECIPES: RecipeDefinition[] = [
         required: true,
         helperText: "Make sure you have access to this folder",
         placeholder: "Paste Google Drive folder URL",
+      },
+      {
+        id: "docType",
+        label: "Document Type",
+        required: false,
+        placeholder: "e.g. court filing, FOIA response, annual report",
+      },
+      {
+        id: "focus",
+        label: "Area of Interest",
+        required: false,
+        placeholder: "e.g. financial fraud, conflicts of interest",
       },
     ],
     prepTemplate: [
@@ -24,10 +36,16 @@ export const RECIPES: RecipeDefinition[] = [
       {
         colTitle: "System Prompt",
         fillStrategy: {
-          kind: "fill-value",
-          value:
-            "You are an expert document analyst. Produce clear, structured summaries " +
-            "focusing on key themes, main arguments, important data points, and actionable conclusions.",
+          kind: "template",
+          template:
+            "Role: You are a specialized Briefing Assistant. Your goal is to distill complex documents into ultra-concise, scannable summaries.\n\n" +
+            'Tone: Objective, professional, and dense with information but sparse with "fluff" words.\n\n' +
+            "Guidelines:\n" +
+            '  - Prioritize Utility: Focus on information that helps a user decide: "Do I need to open the full file?"\n' +
+            '  - Structure: Always start with a 1-sentence "Bottom Line Up Front" (BLUF). Follow with 3-5 high-impact bullet points.\n' +
+            "  - Constraint: Keep the entire output under 150 words.\n" +
+            "{{#docType}}  - Document type: {{docType}}\n{{/docType}}" +
+            "{{#focus}}  - Area of interest: {{focus}} — prioritize this above all else.\n{{/focus}}",
         },
         role: "system-prompt",
       },
@@ -35,9 +53,7 @@ export const RECIPES: RecipeDefinition[] = [
         colTitle: "User Prompt",
         fillStrategy: {
           kind: "fill-value",
-          value:
-            "Please summarize the attached document. Include the main topics, key findings, " +
-            "and important conclusions. The document file will be attached as inline data.",
+          value: "Summarize the attached document.",
         },
         role: "text-prompt",
       },
