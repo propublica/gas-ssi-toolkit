@@ -132,7 +132,13 @@ src/client/sidebar-entry.ts  (thin init — instantiates all panels, creates Rou
     ├── lockable-field.ts        (LockableField — value + lock/unlock toggle; optional onUnlock callback)
     ├── recipe-prep-cook.ts      (RecipePrepCook — 4-state machine: idle/prepping/prep-complete/cooking)
     ├── panel-loader.ts          (PanelLoader — drives panel loading skeleton: progress bar, spinner, message)
-    └── job-indicator.ts         (JobIndicator — renders active/failed jobs to #job-strip; persists across navigation)
+    ├── job-indicator.ts         (JobIndicator — renders active/failed jobs to #job-strip; persists across navigation)
+    ├── token-input.ts           (TokenInput — searchable chip field for column selection; multi or single-select;
+    │                             supports includeNew for new column creation; use when item count is 8+ or items are
+    │                             dynamic headers. Prefer TagList when count is small and all options benefit from
+    │                             simultaneous display, e.g. the Tools section with ~5 fixed entries.)
+    └── prompt-col-list.ts       (PromptColList — ordered list of PromptColumnSpec rows; each row pairs a
+                                  TokenInput column picker with a text/file kind toggle and reorder controls)
     └── src/shared/types.ts
 
 src/client/google.d.ts       (compile-time type stub for google.script.run — uses declare global{} pattern)
@@ -155,11 +161,34 @@ The Gemini tool system spans three layers. `ToolId` (a string union in `shared/t
 
 `buildGeminiPayload` in `api.ts` resolves `ToolId[]` via `TOOL_REGISTRY`, splits by `kind`, and assembles both shapes into the `tools` array of the REST request.
 
-**Propagation path:** `ConfigureAIRunPanel` (UI TagList) → `RunConfig.tools` → `runBatchAI` → `runInference(tools?)` → `invokeGemini` → `callGeminiAPI` → `buildGeminiPayload`. For recipes: `RecipePanel` → `PrepRecipeParams.tools` → server echoes back as `PrepRecipeResult.tools` → assembled into `preppedRunConfig`.
+**Propagation path:** `ConfigureAIRunPanel` (UI TagList) → `RunConfig.tools` → `runBatchAI` → `runInference(tools?)` → `invokeGemini` → `callGeminiAPI` → `buildGeminiPayload`. For recipes: `RecipePanel` → `PrepRecipeParams.cols + inputValues` → server resolves `inputId` references and writes columns → `PrepRecipeResult.rowRange` → client calls `buildRunTemplate(prepTemplate)` (derives `promptCols`/`systemPromptCol`/`outputCol` from `RecipeColumn.role`) merged with `definition.settings` and `rowRange` → `preppedRunConfig`.
 
 Source files use relative imports (e.g. `../shared/types`). The `@server/*` and `@shared/*` aliases are **Jest-only** (mapped in `jest.config.cjs`) and are not available in TypeScript source.
 
 Only `index.ts` should reference Google Apps Script UI services (SpreadsheetApp, HtmlService, PropertiesService). On the client side, only `services.ts` calls `google.script.run` (wrapping each call as a Promise); `sidebar-entry.ts` is a thin init file that creates the Router and calls `router.start()`.
+
+### Recipe System
+
+Recipes are journalist-facing presets that automate column setup and launch a Run AI. Each `RecipeDefinition` in `src/client/recipes.ts` has four parts:
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `inputs` | `RecipeInput[]` | Journalist-facing form fields rendered by `RecipePanel` |
+| `prepTemplate` | `RecipeColumn[]` | Column definitions sent to `prepRecipe()` on the server |
+| `settings` | `RecipeSettings?` | Non-column `RunConfig` fields (tools, markdown, grounding, etc.) |
+| Discovery fields | `id`, `name`, `icon`, `description`, `intro?` | Rendered in the recipes list and recipe header |
+
+**`RecipeColumn`** (`src/client/types.ts`) = `PrepColSpec` + optional `role?: ColumnRole`. The `role` is client-only — `buildRunTemplate()` in `recipe.ts` maps roles to `promptCols`, `systemPromptCol`, and `outputCol` at cook time. Roles: `"file-prompt"` | `"text-prompt"` | `"system-prompt"` | `"output"`.
+
+**`FillStrategy`** (`src/shared/types.ts`) controls how `prepRecipe()` populates each column:
+- `{ kind: "fill-value"; value: string }` — writes a static string to every row
+- `{ kind: "list-drive-folder"; inputId: string }` — lists files from the folder URL in `inputValues[inputId]`
+- `{ kind: "create-empty" }` — creates the column with no content
+- `{ kind: "template"; template: string }` — interpolates `{{inputId}}` placeholders; supports Mustache-style conditionals `{{#inputId}}...{{/inputId}}` (block is omitted when the input is empty)
+
+**`RecipeInput.id`** must be camelCase or underscore_separated — no hyphens. The template interpolation regex uses `\w+` which does not match `-`.
+
+**To add a new recipe:** add an entry to `RECIPES` in `src/client/recipes.ts`. No other files need changing unless you need a new `FillStrategy` kind.
 
 ### TypeScript Configuration
 
