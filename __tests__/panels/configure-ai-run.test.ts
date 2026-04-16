@@ -234,6 +234,16 @@ describe("ConfigureAIRunPanel — back", () => {
     container.querySelector<HTMLButtonElement>("#back-btn")!.click();
     expect(mockNav.back).toHaveBeenCalled();
   });
+
+  it("browse-recipes-link navigates to recipes-list when no headers present", async () => {
+    (services.getSheetHeaders as jest.Mock).mockResolvedValue([]);
+    const container = makeContainer();
+    const panel = new ConfigureAIRunPanel();
+    panel.mount(container, mockNav);
+    await Promise.resolve();
+    container.querySelector<HTMLAnchorElement>("#browse-recipes-link")!.click();
+    expect(mockNav.navigate).toHaveBeenCalledWith("recipes-list");
+  });
 });
 
 describe("ConfigureAIRunPanel — refresh", () => {
