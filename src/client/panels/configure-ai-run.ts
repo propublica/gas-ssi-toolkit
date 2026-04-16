@@ -145,8 +145,11 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       (headers) => {
         if (headers.length === 0) {
           container.querySelector<HTMLElement>("#no-headers-msg")!.style.display = "block";
+          container.querySelector<HTMLElement>("#config-form")!.style.display = "none";
           return;
         }
+
+        container.querySelector<HTMLElement>("#no-headers-msg")!.style.display = "none";
 
         this.promptColList = new PromptColList(
           container.querySelector("#prompt-col-list")!,
@@ -226,6 +229,10 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
 
   private wireNavButtons(container: HTMLElement): void {
     container.querySelector("#back-btn")?.addEventListener("click", () => this.nav?.back());
+    container.querySelector("#browse-recipes-link")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      this.nav?.navigate("recipes-list");
+    });
     container.querySelector("#refresh-btn")?.addEventListener("click", () => {
       const btn = container.querySelector<HTMLButtonElement>("#refresh-btn")!;
       btn.classList.add("spinning");
@@ -347,7 +354,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       <p class="panel-loader__message"></p>
     </div>
     <div id="no-headers-msg" class="no-headers-msg" style="display:none">
-      No columns found — add headers to your sheet first.
+      No columns found.<br>Not sure where to begin? <a id="browse-recipes-link" href="#">Browse recipes</a> to get started.
     </div>
     <div id="config-form" style="display:none">
       <div class="field-group">
