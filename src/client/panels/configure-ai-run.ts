@@ -354,7 +354,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       <p class="panel-loader__message"></p>
     </div>
     <div id="no-headers-msg" class="no-headers-msg" style="display:none">
-      No columns found.<br>Not sure where to begin? <a id="browse-recipes-link" href="#">Browse recipes</a> to get started.
+      No columns found.<br><br><br>Not sure where to begin? <a id="browse-recipes-link" href="#">Browse recipes</a> to get started.
     </div>
     <div id="config-form" style="display:none">
       <div class="field-group">
