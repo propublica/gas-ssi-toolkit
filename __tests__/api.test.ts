@@ -186,19 +186,12 @@ describe("buildGeminiPayload", () => {
     expect((payload.generationConfig as any).temperature).toBe(0.5);
   });
 
-  it("applies CONFIG.MAX_OUTPUT_TOKENS as default maxOutputTokens when no generationConfig is provided", () => {
+  it("does not set maxOutputTokens when no generationConfig is provided", () => {
     const payload = buildGeminiPayload(baseReq);
-    expect((payload.generationConfig as any).maxOutputTokens).toBe(CONFIG.MAX_OUTPUT_TOKENS);
+    expect((payload.generationConfig as any).maxOutputTokens).toBeUndefined();
   });
 
-  it("applies CONFIG.MAX_OUTPUT_TOKENS as default when generationConfig omits maxOutputTokens", () => {
-    const req: GeminiRequest = { ...baseReq, generationConfig: { temperature: 0.7 } };
-    const payload = buildGeminiPayload(req);
-    expect((payload.generationConfig as any).maxOutputTokens).toBe(CONFIG.MAX_OUTPUT_TOKENS);
-    expect((payload.generationConfig as any).temperature).toBe(0.7);
-  });
-
-  it("uses caller-supplied maxOutputTokens over CONFIG default", () => {
+  it("passes through caller-supplied maxOutputTokens", () => {
     const req: GeminiRequest = { ...baseReq, generationConfig: { maxOutputTokens: 512 } };
     const payload = buildGeminiPayload(req);
     expect((payload.generationConfig as any).maxOutputTokens).toBe(512);

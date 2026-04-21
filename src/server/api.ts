@@ -24,7 +24,6 @@ export function buildGeminiPayload(req: GeminiRequest): Record<string, unknown> 
   };
 
   payload.generationConfig = {
-    maxOutputTokens: CONFIG.MAX_OUTPUT_TOKENS,
     ...req.generationConfig,
   };
 
