@@ -285,3 +285,25 @@ Follows Google TypeScript Style Guide (enforced by ESLint + Prettier + pre-commi
 - Semicolons required, double quotes (Prettier), trailing commas
 - Explicit return types on functions (ESLint warning)
 - Prefix unused parameters with `_`
+
+## CSS Conventions
+
+All sidebar styles live in `src/client/sidebar.css`. Use CSS custom properties — don't hardcode values.
+
+**Font sizes** — pick the closest token, don't use raw px:
+
+| Token | Value | Typical use |
+|---|---|---|
+| `--font-size-100` | 11px | Labels, badges, small metadata |
+| `--font-size-200` | 12px | Helper text, tag chips, intro copy |
+| `--font-size-300` | 14px | Body text, inputs, buttons (default) |
+| `--font-size-400` | 16px | Panel titles |
+| `--font-size-500` | 18px | Icons |
+
+**Font family** — browsers don't inherit `font-family` on form elements. Any new `input`, `button`, `textarea`, or `select` must explicitly set `font-family: var(--font-family)`.
+
+**Colors** — prefer variables over hardcoded hex:
+- `--text-main` — primary text
+- `--text-secondary` — secondary/muted text
+- `--primary-blue` — interactive blue (`#1a73e8`)
+- `--border-color` — borders and dividers
