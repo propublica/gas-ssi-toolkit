@@ -9,6 +9,7 @@
 
 (globalThis as any).UrlFetchApp = {
   fetch: jest.fn(),
+  fetchAll: jest.fn(),
 };
 
 (globalThis as any).PropertiesService = {
@@ -19,7 +20,12 @@
 
 // ── Import after mocks ─────────────────────────────────────────
 
-import { buildGeminiPayload, callGeminiAPI, invokeGemini } from "../src/server/api";
+import {
+  buildGeminiPayload,
+  callGeminiAPI,
+  callGeminiAPIBatch,
+  invokeGemini,
+} from "../src/server/api";
 import { CONFIG } from "../src/server/config";
 import type { GeminiRequest } from "../src/server/types";
 
@@ -353,5 +359,96 @@ describe("invokeGemini", () => {
     });
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.contents[0].parts[1].inline_data.mime_type).toBe("application/pdf");
+  });
+});
+
+// ── callGeminiAPIBatch tests ───────────────────────────────────
+
+function mockFetchAllResponses(bodies: unknown[]) {
+  (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue(
+    bodies.map((body) => ({ getContentText: () => JSON.stringify(body) })),
+  );
+}
+
+describe("callGeminiAPIBatch", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("returns one GeminiResponse per request", () => {
+    mockFetchAllResponses([
+      { candidates: [{ content: { parts: [{ text: "Result A" }] } }] },
+      { candidates: [{ content: { parts: [{ text: "Result B" }] } }] },
+    ]);
+    const reqs: GeminiRequest[] = [
+      { apiKey: "key", userParts: [{ text: "Q1" }] },
+      { apiKey: "key", userParts: [{ text: "Q2" }] },
+    ];
+    const results = callGeminiAPIBatch(reqs);
+    expect(results).toHaveLength(2);
+    expect(results[0].text).toBe("Result A");
+    expect(results[1].text).toBe("Result B");
+  });
+
+  it("returns empty array for empty input", () => {
+    expect(callGeminiAPIBatch([])).toEqual([]);
+    expect(UrlFetchApp.fetchAll as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  it("maps a Gemini error response to an error text result (does not throw)", () => {
+    mockFetchAllResponses([
+      { error: { message: "quota exceeded" } },
+      { candidates: [{ content: { parts: [{ text: "OK" }] } }] },
+    ]);
+    const reqs: GeminiRequest[] = [
+      { apiKey: "key", userParts: [{ text: "Q1" }] },
+      { apiKey: "key", userParts: [{ text: "Q2" }] },
+    ];
+    const results = callGeminiAPIBatch(reqs);
+    expect(results[0].text).toMatch(/Error:/);
+    expect(results[1].text).toBe("OK");
+  });
+
+  it("includes file_data parts in the request payload", () => {
+    mockFetchAllResponses([{ candidates: [{ content: { parts: [{ text: "ok" }] } }] }]);
+    const req: GeminiRequest = {
+      apiKey: "key",
+      userParts: [
+        { text: "Describe this file" },
+        {
+          file_data: {
+            file_uri: "https://generativelanguage.googleapis.com/v1beta/files/abc",
+            mime_type: "application/pdf",
+          },
+        },
+      ],
+    };
+    callGeminiAPIBatch([req]);
+    const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
+    const payload = JSON.parse(calls[0].payload);
+    expect(payload.contents[0].parts[1].file_data).toEqual({
+      file_uri: "https://generativelanguage.googleapis.com/v1beta/files/abc",
+      mime_type: "application/pdf",
+    });
+  });
+
+  it("uses modelName from request when provided", () => {
+    mockFetchAllResponses([{ candidates: [{ content: { parts: [{ text: "ok" }] } }] }]);
+    callGeminiAPIBatch([
+      { apiKey: "key", modelName: "gemini-1.5-pro", userParts: [{ text: "Q" }] },
+    ]);
+    const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
+    expect(calls[0].url).toContain("gemini-1.5-pro");
+  });
+
+  it("falls back to CONFIG.MODEL_NAME when modelName is omitted", () => {
+    mockFetchAllResponses([{ candidates: [{ content: { parts: [{ text: "ok" }] } }] }]);
+    callGeminiAPIBatch([{ apiKey: "key", userParts: [{ text: "Q" }] }]);
+    const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
+    expect(calls[0].url).toContain(CONFIG.MODEL_NAME);
+  });
+
+  it("returns 'No response.' when candidates are empty", () => {
+    mockFetchAllResponses([{ candidates: [] }]);
+    const results = callGeminiAPIBatch([{ apiKey: "key", userParts: [{ text: "Q" }] }]);
+    expect(results[0].text).toBe("No response.");
   });
 });
