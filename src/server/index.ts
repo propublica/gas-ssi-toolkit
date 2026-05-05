@@ -389,7 +389,20 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
           message: `Uploading files for chunk...`,
         });
       }
-      const mimeTypes = new Map(fileIds.map((id) => [id, metadata.get(id)!.mimeType]));
+      // Translate Drive native MIME types to exported MIME types.
+      // downloadDriveFiles exports Docs as PDF and Sheets as CSV, so we must use those
+      // MIME types when uploading to Gemini, not the native Drive types.
+      const DOCS_DRIVE_MIME = "application/vnd.google-apps.document";
+      const SHEETS_DRIVE_MIME = "application/vnd.google-apps.spreadsheet";
+      const mimeTypes = new Map(
+        fileIds.map((id) => {
+          const driveMime = metadata.get(id)!.mimeType;
+          let effectiveMime = driveMime;
+          if (driveMime === DOCS_DRIVE_MIME) effectiveMime = "application/pdf";
+          else if (driveMime === SHEETS_DRIVE_MIME) effectiveMime = "text/csv";
+          return [id, effectiveMime];
+        }),
+      );
       fileUriMap = uploadFilesToGemini(bytes, mimeTypes, apiKey);
     }
   }

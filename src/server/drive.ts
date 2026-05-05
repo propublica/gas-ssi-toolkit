@@ -100,6 +100,8 @@ function exportAndEncodeFile(
     // first sheet as CSV. Per-sheet export requires SpreadsheetApp to enumerate sheets
     // and get each sheet's values directly. This is a data-access use of SpreadsheetApp,
     // not a UI concern, so the index.ts-only rule does not apply here.
+    // NOTE: Multi-sheet Sheets files can only export the first sheet as CSV.
+    // Per-sheet parallelization is a known limitation (design doc deferred feature).
     const ss = SpreadsheetApp.openById(fileId);
     return ss.getSheets().map((sheet) => {
       const values = sheet.getDataRange().getValues();
