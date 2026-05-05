@@ -9,13 +9,20 @@
  */
 
 export { SSI } from "./customFunctions";
-import { runInference } from "./inference";
+import { callGeminiAPIBatch } from "./api";
+import {
+  fetchDriveMetadata,
+  downloadDriveFiles,
+  checkDriveService,
+  extractTextUniversal,
+} from "./drive";
+import { uploadFilesToGemini } from "./files";
+import { buildInferenceRequest } from "./inference";
 import {
   buildRichInferenceCellContent,
   buildRichGroundingCellContent,
   type CellContent,
 } from "./rich-text";
-import { checkDriveService, extractTextUniversal } from "./drive";
 import {
   extractId,
   isValidDriveLink,
@@ -27,7 +34,9 @@ import {
   writeColumn,
   writeJobProgress,
   interpolateTemplate,
+  flattenArg,
 } from "./utils";
+import { CONFIG } from "./config";
 import type {
   RunConfig,
   PrepRecipeParams,
@@ -35,7 +44,7 @@ import type {
   ImportDriveLinksConfig,
   ExtractTextConfig,
 } from "../shared/types";
-import type { DriveFileInfo, PromptInput } from "./types";
+import type { DriveFileInfo, PromptInput, GeminiRequest } from "./types";
 
 // ==========================================
 // 🚀 MENU & INITIALIZATION
@@ -328,30 +337,97 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
   const dataValues = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues();
 
-  const totalRows = dataValues.length;
-  let processed = 0;
+  const apiKey = PropertiesService.getScriptProperties().getProperty(CONFIG.API_KEY_PROPERTY);
+  if (!apiKey) {
+    ui.alert("Error", `${CONFIG.API_KEY_PROPERTY} script property not set`, ui.ButtonSet.OK);
+    return;
+  }
 
-  for (let i = 0; i < dataValues.length; i++) {
-    const row = dataValues[i];
-    const realRowIndex = startRow + i;
+  const cache = CacheService.getUserCache();
+  const hasFileInputs = config.promptCols.some((pc) => pc.kind === "file");
 
-    if (jobId) {
-      writeJobProgress(CacheService.getUserCache(), jobId, {
-        message: `Processing row ${i + 1} of ${totalRows}`,
-        current: i + 1,
-        total: totalRows,
-      });
+  // Build all prompt input arrays (one per row) — pure, no I/O
+  const allPromptInputs: PromptInput[][] = dataValues.map((row) =>
+    config.promptCols.map((pc, colIdx) => ({
+      kind: pc.kind,
+      value: row[promptIdxs[colIdx]],
+      ...(config.prefixWithColName ? { label: pc.col } : {}),
+    })),
+  );
+
+  // Wave 1 — file work (multimodal chunks only)
+  let fileUriMap = new Map<string, { uri: string; mimeType: string }>();
+
+  if (hasFileInputs) {
+    const oauthToken = ScriptApp.getOAuthToken();
+
+    // Collect unique Drive file IDs across all rows in this chunk
+    const allFileIds = new Set<string>();
+    for (const inputs of allPromptInputs) {
+      for (const input of inputs) {
+        if (input.kind === "file") {
+          flattenArg(input.value)
+            .filter(isValidDriveLink)
+            .map(extractId)
+            .forEach((id) => allFileIds.add(id));
+        }
+      }
     }
 
-    const promptInputs: PromptInput[] = config.promptCols.map((pc, i) => ({
-      kind: pc.kind,
-      value: row[promptIdxs[i]],
-      ...(config.prefixWithColName ? { label: pc.col } : {}),
-    }));
-    const systemPrompt = systemPromptIdx >= 0 ? row[systemPromptIdx] : undefined;
+    const fileIds = Array.from(allFileIds);
+    if (fileIds.length > 0) {
+      if (jobId) {
+        writeJobProgress(cache, jobId, {
+          message: `Downloading files for chunk...`,
+        });
+      }
+      const metadata = fetchDriveMetadata(fileIds, oauthToken);
+      const bytes = downloadDriveFiles(fileIds, metadata, oauthToken);
 
-    const result = runInference(promptInputs, systemPrompt, config.tools);
-    if (result === null) continue;
+      if (jobId) {
+        writeJobProgress(cache, jobId, {
+          message: `Uploading files for chunk...`,
+        });
+      }
+      const mimeTypes = new Map(fileIds.map((id) => [id, metadata.get(id)!.mimeType]));
+      fileUriMap = uploadFilesToGemini(bytes, mimeTypes, apiKey);
+    }
+  }
+
+  // Wave 2 — build requests and fire inference in parallel
+  if (jobId) {
+    writeJobProgress(cache, jobId, { message: `Running AI on chunk...` });
+  }
+
+  const requests: GeminiRequest[] = [];
+  const rowIndices: number[] = [];
+
+  for (let i = 0; i < allPromptInputs.length; i++) {
+    const systemPrompt = systemPromptIdx >= 0 ? dataValues[i][systemPromptIdx] : undefined;
+    const req = buildInferenceRequest(
+      allPromptInputs[i],
+      systemPrompt,
+      config.tools,
+      hasFileInputs ? fileUriMap : undefined,
+    );
+    if (req !== null) {
+      requests.push({ ...req, apiKey });
+      rowIndices.push(i);
+    }
+  }
+
+  if (requests.length === 0) {
+    SpreadsheetApp.getActive().toast("No rows to process.", "Info", 5);
+    return;
+  }
+
+  const results = callGeminiAPIBatch(requests);
+
+  // Write all results — single flush at end of chunk
+  for (let j = 0; j < results.length; j++) {
+    const i = rowIndices[j];
+    const realRowIndex = startRow + i;
+    const result = results[j];
 
     if (config.applyMarkdown) {
       try {
@@ -359,7 +435,6 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
           .getRange(realRowIndex, outputIdx + 1)
           .setRichTextValue(toCellValue(buildRichInferenceCellContent(result)));
       } catch (_e) {
-        // Fall back to plain text if rich text rendering fails for this row.
         sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
       }
     } else {
@@ -374,12 +449,17 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
           .setRichTextValue(toCellValue(groundingContent));
       }
     }
-
-    processed++;
-    SpreadsheetApp.flush();
   }
 
-  SpreadsheetApp.getActive().toast(`Complete! Processed ${processed} rows.`, "Success", 5);
+  SpreadsheetApp.flush();
+  const successCount = results.filter((r) => !r.text.startsWith("Error:")).length;
+  SpreadsheetApp.getActive().toast(
+    successCount === results.length
+      ? `Complete! Processed ${results.length} rows.`
+      : `Complete! Processed ${successCount} of ${results.length} rows (${results.length - successCount} errors).`,
+    "Success",
+    5,
+  );
 }
 
 // ==========================================
