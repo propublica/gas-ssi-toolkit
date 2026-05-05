@@ -451,4 +451,25 @@ describe("callGeminiAPIBatch", () => {
     const results = callGeminiAPIBatch([{ apiKey: "key", userParts: [{ text: "Q" }] }]);
     expect(results[0].text).toBe("No response.");
   });
+
+  it("populates codePairs when executableCode and codeExecutionResult parts are present", () => {
+    mockFetchAllResponses([
+      {
+        candidates: [
+          {
+            content: {
+              parts: [
+                { executableCode: { language: "PYTHON", code: "print(42)" } },
+                { codeExecutionResult: { outcome: "OUTCOME_OK", output: "42\n" } },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+    const results = callGeminiAPIBatch([{ apiKey: "key", userParts: [{ text: "Q" }] }]);
+    expect(results[0].codePairs).toHaveLength(1);
+    expect(results[0].codePairs![0].code.code).toBe("print(42)");
+    expect(results[0].codePairs![0].result.output).toBe("42\n");
+  });
 });

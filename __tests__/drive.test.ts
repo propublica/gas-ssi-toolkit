@@ -386,6 +386,16 @@ describe("prepareDriveAttachments", () => {
     expect(() => prepareDriveAttachments(["img1", "img2"])).toThrow(/combined|total/i);
   });
 
+  it("throws pre-flight error for non-PDF file exceeding INLINE_MAX_TOTAL_BYTES raw size threshold", () => {
+    // 72MB raw * 4/3 ≈ 96MB encoded > 95MB INLINE_MAX_TOTAL_BYTES
+    (DriveApp.getFileById as jest.Mock).mockReturnValue({
+      getMimeType: () => "image/jpeg",
+      getSize: () => 72 * 1024 * 1024,
+      getName: () => "huge-image.jpg",
+    });
+    expect(() => prepareDriveAttachments(["hugeImgId"])).toThrow("File too large");
+  });
+
   it("error messages reference the Gemini Files API escape hatch", () => {
     (DriveApp.getFileById as jest.Mock).mockReturnValue({
       getMimeType: () => "application/pdf",
@@ -452,6 +462,16 @@ describe("fetchDriveMetadata", () => {
     expect(() => fetchDriveMetadata(["bad-id"], "token")).toThrow("File not found");
   });
 
+  it("falls back to HTTP status code message when error response body is not valid JSON", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      {
+        getResponseCode: () => 503,
+        getContentText: () => "<html>Service Unavailable</html>",
+      },
+    ]);
+    expect(() => fetchDriveMetadata(["id"], "token")).toThrow("HTTP 503");
+  });
+
   it("returns size 0 for Google Workspace files that have no size field", () => {
     (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
       {
@@ -515,6 +535,15 @@ describe("downloadDriveFiles", () => {
 
   it("returns empty map for empty input", () => {
     expect(downloadDriveFiles([], new Map(), "token").size).toBe(0);
+  });
+
+  it("falls back to alt=media when fileId is not in metadata map", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      { getResponseCode: () => 200, getContent: () => [1, 2] },
+    ]);
+    downloadDriveFiles(["unknownId"], new Map(), "token");
+    const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
+    expect(calls[0].url).toContain("?alt=media");
   });
 
   it("throws when a download returns HTTP error", () => {
