@@ -41,6 +41,11 @@ module.exports = {
       branches: 90,
       functions: 100,
     },
+    "./src/server/files.ts": {
+      statements: 90,
+      branches: 80,
+      functions: 100,
+    },
     "./src/server/utils.ts": {
       statements: 83,
       branches: 93,
