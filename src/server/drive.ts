@@ -218,3 +218,110 @@ export function prepareDriveAttachments(fileIds: string[]): GeminiInlineData[] {
 
   return parts;
 }
+
+/**
+ * Fetch metadata for multiple Drive files in parallel using UrlFetchApp.fetchAll.
+ * Returns a map of fileId to { mimeType, size }.
+ *
+ * Note: Google Workspace native files (Docs, Sheets, Slides) do not have a
+ * size field in the Drive API v3 response; size will be 0 for those types.
+ *
+ * @param fileIds - Array of Drive file IDs to fetch metadata for
+ * @param oauthToken - OAuth token with Drive API access
+ * @returns Map of fileId to { mimeType, size }
+ * @throws Error if Drive API returns an error for any file
+ */
+export function fetchDriveMetadata(
+  fileIds: string[],
+  oauthToken: string,
+): Map<string, { mimeType: string; size: number }> {
+  if (fileIds.length === 0) return new Map();
+
+  const requests = fileIds.map((id) => ({
+    url: `https://www.googleapis.com/drive/v3/files/${id}?fields=id%2CmimeType%2Csize`,
+    method: "get" as const,
+    headers: { Authorization: `Bearer ${oauthToken}` },
+    muteHttpExceptions: true,
+  }));
+
+  const responses = UrlFetchApp.fetchAll(requests);
+  const result = new Map<string, { mimeType: string; size: number }>();
+
+  responses.forEach((response, i) => {
+    const code = response.getResponseCode();
+    if (code >= 400) {
+      let message = `HTTP ${code}`;
+      try {
+        const parsed = JSON.parse(response.getContentText()) as { error?: { message: string } };
+        if (parsed.error?.message) message = parsed.error.message;
+      } catch (_e) {
+        // ignore parse errors, use HTTP code in message
+      }
+      throw new Error(`Failed to fetch metadata for ${fileIds[i]}: ${message}`);
+    }
+    const json = JSON.parse(response.getContentText()) as {
+      mimeType?: string;
+      size?: string;
+      error?: { message: string };
+    };
+    result.set(fileIds[i], {
+      mimeType: json.mimeType ?? "application/octet-stream",
+      size: parseInt(json.size ?? "0", 10),
+    });
+  });
+
+  return result;
+}
+
+/**
+ * Download multiple Drive files in parallel using UrlFetchApp.fetchAll.
+ * Handles format conversion for Google Docs (→ PDF) and Sheets (→ CSV).
+ * Returns a map of fileId to Uint8Array bytes.
+ *
+ * @param fileIds - Array of Drive file IDs to download
+ * @param metadata - Map of fileId to { mimeType, size } from fetchDriveMetadata
+ * @param oauthToken - OAuth token with Drive API access
+ * @returns Map of fileId to Uint8Array bytes
+ * @throws Error if any download returns HTTP 400+
+ */
+export function downloadDriveFiles(
+  fileIds: string[],
+  metadata: Map<string, { mimeType: string; size: number }>,
+  oauthToken: string,
+): Map<string, Uint8Array> {
+  if (fileIds.length === 0) return new Map();
+
+  const DOCS_MIME = "application/vnd.google-apps.document";
+  const SHEETS_MIME = "application/vnd.google-apps.spreadsheet";
+
+  const requests = fileIds.map((id) => {
+    const mimeType = metadata.get(id)?.mimeType ?? "";
+    let url: string;
+    if (mimeType === DOCS_MIME) {
+      url = `https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=application/pdf`;
+    } else if (mimeType === SHEETS_MIME) {
+      url = `https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=text/csv`;
+    } else {
+      url = `https://www.googleapis.com/drive/v3/files/${id}?alt=media`;
+    }
+    return {
+      url,
+      method: "get" as const,
+      headers: { Authorization: `Bearer ${oauthToken}` },
+      muteHttpExceptions: true,
+    };
+  });
+
+  const responses = UrlFetchApp.fetchAll(requests);
+  const result = new Map<string, Uint8Array>();
+
+  responses.forEach((response, i) => {
+    const code = response.getResponseCode();
+    if (code >= 400) {
+      throw new Error(`Failed to download file ${fileIds[i]}: HTTP ${code}`);
+    }
+    result.set(fileIds[i], new Uint8Array(response.getContent()));
+  });
+
+  return result;
+}
