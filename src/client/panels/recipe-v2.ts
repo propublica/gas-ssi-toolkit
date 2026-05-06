@@ -102,7 +102,12 @@ export class RecipeV2Panel implements Panel<
     prepRecipe(params)
       .then((result) => {
         const template = buildRunTemplate(this.definition?.prepTemplate ?? []);
-        const config: RunConfig = {
+        if (!template.promptCols || !template.outputCol) {
+          globalThis.alert("Recipe configuration error: missing required columns.");
+          finish();
+          return Promise.resolve();
+        }
+        const config = {
           ...template,
           ...this.definition?.settings,
           rowRange: {
@@ -130,8 +135,14 @@ export class RecipeV2Panel implements Panel<
     };
     prepRecipe(params)
       .then((result) => {
-        const config: RunConfig = {
-          ...buildRunTemplate(this.definition?.prepTemplate ?? []),
+        const template = buildRunTemplate(this.definition?.prepTemplate ?? []);
+        if (!template.promptCols || !template.outputCol) {
+          globalThis.alert("Recipe configuration error: missing required columns.");
+          finish();
+          return Promise.resolve();
+        }
+        const config = {
+          ...template,
           ...this.definition?.settings,
           rowRange: result.rowRange,
         } as RunConfig;

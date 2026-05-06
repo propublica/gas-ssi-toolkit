@@ -165,4 +165,40 @@ describe("Cook flow", () => {
     const calledCols = mockPrepRecipe.mock.calls[0][0].cols;
     expect(calledCols.every((c: { role?: string }) => c.role !== "output")).toBe(true);
   });
+
+  it("disables both buttons while cooking", async () => {
+    mockPrepRecipe.mockResolvedValue({ rowRange: { start: 2, end: 50 } });
+    mockRunBatchAI.mockReturnValue(new Promise(() => {})); // never resolves
+    const { container } = mount();
+    container.querySelector<HTMLInputElement>('[data-input-id="folder"]')!.value =
+      "https://drive.google.com/abc";
+    container.querySelector<HTMLButtonElement>("#cook-btn")!.click();
+    await flush();
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.disabled).toBe(true);
+    expect(container.querySelector<HTMLButtonElement>("#cook-btn")!.disabled).toBe(true);
+  });
+
+  it("re-enables both buttons after Cook completes", async () => {
+    mockPrepRecipe.mockResolvedValue({ rowRange: { start: 2, end: 50 } });
+    mockRunBatchAI.mockResolvedValue(undefined);
+    const { container } = mount();
+    container.querySelector<HTMLInputElement>('[data-input-id="folder"]')!.value =
+      "https://drive.google.com/abc";
+    container.querySelector<HTMLButtonElement>("#cook-btn")!.click();
+    await flush();
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.disabled).toBe(false);
+    expect(container.querySelector<HTMLButtonElement>("#cook-btn")!.disabled).toBe(false);
+  });
+});
+
+describe("Validation", () => {
+  it("shows alert and does not call prepRecipe when required input is empty", async () => {
+    globalThis.alert = jest.fn();
+    const { container } = mount();
+    // Do NOT fill in the required "folder" input
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    await flush();
+    expect(globalThis.alert).toHaveBeenCalledTimes(1);
+    expect(mockPrepRecipe).not.toHaveBeenCalled();
+  });
 });
