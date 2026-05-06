@@ -14,7 +14,7 @@ import type {
 import { RecipePrepCook } from "../components/recipe-prep-cook";
 import { prepRecipe } from "../services";
 
-function buildRunTemplate(cols: RecipeColumn[]): Partial<RunConfig> {
+export function buildRunTemplate(cols: RecipeColumn[]): Partial<RunConfig> {
   const promptCols: PromptColumnSpec[] = [];
   let systemPromptCol: string | undefined;
   let outputCol: string | undefined;
