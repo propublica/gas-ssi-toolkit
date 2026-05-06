@@ -240,7 +240,7 @@ export function fetchDriveMetadata(
   if (fileIds.length === 0) return new Map();
 
   const requests = fileIds.map((id) => ({
-    url: `https://www.googleapis.com/drive/v3/files/${id}?fields=id%2CmimeType%2Csize`,
+    url: `https://www.googleapis.com/drive/v3/files/${id}?fields=id%2CmimeType%2Csize&supportsAllDrives=true`,
     method: "get" as const,
     headers: { Authorization: `Bearer ${oauthToken}` },
     muteHttpExceptions: true,
@@ -300,11 +300,11 @@ export function downloadDriveFiles(
     const mimeType = metadata.get(id)?.mimeType ?? "";
     let url: string;
     if (mimeType === DOCS_MIME) {
-      url = `https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=application/pdf`;
+      url = `https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=application/pdf&supportsAllDrives=true`;
     } else if (mimeType === SHEETS_MIME) {
-      url = `https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=text/csv`;
+      url = `https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=text/csv&supportsAllDrives=true`;
     } else {
-      url = `https://www.googleapis.com/drive/v3/files/${id}?alt=media`;
+      url = `https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`;
     }
     return {
       url,
