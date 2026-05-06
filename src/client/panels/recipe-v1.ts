@@ -9,7 +9,7 @@ type SavedState = {
   inputValues: Record<string, string>;
   v1State: V1State;
   rowRange?: { start: number; end: number };
-  preppedRunConfig?: Partial<RunConfig>;
+  preppedRunConfig?: RunConfig;
 };
 
 export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
@@ -18,7 +18,7 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
   private container: HTMLElement | null = null;
   private v1State: V1State = "idle";
   private rowRange: { start: number; end: number } | null = null;
-  private preppedRunConfig: Partial<RunConfig> | null = null;
+  private preppedRunConfig: RunConfig | null = null;
 
   mount(
     container: HTMLElement,
@@ -154,11 +154,18 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
     prepRecipe(params).then(
       (result) => {
         this.rowRange = result.rowRange;
-        this.preppedRunConfig = {
+        const template = {
           ...buildRunTemplate(this.definition?.prepTemplate ?? []),
           ...this.definition?.settings,
           rowRange: result.rowRange,
         };
+        if (!template.promptCols || !template.outputCol) {
+          globalThis.alert("Recipe configuration error: missing required columns.");
+          this.v1State = "idle";
+          this.applyState(container);
+          return;
+        }
+        this.preppedRunConfig = template as RunConfig;
         this.v1State = "prepped";
         this.applyState(container);
       },
@@ -175,7 +182,7 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
     const config = {
       ...this.preppedRunConfig,
       rowRange: { start: this.rowRange.start, end: this.rowRange.start },
-    } as RunConfig;
+    };
     this.v1State = "testing";
     this.applyState(container);
     runBatchAI(config).then(
@@ -193,7 +200,7 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
 
   private handleCook(container: HTMLElement): void {
     if (!this.rowRange || !this.preppedRunConfig) return;
-    const config = { ...this.preppedRunConfig, rowRange: this.rowRange } as RunConfig;
+    const config = { ...this.preppedRunConfig, rowRange: this.rowRange };
     this.v1State = "cooking";
     this.applyState(container);
     runBatchAI(config).then(
