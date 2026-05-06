@@ -5,14 +5,14 @@ import { TokenInput } from "../components/token-input";
 import { PromptColList } from "../components/prompt-col-list";
 import { RowRange } from "../components/row-range";
 import { PanelLoader } from "../components/panel-loader";
-import { getSheetHeaders, runBatchAI } from "../services";
+import { getSheetHeaders, runBatchAI, getActiveRangeInfo } from "../services";
 import { jobStore } from "../job-store";
 import { TOOL_CATALOG } from "../tools";
 
-export const CHUNK_SIZE = 10;
+export const CHUNK_SIZE = 40;
 // Warn before dispatch when the batch exceeds this many rows, regardless of chunk count.
 // Kept separate from CHUNK_SIZE so small multi-chunk runs don't trigger the dialog.
-export const CHUNK_WARN_THRESHOLD = 50;
+export const CHUNK_WARN_THRESHOLD = 200;
 
 export function computeChunks(
   rowRange: { start: number; end: number },
@@ -267,8 +267,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       const rowCount = config.rowRange.end - config.rowRange.start + 1;
       if (rowCount > CHUNK_WARN_THRESHOLD) {
         const chunkCount = Math.ceil(rowCount / CHUNK_SIZE);
-        // ~5 s/row is a conservative estimate based on typical Gemini API latency.
-        const estimatedMins = Math.ceil((rowCount * 5) / 60);
+        // ~0.5 s/row estimate reflects ~10x speedup from parallel inference.
+        const estimatedMins = Math.ceil((rowCount * 0.5) / 60) || 1;
         const ok = globalThis.confirm(
           `You're about to process ${rowCount} rows across ${chunkCount} chunks.\n\n` +
             `This will take roughly ${estimatedMins} minutes. ` +
@@ -287,11 +287,23 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           globalThis.alert("Error: " + err.message);
         });
     } else {
-      // No explicit row range — active sheet selection, resolved server-side.
-      // Fall back to single dispatch (no chunking, no warning).
-      jobStore.dispatch(jobId, "Batch AI Run", runBatchAI(config, jobId)).catch((err: Error) => {
-        globalThis.alert("Error: " + err.message);
-      });
+      // No explicit row range — query the active sheet selection from the server,
+      // then chunk identically to the explicit rowRange path.
+      jobStore
+        .dispatch(
+          jobId,
+          "Batch AI Run",
+          getActiveRangeInfo().then((rangeInfo) => {
+            if (rangeInfo) {
+              const chunks = computeChunks(rangeInfo, CHUNK_SIZE);
+              return this.runChunks(jobId, config, chunks);
+            }
+            return runBatchAI(config, jobId);
+          }),
+        )
+        .catch((err: Error) => {
+          globalThis.alert("Error: " + err.message);
+        });
     }
     // NOTE: loadHeaders() is intentionally NOT called here.
     // Reloading after dispatch caused flicker and re-initialization mid-run.

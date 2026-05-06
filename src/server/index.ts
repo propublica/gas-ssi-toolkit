@@ -9,13 +9,20 @@
  */
 
 export { SSI } from "./customFunctions";
-import { runInference } from "./inference";
+import { callGeminiAPIBatch } from "./api";
+import {
+  fetchDriveMetadata,
+  downloadDriveFiles,
+  checkDriveService,
+  extractTextUniversal,
+} from "./drive";
+import { uploadFilesToGemini } from "./files";
+import { buildInferenceRequest } from "./inference";
 import {
   buildRichInferenceCellContent,
   buildRichGroundingCellContent,
   type CellContent,
 } from "./rich-text";
-import { checkDriveService, extractTextUniversal } from "./drive";
 import {
   extractId,
   isValidDriveLink,
@@ -27,7 +34,9 @@ import {
   writeColumn,
   writeJobProgress,
   interpolateTemplate,
+  flattenArg,
 } from "./utils";
+import { CONFIG } from "./config";
 import type {
   RunConfig,
   PrepRecipeParams,
@@ -35,7 +44,7 @@ import type {
   ImportDriveLinksConfig,
   ExtractTextConfig,
 } from "../shared/types";
-import type { DriveFileInfo, PromptInput } from "./types";
+import type { DriveFileInfo, PromptInput, GeminiRequest } from "./types";
 
 // ==========================================
 // 🚀 MENU & INITIALIZATION
@@ -246,6 +255,12 @@ function toCellValue(content: CellContent): GoogleAppsScript.Spreadsheet.RichTex
   return builder.build();
 }
 
+// Max files to download + upload per sub-batch in Wave 1.
+// Blobs are passed directly to UrlFetchApp without Array.from(), so JS heap pressure
+// per file is minimal. Bounded by UrlFetchApp.fetchAll's ~20-request limit (two passes
+// per sub-batch = init + upload), so 10 keeps each fetchAll well within that limit.
+const FILE_PIPELINE_BATCH_SIZE = 10;
+
 export function runBatchAI(config: RunConfig, jobId?: string): void {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getActiveSheet();
@@ -328,30 +343,157 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
   const dataValues = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues();
 
-  const totalRows = dataValues.length;
-  let processed = 0;
+  const apiKey = PropertiesService.getScriptProperties().getProperty(CONFIG.API_KEY_PROPERTY);
+  if (!apiKey) {
+    ui.alert("Error", `${CONFIG.API_KEY_PROPERTY} script property not set`, ui.ButtonSet.OK);
+    return;
+  }
 
-  for (let i = 0; i < dataValues.length; i++) {
-    const row = dataValues[i];
-    const realRowIndex = startRow + i;
+  const cache = CacheService.getUserCache();
+  const hasFileInputs = config.promptCols.some((pc) => pc.kind === "file");
 
-    if (jobId) {
-      writeJobProgress(CacheService.getUserCache(), jobId, {
-        message: `Processing row ${i + 1} of ${totalRows}`,
-        current: i + 1,
-        total: totalRows,
-      });
+  // Build all prompt input arrays (one per row) — pure, no I/O
+  const allPromptInputs: PromptInput[][] = dataValues.map((row) =>
+    config.promptCols.map((pc, colIdx) => ({
+      kind: pc.kind,
+      value: row[promptIdxs[colIdx]],
+      ...(config.prefixWithColName ? { label: pc.col } : {}),
+    })),
+  );
+
+  // Wave 1 — file work (multimodal chunks only)
+  const fileUriMap = new Map<string, { uri: string; mimeType: string }>();
+  let fileErrors = new Map<string, string>();
+
+  if (hasFileInputs) {
+    const oauthToken = ScriptApp.getOAuthToken();
+
+    // Collect unique Drive file IDs across all rows in this chunk
+    const allFileIds = new Set<string>();
+    for (const inputs of allPromptInputs) {
+      for (const input of inputs) {
+        if (input.kind === "file") {
+          flattenArg(input.value)
+            .filter(isValidDriveLink)
+            .map(extractId)
+            .forEach((id) => allFileIds.add(id));
+        }
+      }
     }
 
-    const promptInputs: PromptInput[] = config.promptCols.map((pc, i) => ({
-      kind: pc.kind,
-      value: row[promptIdxs[i]],
-      ...(config.prefixWithColName ? { label: pc.col } : {}),
-    }));
-    const systemPrompt = systemPromptIdx >= 0 ? row[systemPromptIdx] : undefined;
+    const fileIds = Array.from(allFileIds);
+    if (fileIds.length > 0) {
+      if (jobId) {
+        writeJobProgress(cache, jobId, {
+          message: `Downloading files for rows ${startRow}–${startRow + numRows - 1}...`,
+        });
+      }
+      const { metadata, errors: metadataErrors } = fetchDriveMetadata(fileIds, oauthToken);
 
-    const result = runInference(promptInputs, systemPrompt, config.tools);
-    if (result === null) continue;
+      // Only attempt to download files whose metadata was successfully fetched
+      const downloadIds = fileIds.filter((id) => metadata.has(id));
+
+      // Translate Drive native MIME types to exported MIME types.
+      // downloadDriveFiles exports Docs as PDF and Sheets as CSV.
+      const DOCS_DRIVE_MIME = "application/vnd.google-apps.document";
+      const SHEETS_DRIVE_MIME = "application/vnd.google-apps.spreadsheet";
+
+      // Process files in sub-batches: download → upload → clear → next sub-batch.
+      // Peak memory is bounded to FILE_PIPELINE_BATCH_SIZE files at a time rather
+      // than all files in the chunk, preventing JS runtime crashes from the
+      // Uint8Array→Byte[] expansion that UrlFetchApp payloads require (~8× overhead).
+      const allDownloadErrors = new Map<string, string>();
+      const allUploadErrors = new Map<string, string>();
+      for (let bStart = 0; bStart < downloadIds.length; bStart += FILE_PIPELINE_BATCH_SIZE) {
+        const batchIds = downloadIds.slice(bStart, bStart + FILE_PIPELINE_BATCH_SIZE);
+        if (jobId) {
+          writeJobProgress(cache, jobId, {
+            message: `Processing files ${bStart + 1}–${Math.min(bStart + FILE_PIPELINE_BATCH_SIZE, downloadIds.length)} of ${downloadIds.length}...`,
+          });
+        }
+        const batchMetadata = new Map(batchIds.map((id) => [id, metadata.get(id)!]));
+        const { bytes: batchBytes, errors: batchDownloadErrors } = downloadDriveFiles(
+          batchIds,
+          batchMetadata,
+          oauthToken,
+        );
+        for (const [id, err] of batchDownloadErrors) allDownloadErrors.set(id, err);
+
+        const batchUploadIds = batchIds.filter((id) => batchBytes.has(id));
+        const batchMimeTypes = new Map(
+          batchUploadIds.map((id) => {
+            const driveMime = metadata.get(id)!.mimeType;
+            let effectiveMime = driveMime;
+            if (driveMime === DOCS_DRIVE_MIME) effectiveMime = "application/pdf";
+            else if (driveMime === SHEETS_DRIVE_MIME) effectiveMime = "text/csv";
+            return [id, effectiveMime];
+          }),
+        );
+        const { uploads: batchUploads, errors: batchUploadErrors } = uploadFilesToGemini(
+          batchBytes,
+          batchMimeTypes,
+          apiKey,
+        );
+        batchBytes.clear(); // release immediately — only one sub-batch in memory at a time
+        for (const [id, info] of batchUploads) fileUriMap.set(id, info);
+        for (const [id, err] of batchUploadErrors) allUploadErrors.set(id, err);
+      }
+      fileErrors = new Map([...metadataErrors, ...allDownloadErrors, ...allUploadErrors]);
+    }
+  }
+
+  // Wave 2 — build requests and fire inference in parallel
+  if (jobId) {
+    writeJobProgress(cache, jobId, {
+      message: `Running AI on rows ${startRow}–${startRow + numRows - 1}...`,
+    });
+  }
+
+  const requests: GeminiRequest[] = [];
+  const rowIndices: number[] = [];
+  // File-error rows are deferred here and written in the same post-batch loop as
+  // inference results, so the entire chunk lands in a single SpreadsheetApp.flush().
+  const directWrites = new Map<number, string>();
+
+  for (let i = 0; i < allPromptInputs.length; i++) {
+    // If any file input for this row failed to fetch/download/upload, defer an
+    // error string for the post-batch write loop and skip inference.
+    if (fileErrors.size > 0) {
+      const failedIds = allPromptInputs[i]
+        .filter((inp) => inp.kind === "file")
+        .flatMap((inp) => flattenArg(inp.value).filter(isValidDriveLink).map(extractId))
+        .filter((id) => fileErrors.has(id));
+      if (failedIds.length > 0) {
+        directWrites.set(i, `[File error: ${fileErrors.get(failedIds[0])}]`);
+        continue;
+      }
+    }
+
+    const systemPrompt = systemPromptIdx >= 0 ? dataValues[i][systemPromptIdx] : undefined;
+    const req = buildInferenceRequest(
+      allPromptInputs[i],
+      systemPrompt,
+      config.tools,
+      hasFileInputs ? fileUriMap : undefined,
+    );
+    if (req !== null) {
+      requests.push({ ...req, apiKey });
+      rowIndices.push(i);
+    }
+  }
+
+  if (requests.length === 0 && directWrites.size === 0) {
+    SpreadsheetApp.getActive().toast("No rows to process.", "Info", 5);
+    return;
+  }
+
+  const results = requests.length > 0 ? callGeminiAPIBatch(requests) : [];
+
+  // Write all results and file errors in a single batch — one flush at end of chunk.
+  for (let j = 0; j < results.length; j++) {
+    const i = rowIndices[j];
+    const realRowIndex = startRow + i;
+    const result = results[j];
 
     if (config.applyMarkdown) {
       try {
@@ -359,7 +501,6 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
           .getRange(realRowIndex, outputIdx + 1)
           .setRichTextValue(toCellValue(buildRichInferenceCellContent(result)));
       } catch (_e) {
-        // Fall back to plain text if rich text rendering fails for this row.
         sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
       }
     } else {
@@ -374,12 +515,22 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
           .setRichTextValue(toCellValue(groundingContent));
       }
     }
-
-    processed++;
-    SpreadsheetApp.flush();
   }
 
-  SpreadsheetApp.getActive().toast(`Complete! Processed ${processed} rows.`, "Success", 5);
+  for (const [i, errorText] of directWrites) {
+    sheet.getRange(startRow + i, outputIdx + 1).setValue(errorText);
+  }
+
+  SpreadsheetApp.flush();
+  const successCount = results.filter((r) => !r.text.startsWith("Error:")).length;
+  const errorCount = results.length - successCount + directWrites.size;
+  SpreadsheetApp.getActive().toast(
+    errorCount === 0
+      ? `Complete! Processed ${results.length} rows.`
+      : `Complete! Processed ${successCount} of ${results.length + directWrites.size} rows (${errorCount} errors).`,
+    "Success",
+    5,
+  );
 }
 
 // ==========================================
@@ -465,4 +616,10 @@ export function getJobProgress(
   const raw = CacheService.getUserCache().get(jobId);
   if (!raw) return null;
   return JSON.parse(raw) as { message?: string; current?: number; total?: number };
+}
+
+export function getActiveRangeInfo(): { start: number; end: number } | null {
+  const range = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getActiveRange();
+  if (!range) return null;
+  return { start: range.getRow(), end: range.getRow() + range.getNumRows() - 1 };
 }

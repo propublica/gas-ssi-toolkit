@@ -6,6 +6,7 @@ const mockRun = {
   withSuccessHandler: jest.fn().mockReturnThis(),
   withFailureHandler: jest.fn().mockReturnThis(),
   getSheetHeaders: jest.fn(),
+  getActiveRangeInfo: jest.fn(),
   runBatchAI: jest.fn(),
   runTool: jest.fn(),
   prepRecipe: jest.fn(),
@@ -204,5 +205,30 @@ describe("getJobProgress", () => {
     const promise = services.getJobProgress("job-789");
     handlers.reject(new Error("progress error"));
     await expect(promise).rejects.toThrow("progress error");
+  });
+});
+
+describe("getActiveRangeInfo", () => {
+  it("calls google.script.run.getActiveRangeInfo and resolves with range", async () => {
+    const handlers = captureHandlers();
+    const range = { start: 1, end: 5 };
+    const promise = services.getActiveRangeInfo();
+    handlers.resolve(range);
+    await expect(promise).resolves.toEqual(range);
+    expect(mockRun.getActiveRangeInfo).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves with null when no range is active", async () => {
+    const handlers = captureHandlers();
+    const promise = services.getActiveRangeInfo();
+    handlers.resolve(null);
+    await expect(promise).resolves.toBeNull();
+  });
+
+  it("rejects on failure", async () => {
+    const handlers = captureHandlers();
+    const promise = services.getActiveRangeInfo();
+    handlers.reject(new Error("range error"));
+    await expect(promise).rejects.toThrow("range error");
   });
 });

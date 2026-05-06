@@ -104,6 +104,74 @@ export function callGeminiAPI(req: GeminiRequest): GeminiResponse {
 }
 
 /**
+ * Call the Gemini generateContent endpoint for multiple requests in parallel using UrlFetchApp.fetchAll.
+ * Unlike callGeminiAPI (which throws on error), the batch version maps errors to { text: "Error: ..." }
+ * so one bad row does not abort the whole chunk.
+ */
+export function callGeminiAPIBatch(reqs: GeminiRequest[]): GeminiResponse[] {
+  if (reqs.length === 0) return [];
+
+  const requests = reqs.map((req) => {
+    const modelName = req.modelName ?? CONFIG.MODEL_NAME;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${req.apiKey}`;
+    return {
+      url,
+      method: "post" as const,
+      contentType: "application/json",
+      payload: JSON.stringify(buildGeminiPayload(req)),
+      muteHttpExceptions: true,
+    };
+  });
+
+  const responses = UrlFetchApp.fetchAll(requests);
+
+  return responses.map((response) => {
+    let json: Record<string, unknown>;
+    try {
+      json = JSON.parse(response.getContentText()) as Record<string, unknown>;
+    } catch (_e) {
+      return { text: `Error: invalid response body (HTTP ${response.getResponseCode()})` };
+    }
+
+    if (json.error) {
+      return { text: `Error: ${(json.error as { message: string }).message}` };
+    }
+
+    const candidate = (json.candidates as Array<Record<string, unknown>> | undefined)?.[0];
+    const parts =
+      (candidate?.content as { parts?: Array<Record<string, unknown>> } | undefined)?.parts ?? [];
+
+    const textParts = parts
+      .filter((p): p is { text: string } => typeof p["text"] === "string")
+      .map((p) => p.text);
+    const text = textParts.join("\n\n") || "No response.";
+
+    const codePairs: GeminiCodePair[] = [];
+    for (let i = 0; i < parts.length - 1; i++) {
+      const curr = parts[i];
+      const next = parts[i + 1];
+      if (curr["executableCode"] !== undefined && next["codeExecutionResult"] !== undefined) {
+        codePairs.push({
+          code: curr["executableCode"] as GeminiCodePair["code"],
+          result: next["codeExecutionResult"] as GeminiCodePair["result"],
+        });
+        i++; // skip the result part — already consumed
+      }
+    }
+
+    const groundingMetadata = candidate?.["groundingMetadata"] as
+      | GeminiResponse["groundingMetadata"]
+      | undefined;
+
+    return {
+      text,
+      ...(groundingMetadata !== undefined && { groundingMetadata }),
+      ...(codePairs.length > 0 && { codePairs }),
+    };
+  });
+}
+
+/**
  * Resolve the Gemini API key from Script Properties and call callGeminiAPI.
  * This is the preferred entry point for all production Gemini calls.
  * Throws if the API key property is not set.
