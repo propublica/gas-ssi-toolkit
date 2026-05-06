@@ -5,11 +5,11 @@ import { TokenInput } from "../components/token-input";
 import { PromptColList } from "../components/prompt-col-list";
 import { RowRange } from "../components/row-range";
 import { PanelLoader } from "../components/panel-loader";
-import { getSheetHeaders, runBatchAI } from "../services";
+import { getSheetHeaders, runBatchAI, getActiveRangeInfo } from "../services";
 import { jobStore } from "../job-store";
 import { TOOL_CATALOG } from "../tools";
 
-export const CHUNK_SIZE = 50;
+export const CHUNK_SIZE = 40;
 // Warn before dispatch when the batch exceeds this many rows, regardless of chunk count.
 // Kept separate from CHUNK_SIZE so small multi-chunk runs don't trigger the dialog.
 export const CHUNK_WARN_THRESHOLD = 200;
@@ -287,11 +287,23 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           globalThis.alert("Error: " + err.message);
         });
     } else {
-      // No explicit row range — active sheet selection, resolved server-side.
-      // Fall back to single dispatch (no chunking, no warning).
-      jobStore.dispatch(jobId, "Batch AI Run", runBatchAI(config, jobId)).catch((err: Error) => {
-        globalThis.alert("Error: " + err.message);
-      });
+      // No explicit row range — query the active sheet selection from the server,
+      // then chunk identically to the explicit rowRange path.
+      jobStore
+        .dispatch(
+          jobId,
+          "Batch AI Run",
+          getActiveRangeInfo().then((rangeInfo) => {
+            if (rangeInfo) {
+              const chunks = computeChunks(rangeInfo, CHUNK_SIZE);
+              return this.runChunks(jobId, config, chunks);
+            }
+            return runBatchAI(config, jobId);
+          }),
+        )
+        .catch((err: Error) => {
+          globalThis.alert("Error: " + err.message);
+        });
     }
     // NOTE: loadHeaders() is intentionally NOT called here.
     // Reloading after dispatch caused flicker and re-initialization mid-run.

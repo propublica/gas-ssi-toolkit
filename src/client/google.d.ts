@@ -17,6 +17,7 @@ declare global {
     extractText(config: ExtractTextConfig, jobId?: string): void;
     prepRecipe(params: PrepRecipeParams): PrepRecipeResult;
     getJobProgress(jobId: string): void;
+    getActiveRangeInfo(): void;
   }
 
   const google: {

@@ -5,6 +5,7 @@
 jest.mock("../../src/client/services", () => ({
   getSheetHeaders: jest.fn(),
   runBatchAI: jest.fn(),
+  getActiveRangeInfo: jest.fn().mockResolvedValue(null),
   getJobProgress: jest.fn().mockResolvedValue(null),
 }));
 
@@ -200,8 +201,9 @@ describe("ConfigureAIRunPanel — Run AI", () => {
       outputCol: "ai_inference",
     });
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    await Promise.resolve();
-    await Promise.resolve(); // flush rejection
+    // Extra ticks: getActiveRangeInfo adds an async hop before runBatchAI, so
+    // the catch handler fires one tick later than in the single-dispatch path.
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(globalThis.alert).toHaveBeenCalledWith("Error: API error");
   });
 

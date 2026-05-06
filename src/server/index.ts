@@ -255,6 +255,12 @@ function toCellValue(content: CellContent): GoogleAppsScript.Spreadsheet.RichTex
   return builder.build();
 }
 
+// Max files to download + upload per sub-batch in Wave 1.
+// Blobs are passed directly to UrlFetchApp without Array.from(), so JS heap pressure
+// per file is minimal. Bounded by UrlFetchApp.fetchAll's ~20-request limit (two passes
+// per sub-batch = init + upload), so 10 keeps each fetchAll well within that limit.
+const FILE_PIPELINE_BATCH_SIZE = 10;
+
 export function runBatchAI(config: RunConfig, jobId?: string): void {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getActiveSheet();
@@ -356,7 +362,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
   );
 
   // Wave 1 — file work (multimodal chunks only)
-  let fileUriMap = new Map<string, { uri: string; mimeType: string }>();
+  const fileUriMap = new Map<string, { uri: string; mimeType: string }>();
   let fileErrors = new Map<string, string>();
 
   if (hasFileInputs) {
@@ -386,37 +392,53 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
       // Only attempt to download files whose metadata was successfully fetched
       const downloadIds = fileIds.filter((id) => metadata.has(id));
-      const { bytes, errors: downloadErrors } = downloadDriveFiles(
-        downloadIds,
-        metadata,
-        oauthToken,
-      );
 
-      if (jobId) {
-        writeJobProgress(cache, jobId, {
-          message: `Uploading files for rows ${startRow}–${startRow + numRows - 1}...`,
-        });
-      }
       // Translate Drive native MIME types to exported MIME types.
-      // downloadDriveFiles exports Docs as PDF and Sheets as CSV, so we must use those
-      // MIME types when uploading to Gemini, not the native Drive types.
+      // downloadDriveFiles exports Docs as PDF and Sheets as CSV.
       const DOCS_DRIVE_MIME = "application/vnd.google-apps.document";
       const SHEETS_DRIVE_MIME = "application/vnd.google-apps.spreadsheet";
-      const uploadIds = downloadIds.filter((id) => bytes.has(id));
-      const mimeTypes = new Map(
-        uploadIds.map((id) => {
-          const driveMime = metadata.get(id)!.mimeType;
-          let effectiveMime = driveMime;
-          if (driveMime === DOCS_DRIVE_MIME) effectiveMime = "application/pdf";
-          else if (driveMime === SHEETS_DRIVE_MIME) effectiveMime = "text/csv";
-          return [id, effectiveMime];
-        }),
-      );
-      // Pass bytes directly — its keys equal uploadIds by construction.
-      const { uploads, errors: uploadErrors } = uploadFilesToGemini(bytes, mimeTypes, apiKey);
-      bytes.clear(); // release downloaded file bytes — no longer needed after upload
-      fileUriMap = uploads;
-      fileErrors = new Map([...metadataErrors, ...downloadErrors, ...uploadErrors]);
+
+      // Process files in sub-batches: download → upload → clear → next sub-batch.
+      // Peak memory is bounded to FILE_PIPELINE_BATCH_SIZE files at a time rather
+      // than all files in the chunk, preventing JS runtime crashes from the
+      // Uint8Array→Byte[] expansion that UrlFetchApp payloads require (~8× overhead).
+      const allDownloadErrors = new Map<string, string>();
+      const allUploadErrors = new Map<string, string>();
+      for (let bStart = 0; bStart < downloadIds.length; bStart += FILE_PIPELINE_BATCH_SIZE) {
+        const batchIds = downloadIds.slice(bStart, bStart + FILE_PIPELINE_BATCH_SIZE);
+        if (jobId) {
+          writeJobProgress(cache, jobId, {
+            message: `Processing files ${bStart + 1}–${Math.min(bStart + FILE_PIPELINE_BATCH_SIZE, downloadIds.length)} of ${downloadIds.length}...`,
+          });
+        }
+        const batchMetadata = new Map(batchIds.map((id) => [id, metadata.get(id)!]));
+        const { bytes: batchBytes, errors: batchDownloadErrors } = downloadDriveFiles(
+          batchIds,
+          batchMetadata,
+          oauthToken,
+        );
+        for (const [id, err] of batchDownloadErrors) allDownloadErrors.set(id, err);
+
+        const batchUploadIds = batchIds.filter((id) => batchBytes.has(id));
+        const batchMimeTypes = new Map(
+          batchUploadIds.map((id) => {
+            const driveMime = metadata.get(id)!.mimeType;
+            let effectiveMime = driveMime;
+            if (driveMime === DOCS_DRIVE_MIME) effectiveMime = "application/pdf";
+            else if (driveMime === SHEETS_DRIVE_MIME) effectiveMime = "text/csv";
+            return [id, effectiveMime];
+          }),
+        );
+        const { uploads: batchUploads, errors: batchUploadErrors } = uploadFilesToGemini(
+          batchBytes,
+          batchMimeTypes,
+          apiKey,
+        );
+        batchBytes.clear(); // release immediately — only one sub-batch in memory at a time
+        for (const [id, info] of batchUploads) fileUriMap.set(id, info);
+        for (const [id, err] of batchUploadErrors) allUploadErrors.set(id, err);
+      }
+      fileErrors = new Map([...metadataErrors, ...allDownloadErrors, ...allUploadErrors]);
     }
   }
 
@@ -594,4 +616,10 @@ export function getJobProgress(
   const raw = CacheService.getUserCache().get(jobId);
   if (!raw) return null;
   return JSON.parse(raw) as { message?: string; current?: number; total?: number };
+}
+
+export function getActiveRangeInfo(): { start: number; end: number } | null {
+  const range = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getActiveRange();
+  if (!range) return null;
+  return { start: range.getRow(), end: range.getRow() + range.getNumRows() - 1 };
 }

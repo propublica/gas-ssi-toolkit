@@ -291,7 +291,7 @@ export function downloadDriveFiles(
   fileIds: string[],
   metadata: Map<string, { mimeType: string; size: number }>,
   oauthToken: string,
-): { bytes: Map<string, Uint8Array>; errors: Map<string, string> } {
+): { bytes: Map<string, GoogleAppsScript.Base.Blob>; errors: Map<string, string> } {
   if (fileIds.length === 0) return { bytes: new Map(), errors: new Map() };
 
   const DOCS_MIME = "application/vnd.google-apps.document";
@@ -316,7 +316,7 @@ export function downloadDriveFiles(
   });
 
   const responses = UrlFetchApp.fetchAll(requests);
-  const bytes = new Map<string, Uint8Array>();
+  const bytes = new Map<string, GoogleAppsScript.Base.Blob>();
   const errors = new Map<string, string>();
 
   responses.forEach((response, i) => {
@@ -332,7 +332,7 @@ export function downloadDriveFiles(
       errors.set(fileIds[i], message);
       return;
     }
-    bytes.set(fileIds[i], new Uint8Array(response.getContent()));
+    bytes.set(fileIds[i], response.getBlob());
   });
 
   return { bytes, errors };

@@ -495,8 +495,9 @@ describe("downloadDriveFiles", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("uses export URL for Google Docs", () => {
+    const mockBlob = {};
     (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
-      { getResponseCode: () => 200, getContent: () => [1, 2, 3] },
+      { getResponseCode: () => 200, getBlob: () => mockBlob },
     ]);
     const metadata = new Map([
       ["docId", { mimeType: "application/vnd.google-apps.document", size: 0 }],
@@ -507,8 +508,9 @@ describe("downloadDriveFiles", () => {
   });
 
   it("uses export URL for Google Sheets", () => {
+    const mockBlob = {};
     (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
-      { getResponseCode: () => 200, getContent: () => [1, 2, 3] },
+      { getResponseCode: () => 200, getBlob: () => mockBlob },
     ]);
     const metadata = new Map([
       ["sheetId", { mimeType: "application/vnd.google-apps.spreadsheet", size: 0 }],
@@ -519,8 +521,9 @@ describe("downloadDriveFiles", () => {
   });
 
   it("uses alt=media for binary files", () => {
+    const mockBlob = {};
     (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
-      { getResponseCode: () => 200, getContent: () => [255, 254] },
+      { getResponseCode: () => 200, getBlob: () => mockBlob },
     ]);
     const metadata = new Map([["pdfId", { mimeType: "application/pdf", size: 0 }]]);
     downloadDriveFiles(["pdfId"], metadata, "token");
@@ -528,13 +531,14 @@ describe("downloadDriveFiles", () => {
     expect(calls[0].url).toContain("?alt=media");
   });
 
-  it("returns a map of fileId to Uint8Array bytes", () => {
+  it("returns a map of fileId to Blob", () => {
+    const mockBlob = {};
     (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
-      { getResponseCode: () => 200, getContent: () => [10, 20, 30] },
+      { getResponseCode: () => 200, getBlob: () => mockBlob },
     ]);
     const metadata = new Map([["fileId", { mimeType: "application/pdf", size: 0 }]]);
     const { bytes } = downloadDriveFiles(["fileId"], metadata, "token");
-    expect(bytes.get("fileId")).toEqual(new Uint8Array([10, 20, 30]));
+    expect(bytes.get("fileId")).toBe(mockBlob);
   });
 
   it("returns empty map for empty input", () => {
@@ -542,8 +546,9 @@ describe("downloadDriveFiles", () => {
   });
 
   it("falls back to alt=media when fileId is not in metadata map", () => {
+    const mockBlob = {};
     (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
-      { getResponseCode: () => 200, getContent: () => [1, 2] },
+      { getResponseCode: () => 200, getBlob: () => mockBlob },
     ]);
     downloadDriveFiles(["unknownId"], new Map(), "token");
     const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
