@@ -357,6 +357,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
   // Wave 1 — file work (multimodal chunks only)
   let fileUriMap = new Map<string, { uri: string; mimeType: string }>();
+  let fileErrors = new Map<string, string>();
 
   if (hasFileInputs) {
     const oauthToken = ScriptApp.getOAuthToken();
@@ -381,8 +382,15 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
           message: `Downloading files for rows ${startRow}–${startRow + numRows - 1}...`,
         });
       }
-      const metadata = fetchDriveMetadata(fileIds, oauthToken);
-      const bytes = downloadDriveFiles(fileIds, metadata, oauthToken);
+      const { metadata, errors: metadataErrors } = fetchDriveMetadata(fileIds, oauthToken);
+
+      // Only attempt to download files whose metadata was successfully fetched
+      const downloadIds = fileIds.filter((id) => metadata.has(id));
+      const { bytes, errors: downloadErrors } = downloadDriveFiles(
+        downloadIds,
+        metadata,
+        oauthToken,
+      );
 
       if (jobId) {
         writeJobProgress(cache, jobId, {
@@ -394,8 +402,9 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
       // MIME types when uploading to Gemini, not the native Drive types.
       const DOCS_DRIVE_MIME = "application/vnd.google-apps.document";
       const SHEETS_DRIVE_MIME = "application/vnd.google-apps.spreadsheet";
+      const uploadIds = downloadIds.filter((id) => bytes.has(id));
       const mimeTypes = new Map(
-        fileIds.map((id) => {
+        uploadIds.map((id) => {
           const driveMime = metadata.get(id)!.mimeType;
           let effectiveMime = driveMime;
           if (driveMime === DOCS_DRIVE_MIME) effectiveMime = "application/pdf";
@@ -403,7 +412,10 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
           return [id, effectiveMime];
         }),
       );
-      fileUriMap = uploadFilesToGemini(bytes, mimeTypes, apiKey);
+      const uploadBytes = new Map(uploadIds.map((id) => [id, bytes.get(id)!]));
+      const { uploads, errors: uploadErrors } = uploadFilesToGemini(uploadBytes, mimeTypes, apiKey);
+      fileUriMap = uploads;
+      fileErrors = new Map([...metadataErrors, ...downloadErrors, ...uploadErrors]);
     }
   }
 
@@ -418,6 +430,21 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
   const rowIndices: number[] = [];
 
   for (let i = 0; i < allPromptInputs.length; i++) {
+    // If any file input for this row failed to fetch/download/upload, write the
+    // error directly to the output cell and skip inference for this row.
+    if (fileErrors.size > 0) {
+      const failedIds = allPromptInputs[i]
+        .filter((inp) => inp.kind === "file")
+        .flatMap((inp) => flattenArg(inp.value).filter(isValidDriveLink).map(extractId))
+        .filter((id) => fileErrors.has(id));
+      if (failedIds.length > 0) {
+        sheet
+          .getRange(startRow + i, outputIdx + 1)
+          .setValue(`[File error: ${fileErrors.get(failedIds[0])}]`);
+        continue;
+      }
+    }
+
     const systemPrompt = systemPromptIdx >= 0 ? dataValues[i][systemPromptIdx] : undefined;
     const req = buildInferenceRequest(
       allPromptInputs[i],

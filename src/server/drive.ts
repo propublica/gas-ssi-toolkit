@@ -223,21 +223,21 @@ export function prepareDriveAttachments(fileIds: string[]): GeminiInlineData[] {
 
 /**
  * Fetch metadata for multiple Drive files in parallel using UrlFetchApp.fetchAll.
- * Returns a map of fileId to { mimeType, size }.
+ * Returns partial results — files that fail are recorded in `errors` rather than
+ * aborting the whole batch.
  *
  * Note: Google Workspace native files (Docs, Sheets, Slides) do not have a
  * size field in the Drive API v3 response; size will be 0 for those types.
  *
  * @param fileIds - Array of Drive file IDs to fetch metadata for
  * @param oauthToken - OAuth token with Drive API access
- * @returns Map of fileId to { mimeType, size }
- * @throws Error if Drive API returns an error for any file
+ * @returns { metadata: Map of fileId to { mimeType, size }, errors: Map of fileId to error message }
  */
 export function fetchDriveMetadata(
   fileIds: string[],
   oauthToken: string,
-): Map<string, { mimeType: string; size: number }> {
-  if (fileIds.length === 0) return new Map();
+): { metadata: Map<string, { mimeType: string; size: number }>; errors: Map<string, string> } {
+  if (fileIds.length === 0) return { metadata: new Map(), errors: new Map() };
 
   const requests = fileIds.map((id) => ({
     url: `https://www.googleapis.com/drive/v3/files/${id}?fields=id%2CmimeType%2Csize&supportsAllDrives=true`,
@@ -247,7 +247,8 @@ export function fetchDriveMetadata(
   }));
 
   const responses = UrlFetchApp.fetchAll(requests);
-  const result = new Map<string, { mimeType: string; size: number }>();
+  const metadata = new Map<string, { mimeType: string; size: number }>();
+  const errors = new Map<string, string>();
 
   responses.forEach((response, i) => {
     const code = response.getResponseCode();
@@ -259,39 +260,39 @@ export function fetchDriveMetadata(
       } catch (_e) {
         // ignore parse errors, use HTTP code in message
       }
-      throw new Error(`Failed to fetch metadata for ${fileIds[i]}: ${message}`);
+      errors.set(fileIds[i], message);
+      return;
     }
     const json = JSON.parse(response.getContentText()) as {
       mimeType?: string;
       size?: string;
-      error?: { message: string };
     };
-    result.set(fileIds[i], {
+    metadata.set(fileIds[i], {
       mimeType: json.mimeType ?? "application/octet-stream",
       size: parseInt(json.size ?? "0", 10),
     });
   });
 
-  return result;
+  return { metadata, errors };
 }
 
 /**
  * Download multiple Drive files in parallel using UrlFetchApp.fetchAll.
  * Handles format conversion for Google Docs (→ PDF) and Sheets (→ CSV).
- * Returns a map of fileId to Uint8Array bytes.
+ * Returns partial results — files that fail are recorded in `errors` rather than
+ * aborting the whole batch.
  *
  * @param fileIds - Array of Drive file IDs to download
  * @param metadata - Map of fileId to { mimeType, size } from fetchDriveMetadata
  * @param oauthToken - OAuth token with Drive API access
- * @returns Map of fileId to Uint8Array bytes
- * @throws Error if any download returns HTTP 400+
+ * @returns { bytes: Map of fileId to Uint8Array, errors: Map of fileId to error message }
  */
 export function downloadDriveFiles(
   fileIds: string[],
   metadata: Map<string, { mimeType: string; size: number }>,
   oauthToken: string,
-): Map<string, Uint8Array> {
-  if (fileIds.length === 0) return new Map();
+): { bytes: Map<string, Uint8Array>; errors: Map<string, string> } {
+  if (fileIds.length === 0) return { bytes: new Map(), errors: new Map() };
 
   const DOCS_MIME = "application/vnd.google-apps.document";
   const SHEETS_MIME = "application/vnd.google-apps.spreadsheet";
@@ -315,15 +316,17 @@ export function downloadDriveFiles(
   });
 
   const responses = UrlFetchApp.fetchAll(requests);
-  const result = new Map<string, Uint8Array>();
+  const bytes = new Map<string, Uint8Array>();
+  const errors = new Map<string, string>();
 
   responses.forEach((response, i) => {
     const code = response.getResponseCode();
     if (code >= 400) {
-      throw new Error(`Failed to download file ${fileIds[i]}: HTTP ${code}`);
+      errors.set(fileIds[i], `HTTP ${code}`);
+      return;
     }
-    result.set(fileIds[i], new Uint8Array(response.getContent()));
+    bytes.set(fileIds[i], new Uint8Array(response.getContent()));
   });
 
-  return result;
+  return { bytes, errors };
 }

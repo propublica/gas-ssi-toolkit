@@ -442,24 +442,26 @@ describe("fetchDriveMetadata", () => {
         getContentText: () => JSON.stringify({ mimeType: "image/png", size: "204800" }),
       },
     ]);
-    const result = fetchDriveMetadata(["file1", "file2"], "token");
-    expect(result.get("file1")).toEqual({ mimeType: "application/pdf", size: 102400 });
-    expect(result.get("file2")).toEqual({ mimeType: "image/png", size: 204800 });
+    const { metadata } = fetchDriveMetadata(["file1", "file2"], "token");
+    expect(metadata.get("file1")).toEqual({ mimeType: "application/pdf", size: 102400 });
+    expect(metadata.get("file2")).toEqual({ mimeType: "image/png", size: 204800 });
   });
 
   it("returns empty map for empty input", () => {
-    expect(fetchDriveMetadata([], "token").size).toBe(0);
+    expect(fetchDriveMetadata([], "token").metadata.size).toBe(0);
     expect(UrlFetchApp.fetchAll as jest.Mock).not.toHaveBeenCalled();
   });
 
-  it("throws when Drive API returns an error", () => {
+  it("records error in errors map when Drive API returns an error", () => {
     (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
       {
         getResponseCode: () => 404,
         getContentText: () => JSON.stringify({ error: { message: "File not found" } }),
       },
     ]);
-    expect(() => fetchDriveMetadata(["bad-id"], "token")).toThrow("File not found");
+    const { metadata, errors } = fetchDriveMetadata(["bad-id"], "token");
+    expect(metadata.size).toBe(0);
+    expect(errors.get("bad-id")).toContain("File not found");
   });
 
   it("falls back to HTTP status code message when error response body is not valid JSON", () => {
@@ -469,7 +471,9 @@ describe("fetchDriveMetadata", () => {
         getContentText: () => "<html>Service Unavailable</html>",
       },
     ]);
-    expect(() => fetchDriveMetadata(["id"], "token")).toThrow("HTTP 503");
+    const { metadata, errors } = fetchDriveMetadata(["id"], "token");
+    expect(metadata.size).toBe(0);
+    expect(errors.get("id")).toContain("HTTP 503");
   });
 
   it("returns size 0 for Google Workspace files that have no size field", () => {
@@ -479,8 +483,8 @@ describe("fetchDriveMetadata", () => {
         getContentText: () => JSON.stringify({ mimeType: "application/vnd.google-apps.document" }),
       },
     ]);
-    const result = fetchDriveMetadata(["docId"], "token");
-    expect(result.get("docId")).toEqual({
+    const { metadata } = fetchDriveMetadata(["docId"], "token");
+    expect(metadata.get("docId")).toEqual({
       mimeType: "application/vnd.google-apps.document",
       size: 0,
     });
@@ -529,12 +533,12 @@ describe("downloadDriveFiles", () => {
       { getResponseCode: () => 200, getContent: () => [10, 20, 30] },
     ]);
     const metadata = new Map([["fileId", { mimeType: "application/pdf", size: 0 }]]);
-    const result = downloadDriveFiles(["fileId"], metadata, "token");
-    expect(result.get("fileId")).toEqual(new Uint8Array([10, 20, 30]));
+    const { bytes } = downloadDriveFiles(["fileId"], metadata, "token");
+    expect(bytes.get("fileId")).toEqual(new Uint8Array([10, 20, 30]));
   });
 
   it("returns empty map for empty input", () => {
-    expect(downloadDriveFiles([], new Map(), "token").size).toBe(0);
+    expect(downloadDriveFiles([], new Map(), "token").bytes.size).toBe(0);
   });
 
   it("falls back to alt=media when fileId is not in metadata map", () => {
@@ -546,11 +550,13 @@ describe("downloadDriveFiles", () => {
     expect(calls[0].url).toContain("?alt=media");
   });
 
-  it("throws when a download returns HTTP error", () => {
+  it("records error in errors map when a download returns HTTP error", () => {
     (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
       { getResponseCode: () => 403, getContent: () => [] },
     ]);
     const metadata = new Map([["fileId", { mimeType: "application/pdf", size: 0 }]]);
-    expect(() => downloadDriveFiles(["fileId"], metadata, "token")).toThrow("403");
+    const { bytes, errors } = downloadDriveFiles(["fileId"], metadata, "token");
+    expect(bytes.size).toBe(0);
+    expect(errors.get("fileId")).toContain("403");
   });
 });

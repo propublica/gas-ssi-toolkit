@@ -44,30 +44,32 @@ describe("uploadFilesToGemini", () => {
       ["file1", "application/pdf"],
       ["file2", "image/png"],
     ]);
-    const result = uploadFilesToGemini(files, mimeTypes, "test-key");
-    expect(result.get("file1")).toEqual({
+    const { uploads } = uploadFilesToGemini(files, mimeTypes, "test-key");
+    expect(uploads.get("file1")).toEqual({
       uri: "https://generativelanguage.googleapis.com/v1beta/files/abc",
       mimeType: "application/pdf",
     });
-    expect(result.get("file2")).toEqual({
+    expect(uploads.get("file2")).toEqual({
       uri: "https://generativelanguage.googleapis.com/v1beta/files/def",
       mimeType: "image/png",
     });
   });
 
   it("returns empty map for empty input", () => {
-    const result = uploadFilesToGemini(new Map(), new Map(), "key");
-    expect(result.size).toBe(0);
+    const { uploads } = uploadFilesToGemini(new Map(), new Map(), "key");
+    expect(uploads.size).toBe(0);
     expect(UrlFetchApp.fetchAll as jest.Mock).not.toHaveBeenCalled();
   });
 
-  it("throws when Files API returns an error", () => {
+  it("records error in errors map when Files API returns an error", () => {
     (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
       { getContentText: () => JSON.stringify({ error: { message: "quota exceeded" } }) },
     ]);
     const files = new Map([["fileId", new Uint8Array([1])]]);
     const mimeTypes = new Map([["fileId", "application/pdf"]]);
-    expect(() => uploadFilesToGemini(files, mimeTypes, "key")).toThrow("quota exceeded");
+    const { uploads, errors } = uploadFilesToGemini(files, mimeTypes, "key");
+    expect(uploads.size).toBe(0);
+    expect(errors.get("fileId")).toContain("quota exceeded");
   });
 
   it("processes files in sub-batches of 10", () => {
@@ -86,9 +88,9 @@ describe("uploadFilesToGemini", () => {
       .mockReturnValueOnce(fileIds.slice(10, 20).map(singleResponse))
       .mockReturnValueOnce(fileIds.slice(20, 25).map(singleResponse));
 
-    const result = uploadFilesToGemini(files, mimeTypes, "key");
+    const { uploads } = uploadFilesToGemini(files, mimeTypes, "key");
     expect(UrlFetchApp.fetchAll as jest.Mock).toHaveBeenCalledTimes(3);
-    expect(result.size).toBe(25);
+    expect(uploads.size).toBe(25);
   });
 
   it("sends multipart content-type header", () => {

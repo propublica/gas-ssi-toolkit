@@ -10,20 +10,23 @@
 /**
  * Upload a batch of files to the Gemini Files API in parallel.
  * Processed in sub-batches of 10 to limit peak memory.
+ * Returns partial results — files that fail are recorded in `errors` rather than
+ * aborting the whole batch.
  *
  * @param files     Map of driveFileId → raw bytes (Uint8Array)
  * @param mimeTypes Map of driveFileId → MIME type string
  * @param apiKey    Gemini API key
- * @returns Map of driveFileId → { uri, mimeType } from the Files API response
+ * @returns { uploads: Map of driveFileId → { uri, mimeType }, errors: Map of driveFileId → error message }
  */
 export function uploadFilesToGemini(
   files: Map<string, Uint8Array>,
   mimeTypes: Map<string, string>,
   apiKey: string,
-): Map<string, { uri: string; mimeType: string }> {
-  const result = new Map<string, { uri: string; mimeType: string }>();
+): { uploads: Map<string, { uri: string; mimeType: string }>; errors: Map<string, string> } {
+  const uploads = new Map<string, { uri: string; mimeType: string }>();
+  const errors = new Map<string, string>();
   const fileIds = Array.from(files.keys());
-  if (fileIds.length === 0) return result;
+  if (fileIds.length === 0) return { uploads, errors };
 
   const BATCH_SIZE = 10;
   for (let i = 0; i < fileIds.length; i += BATCH_SIZE) {
@@ -45,15 +48,14 @@ export function uploadFilesToGemini(
         error?: { message: string };
       };
       if (json.error || !json.file?.uri) {
-        throw new Error(
-          `Failed to upload file ${fileId}: ${json.error?.message ?? "missing URI in response"}`,
-        );
+        errors.set(fileId, json.error?.message ?? "missing URI in response");
+        return;
       }
-      result.set(fileId, { uri: json.file.uri, mimeType: json.file.mimeType });
+      uploads.set(fileId, { uri: json.file.uri, mimeType: json.file.mimeType });
     });
   }
 
-  return result;
+  return { uploads, errors };
 }
 
 function buildUploadRequest(
