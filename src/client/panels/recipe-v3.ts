@@ -1,0 +1,342 @@
+import type { NavigationContext, Panel, RecipeDefinition } from "../types";
+import type { PrepRecipeParams, RunConfig } from "../../shared/types";
+import { prepRecipe, runBatchAI } from "../services";
+import { buildRunTemplate } from "./recipe";
+
+type V3RunState = "idle" | "testing" | "cooking";
+
+export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
+  private nav: NavigationContext | null = null;
+  private definition: RecipeDefinition | null = null;
+  private container: HTMLElement | null = null;
+  private step1Complete = false;
+  private step2Complete = false;
+  private step3Unlocked = false;
+  private rowRange: { start: number; end: number } | null = null;
+  private preppedRunConfig: RunConfig | null = null;
+  private runState: V3RunState = "idle";
+
+  mount(container: HTMLElement, nav: NavigationContext, definition?: RecipeDefinition): void {
+    this.nav = nav;
+    this.definition = definition ?? null;
+    this.container = container;
+    this.step1Complete = false;
+    this.step2Complete = false;
+    this.step3Unlocked = false;
+    this.rowRange = null;
+    this.preppedRunConfig = null;
+    this.runState = "idle";
+
+    container.innerHTML = this.template(definition);
+    container.querySelector("#back-btn")?.addEventListener("click", () => nav.back());
+    this.wireInputResets(container, definition);
+    this.wireStepButtons(container);
+    this.applyLockState(container);
+  }
+
+  unmount(): never {
+    return undefined as never;
+  }
+
+  private getStep1InputIds(): Set<string> {
+    const ids = new Set<string>();
+    for (const col of this.definition?.prepTemplate ?? []) {
+      if (col.fillStrategy.kind === "list-drive-folder") {
+        ids.add(col.fillStrategy.inputId);
+      }
+    }
+    return ids;
+  }
+
+  private wireInputResets(container: HTMLElement, definition: RecipeDefinition | undefined): void {
+    for (const input of definition?.inputs ?? []) {
+      const el = container.querySelector<HTMLInputElement>(`[data-input-id="${input.id}"]`);
+      el?.addEventListener("input", () => {
+        this.step3Unlocked = false;
+        this.preppedRunConfig = null;
+        this.applyLockState(container);
+      });
+    }
+  }
+
+  private wireStepButtons(container: HTMLElement): void {
+    container
+      .querySelector("#step1-btn")
+      ?.addEventListener("click", () => this.handleStep1(container));
+    container
+      .querySelector("#step2-btn")
+      ?.addEventListener("click", () => this.handleStep2(container));
+    container
+      .querySelector("#test-btn")
+      ?.addEventListener("click", () => this.handleTest(container));
+    container
+      .querySelector("#cook-btn")
+      ?.addEventListener("click", () => this.handleCook(container));
+    container
+      .querySelector("#configure-btn")
+      ?.addEventListener("click", () => this.handleConfigureAI());
+  }
+
+  private applyLockState(container: HTMLElement): void {
+    const step2Section = container.querySelector<HTMLElement>("[data-step='2']");
+    const step3Section = container.querySelector<HTMLElement>("[data-step='3']");
+
+    if (step2Section) {
+      const locked = !this.step1Complete;
+      step2Section
+        .querySelectorAll<HTMLButtonElement | HTMLInputElement>("button, input")
+        .forEach((el) => {
+          el.disabled = locked;
+        });
+      const lock = step2Section.querySelector<HTMLElement>(".v3-lock");
+      if (lock) lock.hidden = !locked;
+    }
+
+    if (step3Section) {
+      const locked = !this.step3Unlocked;
+      const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
+      const cookBtn = container.querySelector<HTMLButtonElement>("#cook-btn")!;
+      const configBtn = container.querySelector<HTMLButtonElement>("#configure-btn")!;
+      if (this.runState === "idle") {
+        testBtn.disabled = locked;
+        cookBtn.disabled = locked;
+        configBtn.disabled = locked;
+        testBtn.textContent = "Test ▸ row 2";
+        cookBtn.textContent = "Cook ▸ All";
+      } else if (this.runState === "testing") {
+        testBtn.disabled = true;
+        testBtn.innerHTML = `<span class="btn-spinner"></span>Testing…`;
+        cookBtn.disabled = true;
+        configBtn.disabled = true;
+      } else if (this.runState === "cooking") {
+        testBtn.disabled = true;
+        cookBtn.disabled = true;
+        cookBtn.innerHTML = `<span class="btn-spinner"></span>Cooking…`;
+        configBtn.disabled = true;
+      }
+      const lock = step3Section.querySelector<HTMLElement>(".v3-lock");
+      if (lock) lock.hidden = !locked;
+    }
+  }
+
+  private buildStep1Params(): PrepRecipeParams | null {
+    const step1InputIds = this.getStep1InputIds();
+    const inputValues: Record<string, string> = {};
+    for (const input of (this.definition?.inputs ?? []).filter((i) => step1InputIds.has(i.id))) {
+      const el = this.container?.querySelector<HTMLInputElement>(`[data-input-id="${input.id}"]`);
+      const value = el?.value.trim() ?? "";
+      if (input.required && !value) {
+        globalThis.alert(`Please fill in "${input.label}".`);
+        return null;
+      }
+      inputValues[input.id] = value;
+    }
+    return {
+      cols: (this.definition?.prepTemplate ?? []).filter((col) => col.role === "file-prompt"),
+      inputValues,
+    };
+  }
+
+  private buildStep2Params(): PrepRecipeParams | null {
+    const step1InputIds = this.getStep1InputIds();
+    const inputValues: Record<string, string> = {};
+    for (const input of (this.definition?.inputs ?? []).filter((i) => !step1InputIds.has(i.id))) {
+      const el = this.container?.querySelector<HTMLInputElement>(`[data-input-id="${input.id}"]`);
+      const value = el?.value.trim() ?? "";
+      if (input.required && !value) {
+        globalThis.alert(`Please fill in "${input.label}".`);
+        return null;
+      }
+      inputValues[input.id] = value;
+    }
+    return {
+      cols: (this.definition?.prepTemplate ?? []).filter(
+        (col) => col.role === "system-prompt" || col.role === "text-prompt",
+      ),
+      inputValues,
+    };
+  }
+
+  private handleStep1(container: HTMLElement): void {
+    const params = this.buildStep1Params();
+    if (!params) return;
+    const btn = container.querySelector<HTMLButtonElement>("#step1-btn")!;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="btn-spinner"></span>Importing…`;
+    prepRecipe(params).then(
+      (result) => {
+        this.rowRange = result.rowRange;
+        this.step1Complete = true;
+        if (this.step2Complete) {
+          const template = buildRunTemplate(this.definition?.prepTemplate ?? []);
+          if (template.promptCols && template.outputCol) {
+            this.step3Unlocked = true;
+            this.preppedRunConfig = {
+              ...template,
+              ...this.definition?.settings,
+              rowRange: result.rowRange,
+            } as RunConfig;
+          }
+        }
+        btn.disabled = false;
+        btn.textContent = "Re-import Files";
+        const status = container.querySelector<HTMLElement>("#step1-status");
+        if (status) {
+          const count = result.rowRange.end - result.rowRange.start + 1;
+          status.textContent = `✓ ${count} file${count !== 1 ? "s" : ""} imported to Drive Link column`;
+          status.hidden = false;
+        }
+        this.applyLockState(container);
+      },
+      (err: Error) => {
+        globalThis.alert("Error: " + err.message);
+        btn.disabled = false;
+        btn.textContent = "Import Files";
+      },
+    );
+  }
+
+  private handleStep2(container: HTMLElement): void {
+    const params = this.buildStep2Params();
+    if (!params) return;
+    const btn = container.querySelector<HTMLButtonElement>("#step2-btn")!;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="btn-spinner"></span>Importing…`;
+    prepRecipe(params).then(
+      () => {
+        this.step2Complete = true;
+        const template = buildRunTemplate(this.definition?.prepTemplate ?? []);
+        if (template.promptCols && template.outputCol && this.rowRange) {
+          this.step3Unlocked = true;
+          this.preppedRunConfig = {
+            ...template,
+            ...this.definition?.settings,
+            rowRange: this.rowRange,
+          } as RunConfig;
+        }
+        btn.disabled = false;
+        btn.textContent = "Re-import Prompt";
+        const status = container.querySelector<HTMLElement>("#step2-status");
+        if (status) {
+          status.textContent = "✓ Prompt written to System Prompt column";
+          status.hidden = false;
+        }
+        this.applyLockState(container);
+      },
+      (err: Error) => {
+        globalThis.alert("Error: " + err.message);
+        btn.disabled = false;
+        btn.textContent = "Import Prompt";
+      },
+    );
+  }
+
+  private handleTest(container: HTMLElement): void {
+    if (!this.rowRange || !this.preppedRunConfig) return;
+    const config: RunConfig = {
+      ...this.preppedRunConfig,
+      rowRange: { start: this.rowRange.start, end: this.rowRange.start },
+    };
+    this.runState = "testing";
+    this.applyLockState(container);
+    runBatchAI(config).then(
+      () => {
+        this.runState = "idle";
+        this.applyLockState(container);
+      },
+      (err: Error) => {
+        globalThis.alert("Error: " + err.message);
+        this.runState = "idle";
+        this.applyLockState(container);
+      },
+    );
+  }
+
+  private handleCook(container: HTMLElement): void {
+    if (!this.rowRange || !this.preppedRunConfig) return;
+    const config: RunConfig = { ...this.preppedRunConfig, rowRange: this.rowRange };
+    this.runState = "cooking";
+    this.applyLockState(container);
+    runBatchAI(config).then(
+      () => {
+        this.runState = "idle";
+        this.applyLockState(container);
+      },
+      (err: Error) => {
+        globalThis.alert("Error: " + err.message);
+        this.runState = "idle";
+        this.applyLockState(container);
+      },
+    );
+  }
+
+  private handleConfigureAI(): void {
+    if (this.preppedRunConfig) {
+      this.nav?.navigate("configure-ai-run", this.preppedRunConfig);
+    }
+  }
+
+  private template(definition: RecipeDefinition | undefined | null): string {
+    const inputs = definition?.inputs ?? [];
+    const title = definition ? `${definition.icon} ${definition.name}` : "Recipe";
+    const introHtml = definition?.intro ? `<p class="recipe-intro">${definition.intro}</p>` : "";
+    const step1InputIds = new Set(
+      (definition?.prepTemplate ?? [])
+        .filter((col) => col.fillStrategy.kind === "list-drive-folder")
+        .map((col) => (col.fillStrategy as { kind: "list-drive-folder"; inputId: string }).inputId),
+    );
+    const renderInput = (input: RecipeDefinition["inputs"][number]): string => {
+      const mark = input.required
+        ? `<span class="required"> *</span>`
+        : `<span class="optional"> (optional)</span>`;
+      const helper = input.helperText ? `<p class="field-helper">${input.helperText}</p>` : "";
+      return `<div class="field-group">
+        <span class="field-label">${input.label}${mark}</span>
+        ${helper}
+        <input data-input-id="${input.id}" type="text" class="text-input" placeholder="${input.placeholder ?? ""}" />
+      </div>`;
+    };
+    const step1Inputs = inputs
+      .filter((i) => step1InputIds.has(i.id))
+      .map(renderInput)
+      .join("");
+    const step2Inputs = inputs
+      .filter((i) => !step1InputIds.has(i.id))
+      .map(renderInput)
+      .join("");
+
+    return `
+      <div class="panel-header">
+        <button id="back-btn" class="back-btn">← Back</button>
+        <span class="panel-title">${title}</span>
+      </div>
+      ${introHtml}
+      <div data-step="1" class="v3-step">
+        <p class="v3-step-label"><strong>Step 1: Import your documents</strong></p>
+        <p class="field-helper">Import files from a Drive folder into your spreadsheet. Each file gets its own row.</p>
+        ${step1Inputs}
+        <button id="step1-btn" class="btn-outline">Import Files</button>
+        <p id="step1-status" class="field-helper" hidden></p>
+      </div>
+      <div data-step="2" class="v3-step">
+        <p class="v3-step-label"><strong>Step 2: Set up your prompt</strong> <span class="v3-lock">🔒</span></p>
+        <p class="field-helper">Configure how the AI should read and summarize your documents.</p>
+        ${step2Inputs}
+        <button id="step2-btn" class="btn-outline">Import Prompt</button>
+        <p id="step2-status" class="field-helper" hidden></p>
+      </div>
+      <div data-step="3" class="v3-step">
+        <p class="v3-step-label"><strong>Step 3: Run</strong> <span class="v3-lock">🔒</span></p>
+        <div class="panel-buttons">
+          <button id="test-btn" class="btn-outline">Test ▸ row 2</button>
+          <button id="cook-btn" class="btn-run">Cook ▸ All</button>
+          <button id="configure-btn" class="btn-outline">Configure AI</button>
+        </div>
+        <p class="field-helper">
+          <strong>Test</strong> — runs the AI on the first row only so you can check quality before committing.
+          <strong>Cook</strong> — runs the AI on every file. Keep the sidebar open until it finishes.
+          <strong>Configure AI</strong> — opens the full settings panel to review or adjust before running.
+        </p>
+      </div>`;
+  }
+}
