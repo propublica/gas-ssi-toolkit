@@ -378,7 +378,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
     if (fileIds.length > 0) {
       if (jobId) {
         writeJobProgress(cache, jobId, {
-          message: `Downloading files for chunk...`,
+          message: `Downloading files for rows ${startRow}–${startRow + numRows - 1}...`,
         });
       }
       const metadata = fetchDriveMetadata(fileIds, oauthToken);
@@ -386,7 +386,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
       if (jobId) {
         writeJobProgress(cache, jobId, {
-          message: `Uploading files for chunk...`,
+          message: `Uploading files for rows ${startRow}–${startRow + numRows - 1}...`,
         });
       }
       // Translate Drive native MIME types to exported MIME types.
@@ -409,7 +409,9 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
   // Wave 2 — build requests and fire inference in parallel
   if (jobId) {
-    writeJobProgress(cache, jobId, { message: `Running AI on chunk...` });
+    writeJobProgress(cache, jobId, {
+      message: `Running AI on rows ${startRow}–${startRow + numRows - 1}...`,
+    });
   }
 
   const requests: GeminiRequest[] = [];
