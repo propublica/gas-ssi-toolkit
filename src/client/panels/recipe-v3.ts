@@ -169,7 +169,9 @@ export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
         this.step1Complete = true;
         if (this.step2Complete) {
           const template = buildRunTemplate(this.definition?.prepTemplate ?? []);
-          if (template.promptCols && template.outputCol) {
+          if (!template.promptCols || !template.outputCol) {
+            globalThis.alert("Recipe configuration error: missing required columns.");
+          } else {
             this.step3Unlocked = true;
             this.preppedRunConfig = {
               ...template,
@@ -206,7 +208,9 @@ export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
       () => {
         this.step2Complete = true;
         const template = buildRunTemplate(this.definition?.prepTemplate ?? []);
-        if (template.promptCols && template.outputCol && this.rowRange) {
+        if (!template.promptCols || !template.outputCol || !this.rowRange) {
+          globalThis.alert("Recipe configuration error: missing required columns.");
+        } else {
           this.step3Unlocked = true;
           this.preppedRunConfig = {
             ...template,
