@@ -126,7 +126,12 @@ export function callGeminiAPIBatch(reqs: GeminiRequest[]): GeminiResponse[] {
   const responses = UrlFetchApp.fetchAll(requests);
 
   return responses.map((response) => {
-    const json = JSON.parse(response.getContentText()) as Record<string, unknown>;
+    let json: Record<string, unknown>;
+    try {
+      json = JSON.parse(response.getContentText()) as Record<string, unknown>;
+    } catch (_e) {
+      return { text: `Error: invalid response body (HTTP ${response.getResponseCode()})` };
+    }
 
     if (json.error) {
       return { text: `Error: ${(json.error as { message: string }).message}` };

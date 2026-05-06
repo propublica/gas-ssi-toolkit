@@ -412,8 +412,9 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
           return [id, effectiveMime];
         }),
       );
-      const uploadBytes = new Map(uploadIds.map((id) => [id, bytes.get(id)!]));
-      const { uploads, errors: uploadErrors } = uploadFilesToGemini(uploadBytes, mimeTypes, apiKey);
+      // Pass bytes directly — its keys equal uploadIds by construction.
+      const { uploads, errors: uploadErrors } = uploadFilesToGemini(bytes, mimeTypes, apiKey);
+      bytes.clear(); // release downloaded file bytes — no longer needed after upload
       fileUriMap = uploads;
       fileErrors = new Map([...metadataErrors, ...downloadErrors, ...uploadErrors]);
     }
@@ -428,19 +429,20 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
   const requests: GeminiRequest[] = [];
   const rowIndices: number[] = [];
+  // File-error rows are deferred here and written in the same post-batch loop as
+  // inference results, so the entire chunk lands in a single SpreadsheetApp.flush().
+  const directWrites = new Map<number, string>();
 
   for (let i = 0; i < allPromptInputs.length; i++) {
-    // If any file input for this row failed to fetch/download/upload, write the
-    // error directly to the output cell and skip inference for this row.
+    // If any file input for this row failed to fetch/download/upload, defer an
+    // error string for the post-batch write loop and skip inference.
     if (fileErrors.size > 0) {
       const failedIds = allPromptInputs[i]
         .filter((inp) => inp.kind === "file")
         .flatMap((inp) => flattenArg(inp.value).filter(isValidDriveLink).map(extractId))
         .filter((id) => fileErrors.has(id));
       if (failedIds.length > 0) {
-        sheet
-          .getRange(startRow + i, outputIdx + 1)
-          .setValue(`[File error: ${fileErrors.get(failedIds[0])}]`);
+        directWrites.set(i, `[File error: ${fileErrors.get(failedIds[0])}]`);
         continue;
       }
     }
@@ -458,14 +460,14 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
     }
   }
 
-  if (requests.length === 0) {
+  if (requests.length === 0 && directWrites.size === 0) {
     SpreadsheetApp.getActive().toast("No rows to process.", "Info", 5);
     return;
   }
 
-  const results = callGeminiAPIBatch(requests);
+  const results = requests.length > 0 ? callGeminiAPIBatch(requests) : [];
 
-  // Write all results — single flush at end of chunk
+  // Write all results and file errors in a single batch — one flush at end of chunk.
   for (let j = 0; j < results.length; j++) {
     const i = rowIndices[j];
     const realRowIndex = startRow + i;
@@ -493,12 +495,17 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
     }
   }
 
+  for (const [i, errorText] of directWrites) {
+    sheet.getRange(startRow + i, outputIdx + 1).setValue(errorText);
+  }
+
   SpreadsheetApp.flush();
   const successCount = results.filter((r) => !r.text.startsWith("Error:")).length;
+  const errorCount = results.length - successCount + directWrites.size;
   SpreadsheetApp.getActive().toast(
-    successCount === results.length
+    errorCount === 0
       ? `Complete! Processed ${results.length} rows.`
-      : `Complete! Processed ${successCount} of ${results.length} rows (${results.length - successCount} errors).`,
+      : `Complete! Processed ${successCount} of ${results.length + directWrites.size} rows (${errorCount} errors).`,
     "Success",
     5,
   );

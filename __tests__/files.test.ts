@@ -19,6 +19,7 @@ describe("uploadFilesToGemini", () => {
 
   function mockUploadResponse(fileId: string, uri: string, mimeType: string) {
     return {
+      getResponseCode: () => 200,
       getContentText: () => JSON.stringify({ file: { name: `files/${fileId}`, uri, mimeType } }),
     };
   }
@@ -61,9 +62,12 @@ describe("uploadFilesToGemini", () => {
     expect(UrlFetchApp.fetchAll as jest.Mock).not.toHaveBeenCalled();
   });
 
-  it("records error in errors map when Files API returns an error", () => {
+  it("records error in errors map when Files API returns an error in body", () => {
     (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
-      { getContentText: () => JSON.stringify({ error: { message: "quota exceeded" } }) },
+      {
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({ error: { message: "quota exceeded" } }),
+      },
     ]);
     const files = new Map([["fileId", new Uint8Array([1])]]);
     const mimeTypes = new Map([["fileId", "application/pdf"]]);
@@ -72,12 +76,35 @@ describe("uploadFilesToGemini", () => {
     expect(errors.get("fileId")).toContain("quota exceeded");
   });
 
+  it("records error in errors map when Files API returns HTTP error status", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      { getResponseCode: () => 429, getContentText: () => "" },
+    ]);
+    const files = new Map([["fileId", new Uint8Array([1])]]);
+    const mimeTypes = new Map([["fileId", "application/pdf"]]);
+    const { uploads, errors } = uploadFilesToGemini(files, mimeTypes, "key");
+    expect(uploads.size).toBe(0);
+    expect(errors.get("fileId")).toContain("429");
+  });
+
+  it("records error in errors map when Files API returns non-JSON body", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      { getResponseCode: () => 200, getContentText: () => "<html>error</html>" },
+    ]);
+    const files = new Map([["fileId", new Uint8Array([1])]]);
+    const mimeTypes = new Map([["fileId", "application/pdf"]]);
+    const { uploads, errors } = uploadFilesToGemini(files, mimeTypes, "key");
+    expect(uploads.size).toBe(0);
+    expect(errors.get("fileId")).toContain("Invalid JSON");
+  });
+
   it("processes files in sub-batches of 10", () => {
     const fileIds = Array.from({ length: 25 }, (_, i) => `file${i}`);
     const files = new Map(fileIds.map((id) => [id, new Uint8Array([1])]));
     const mimeTypes = new Map(fileIds.map((id) => [id, "application/pdf"]));
 
     const singleResponse = (id: string) => ({
+      getResponseCode: () => 200,
       getContentText: () =>
         JSON.stringify({ file: { uri: `https://example.com/${id}`, mimeType: "application/pdf" } }),
     });

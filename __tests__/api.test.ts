@@ -407,6 +407,26 @@ describe("callGeminiAPIBatch", () => {
     expect(results[1].text).toBe("OK");
   });
 
+  it("maps a non-JSON response to an error text result without aborting the batch", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      {
+        getResponseCode: () => 503,
+        getContentText: () => "<html>Service Unavailable</html>",
+      },
+      {
+        getContentText: () =>
+          JSON.stringify({ candidates: [{ content: { parts: [{ text: "OK" }] } }] }),
+      },
+    ]);
+    const reqs: GeminiRequest[] = [
+      { apiKey: "key", userParts: [{ text: "Q1" }] },
+      { apiKey: "key", userParts: [{ text: "Q2" }] },
+    ];
+    const results = callGeminiAPIBatch(reqs);
+    expect(results[0].text).toMatch(/Error:.*503/);
+    expect(results[1].text).toBe("OK");
+  });
+
   it("includes file_data parts in the request payload", () => {
     mockFetchAllResponses([{ candidates: [{ content: { parts: [{ text: "ok" }] } }] }]);
     const req: GeminiRequest = {

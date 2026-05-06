@@ -43,10 +43,18 @@ export function uploadFilesToGemini(
     const responses = UrlFetchApp.fetchAll(requests);
     responses.forEach((response, j) => {
       const fileId = batch[j];
-      const json = JSON.parse(response.getContentText()) as {
-        file?: { uri: string; mimeType: string };
-        error?: { message: string };
-      };
+      const code = response.getResponseCode();
+      if (code >= 400) {
+        errors.set(fileId, `HTTP ${code}`);
+        return;
+      }
+      let json: { file?: { uri: string; mimeType: string }; error?: { message: string } };
+      try {
+        json = JSON.parse(response.getContentText()) as typeof json;
+      } catch (_e) {
+        errors.set(fileId, "Invalid JSON in upload response");
+        return;
+      }
       if (json.error || !json.file?.uri) {
         errors.set(fileId, json.error?.message ?? "missing URI in response");
         return;

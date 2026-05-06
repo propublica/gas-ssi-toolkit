@@ -322,7 +322,14 @@ export function downloadDriveFiles(
   responses.forEach((response, i) => {
     const code = response.getResponseCode();
     if (code >= 400) {
-      errors.set(fileIds[i], `HTTP ${code}`);
+      let message = `HTTP ${code}`;
+      try {
+        const parsed = JSON.parse(response.getContentText()) as { error?: { message: string } };
+        if (parsed.error?.message) message = parsed.error.message;
+      } catch (_e) {
+        // ignore parse errors, use HTTP code in message
+      }
+      errors.set(fileIds[i], message);
       return;
     }
     bytes.set(fileIds[i], new Uint8Array(response.getContent()));
