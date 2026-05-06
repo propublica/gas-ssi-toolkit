@@ -489,6 +489,42 @@ describe("fetchDriveMetadata", () => {
       size: 0,
     });
   });
+
+  it("handles non-JSON error responses in fetchDriveMetadata", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      {
+        getResponseCode: () => 400,
+        getContentText: () => "Not a JSON string",
+      },
+    ]);
+    const { errors } = fetchDriveMetadata(["id"], "token");
+    expect(errors.get("id")).toBe("HTTP 400");
+  });
+
+  it("handles JSON error responses missing message in fetchDriveMetadata", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      {
+        getResponseCode: () => 400,
+        getContentText: () => JSON.stringify({ error: {} }),
+      },
+    ]);
+    const { errors } = fetchDriveMetadata(["id"], "token");
+    expect(errors.get("id")).toBe("HTTP 400");
+  });
+
+  it("uses default mimeType and size when missing in JSON response", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      {
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({}),
+      },
+    ]);
+    const { metadata } = fetchDriveMetadata(["id"], "token");
+    expect(metadata.get("id")).toEqual({
+      mimeType: "application/octet-stream",
+      size: 0,
+    });
+  });
 });
 
 describe("downloadDriveFiles", () => {
@@ -563,5 +599,21 @@ describe("downloadDriveFiles", () => {
     const { bytes, errors } = downloadDriveFiles(["fileId"], metadata, "token");
     expect(bytes.size).toBe(0);
     expect(errors.get("fileId")).toContain("403");
+  });
+
+  it("handles non-JSON error responses in downloadDriveFiles", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      { getResponseCode: () => 500, getContentText: () => "Server Error" },
+    ]);
+    const { errors } = downloadDriveFiles(["id"], new Map(), "token");
+    expect(errors.get("id")).toBe("HTTP 500");
+  });
+
+  it("handles JSON error responses missing message in downloadDriveFiles", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      { getResponseCode: () => 401, getContentText: () => JSON.stringify({ error: {} }) },
+    ]);
+    const { errors } = downloadDriveFiles(["id"], new Map(), "token");
+    expect(errors.get("id")).toBe("HTTP 401");
   });
 });
