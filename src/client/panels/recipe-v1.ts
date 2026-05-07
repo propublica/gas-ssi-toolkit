@@ -102,7 +102,7 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
     testBtn.disabled = true;
     cookBtn.disabled = true;
     configBtn.disabled = true;
-    prepBtn.innerHTML = btn("1. Prep Recipe", "Set up columns and import files from Drive");
+    prepBtn.innerHTML = btn("Prep Recipe", "Set up columns and import files from Drive");
     testBtn.innerHTML = btn("Test", "Check quality on the first 5 rows");
     cookBtn.innerHTML = btn("Cook", "Process all imported files");
     cookBtn.className = "btn-run recipe-action-btn";
@@ -114,7 +114,7 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
         prepBtn.innerHTML = `<span class="btn-spinner"></span><span class="recipe-btn-main">Prepping…</span>`;
         break;
       case "prepped":
-        prepBtn.innerHTML = btn("1. Re-prep", "Set up columns and import files from Drive");
+        prepBtn.innerHTML = btn("Re-prep", "Set up columns and import files from Drive");
         testBtn.disabled = false;
         cookBtn.disabled = false;
         configBtn.disabled = false;
