@@ -301,6 +301,8 @@
         .recipe-btn-sub { font-size: var(--font-size-200); font-weight: 400; opacity: 0.8; line-height: 1.4; }
         .prep-status-msg { font-size: var(--font-size-200); color: #34a853; margin: 2px 0 6px 0; }
 
+        .v3-step-content .field-group + .field-group { border-top: none; padding-top: 0; }
+
         /* V3 step stepper */
         .v3-step { display: flex; gap: 10px; }
         .v3-step-left { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 20px; }
