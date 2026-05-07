@@ -60,6 +60,17 @@ export function extractText(config: ExtractTextConfig, jobId?: string): Promise<
   });
 }
 
+export function getActiveRangeInfo(): Promise<{ start: number; end: number } | null> {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler((result: unknown) =>
+        resolve(result as { start: number; end: number } | null),
+      )
+      .withFailureHandler((err: Error) => reject(err))
+      .getActiveRangeInfo();
+  });
+}
+
 export function getJobProgress(
   jobId: string,
 ): Promise<{ message?: string; current?: number; total?: number } | null> {

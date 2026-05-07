@@ -6,6 +6,7 @@ const mockRun = {
   withSuccessHandler: jest.fn().mockReturnThis(),
   withFailureHandler: jest.fn().mockReturnThis(),
   getSheetHeaders: jest.fn(),
+  getActiveRangeInfo: jest.fn(),
   runBatchAI: jest.fn(),
   runTool: jest.fn(),
   prepRecipe: jest.fn(),
@@ -107,12 +108,14 @@ describe("prepRecipe", () => {
   it("calls google.script.run.prepRecipe with params and resolves with result", async () => {
     const handlers = captureHandlers();
     const params: import("../src/shared/types").PrepRecipeParams = {
-      driveFolder: { url: "https://drive.google.com/folder/abc", colTitle: "Drive Link" },
-      outputCol: { colTitle: "AI_Summarization" },
+      cols: [
+        { colTitle: "Drive Link", fillStrategy: { kind: "list-drive-folder", inputId: "folder" } },
+        { colTitle: "AI_Summarization", fillStrategy: { kind: "create-empty" } },
+      ],
+      inputValues: { folder: "https://drive.google.com/drive/folders/abc123" },
     };
     const result: import("../src/shared/types").PrepRecipeResult = {
       rowRange: { start: 2, end: 5 },
-      colNames: { driveLink: "Drive Link", outputCol: "AI_Summarization" },
     };
     const promise = services.prepRecipe(params);
     handlers.resolve(result);
@@ -122,7 +125,7 @@ describe("prepRecipe", () => {
 
   it("rejects on failure", async () => {
     const handlers = captureHandlers();
-    const promise = services.prepRecipe({});
+    const promise = services.prepRecipe({ cols: [], inputValues: {} });
     handlers.reject(new Error("prep error"));
     await expect(promise).rejects.toThrow("prep error");
   });
@@ -202,5 +205,30 @@ describe("getJobProgress", () => {
     const promise = services.getJobProgress("job-789");
     handlers.reject(new Error("progress error"));
     await expect(promise).rejects.toThrow("progress error");
+  });
+});
+
+describe("getActiveRangeInfo", () => {
+  it("calls google.script.run.getActiveRangeInfo and resolves with range", async () => {
+    const handlers = captureHandlers();
+    const range = { start: 1, end: 5 };
+    const promise = services.getActiveRangeInfo();
+    handlers.resolve(range);
+    await expect(promise).resolves.toEqual(range);
+    expect(mockRun.getActiveRangeInfo).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves with null when no range is active", async () => {
+    const handlers = captureHandlers();
+    const promise = services.getActiveRangeInfo();
+    handlers.resolve(null);
+    await expect(promise).resolves.toBeNull();
+  });
+
+  it("rejects on failure", async () => {
+    const handlers = captureHandlers();
+    const promise = services.getActiveRangeInfo();
+    handlers.reject(new Error("range error"));
+    await expect(promise).rejects.toThrow("range error");
   });
 });

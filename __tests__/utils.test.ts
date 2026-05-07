@@ -18,6 +18,7 @@ import {
   findOrCreateColumn,
   writeColumn,
   writeJobProgress,
+  interpolateTemplate,
 } from "../src/server/utils";
 import type { DriveFileInfo } from "../src/server/types";
 
@@ -427,5 +428,73 @@ describe("writeColumn", () => {
     const wrapStrategy = "CLIP" as unknown as GoogleAppsScript.Spreadsheet.WrapStrategy;
     writeColumn(sheet, 3, ["a", "b"], wrapStrategy);
     expect(setWrapStrategyMock).toHaveBeenCalledWith(wrapStrategy);
+  });
+});
+
+describe("interpolateTemplate", () => {
+  it("replaces a single {{inputId}} with the corresponding value", () => {
+    expect(interpolateTemplate("Hello {{name}}", { name: "world" })).toBe("Hello world");
+  });
+
+  it("replaces multiple placeholders in one string", () => {
+    expect(interpolateTemplate("{{a}} and {{b}}", { a: "foo", b: "bar" })).toBe("foo and bar");
+  });
+
+  it("replaces the same placeholder multiple times", () => {
+    expect(interpolateTemplate("{{x}} {{x}}", { x: "hi" })).toBe("hi hi");
+  });
+
+  it("leaves unknown placeholders as empty string", () => {
+    expect(interpolateTemplate("{{missing}}", {})).toBe("");
+  });
+
+  it("returns the string unchanged when no placeholders present", () => {
+    expect(interpolateTemplate("no placeholders", { x: "y" })).toBe("no placeholders");
+  });
+
+  it("includes block content when the key has a non-empty value", () => {
+    expect(interpolateTemplate("{{#focus}}Focus: {{focus}}{{/focus}}", { focus: "fraud" })).toBe(
+      "Focus: fraud",
+    );
+  });
+
+  it("omits block content when the key is empty string", () => {
+    expect(interpolateTemplate("{{#focus}}Focus: {{focus}}{{/focus}}", { focus: "" })).toBe("");
+  });
+
+  it("omits block content when the key is missing from inputValues", () => {
+    expect(interpolateTemplate("{{#focus}}Focus: {{focus}}{{/focus}}", {})).toBe("");
+  });
+
+  it("handles multiple conditional blocks independently", () => {
+    expect(
+      interpolateTemplate(
+        "{{#docType}}Type: {{docType}}{{/docType}}\n{{#focus}}Focus: {{focus}}{{/focus}}",
+        { docType: "filing", focus: "" },
+      ),
+    ).toBe("Type: filing\n");
+  });
+
+  it("handles conditional blocks alongside simple placeholders", () => {
+    expect(
+      interpolateTemplate("Hello {{name}}{{#extra}} ({{extra}}){{/extra}}", {
+        name: "world",
+        extra: "detail",
+      }),
+    ).toBe("Hello world (detail)");
+  });
+
+  it("handles conditional blocks with multiline content", () => {
+    expect(interpolateTemplate("before\n{{#key}}line1\nline2\n{{/key}}after", { key: "yes" })).toBe(
+      "before\nline1\nline2\nafter",
+    );
+  });
+
+  it("handles two conditional blocks with the same key", () => {
+    expect(interpolateTemplate("{{#x}}first{{/x}}{{#x}}second{{/x}}", { x: "yes" })).toBe(
+      "firstsecond",
+    );
+
+    expect(interpolateTemplate("{{#x}}first{{/x}}{{#x}}second{{/x}}", { x: "" })).toBe("");
   });
 });

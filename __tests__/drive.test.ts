@@ -39,12 +39,23 @@ const mockUi = {
   PDF: "application/pdf",
 };
 
+(globalThis as any).UrlFetchApp = {
+  fetch: jest.fn(),
+  fetchAll: jest.fn(),
+};
+
+(globalThis as any).ScriptApp = {
+  getOAuthToken: jest.fn().mockReturnValue("mock-oauth-token"),
+};
+
 // ── Import after mocks ─────────────────────────────────────────
 
 import {
   checkDriveService,
   extractTextUniversal,
   prepareDriveAttachments,
+  fetchDriveMetadata,
+  downloadDriveFiles,
 } from "../src/server/drive";
 
 // ── Tests ──────────────────────────────────────────────────────
@@ -375,6 +386,16 @@ describe("prepareDriveAttachments", () => {
     expect(() => prepareDriveAttachments(["img1", "img2"])).toThrow(/combined|total/i);
   });
 
+  it("throws pre-flight error for non-PDF file exceeding INLINE_MAX_TOTAL_BYTES raw size threshold", () => {
+    // 72MB raw * 4/3 ≈ 96MB encoded > 95MB INLINE_MAX_TOTAL_BYTES
+    (DriveApp.getFileById as jest.Mock).mockReturnValue({
+      getMimeType: () => "image/jpeg",
+      getSize: () => 72 * 1024 * 1024,
+      getName: () => "huge-image.jpg",
+    });
+    expect(() => prepareDriveAttachments(["hugeImgId"])).toThrow("File too large");
+  });
+
   it("error messages reference the Gemini Files API escape hatch", () => {
     (DriveApp.getFileById as jest.Mock).mockReturnValue({
       getMimeType: () => "application/pdf",
@@ -404,5 +425,195 @@ describe("prepareDriveAttachments", () => {
     expect(result).toHaveLength(2);
     expect(result[0].mime_type).toBe("application/pdf");
     expect(result[1].mime_type).toBe("image/png");
+  });
+});
+
+describe("fetchDriveMetadata", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("returns a map of fileId to mimeType and size", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      {
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({ mimeType: "application/pdf", size: "102400" }),
+      },
+      {
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({ mimeType: "image/png", size: "204800" }),
+      },
+    ]);
+    const { metadata } = fetchDriveMetadata(["file1", "file2"], "token");
+    expect(metadata.get("file1")).toEqual({ mimeType: "application/pdf", size: 102400 });
+    expect(metadata.get("file2")).toEqual({ mimeType: "image/png", size: 204800 });
+  });
+
+  it("returns empty map for empty input", () => {
+    expect(fetchDriveMetadata([], "token").metadata.size).toBe(0);
+    expect(UrlFetchApp.fetchAll as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  it("records error in errors map when Drive API returns an error", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      {
+        getResponseCode: () => 404,
+        getContentText: () => JSON.stringify({ error: { message: "File not found" } }),
+      },
+    ]);
+    const { metadata, errors } = fetchDriveMetadata(["bad-id"], "token");
+    expect(metadata.size).toBe(0);
+    expect(errors.get("bad-id")).toContain("File not found");
+  });
+
+  it("falls back to HTTP status code message when error response body is not valid JSON", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      {
+        getResponseCode: () => 503,
+        getContentText: () => "<html>Service Unavailable</html>",
+      },
+    ]);
+    const { metadata, errors } = fetchDriveMetadata(["id"], "token");
+    expect(metadata.size).toBe(0);
+    expect(errors.get("id")).toContain("HTTP 503");
+  });
+
+  it("returns size 0 for Google Workspace files that have no size field", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      {
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({ mimeType: "application/vnd.google-apps.document" }),
+      },
+    ]);
+    const { metadata } = fetchDriveMetadata(["docId"], "token");
+    expect(metadata.get("docId")).toEqual({
+      mimeType: "application/vnd.google-apps.document",
+      size: 0,
+    });
+  });
+
+  it("handles non-JSON error responses in fetchDriveMetadata", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      {
+        getResponseCode: () => 400,
+        getContentText: () => "Not a JSON string",
+      },
+    ]);
+    const { errors } = fetchDriveMetadata(["id"], "token");
+    expect(errors.get("id")).toBe("HTTP 400");
+  });
+
+  it("handles JSON error responses missing message in fetchDriveMetadata", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      {
+        getResponseCode: () => 400,
+        getContentText: () => JSON.stringify({ error: {} }),
+      },
+    ]);
+    const { errors } = fetchDriveMetadata(["id"], "token");
+    expect(errors.get("id")).toBe("HTTP 400");
+  });
+
+  it("uses default mimeType and size when missing in JSON response", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      {
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({}),
+      },
+    ]);
+    const { metadata } = fetchDriveMetadata(["id"], "token");
+    expect(metadata.get("id")).toEqual({
+      mimeType: "application/octet-stream",
+      size: 0,
+    });
+  });
+});
+
+describe("downloadDriveFiles", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("uses export URL for Google Docs", () => {
+    const mockBlob = {};
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      { getResponseCode: () => 200, getBlob: () => mockBlob },
+    ]);
+    const metadata = new Map([
+      ["docId", { mimeType: "application/vnd.google-apps.document", size: 0 }],
+    ]);
+    downloadDriveFiles(["docId"], metadata, "token");
+    const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
+    expect(calls[0].url).toContain("export?mimeType=application/pdf");
+  });
+
+  it("uses export URL for Google Sheets", () => {
+    const mockBlob = {};
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      { getResponseCode: () => 200, getBlob: () => mockBlob },
+    ]);
+    const metadata = new Map([
+      ["sheetId", { mimeType: "application/vnd.google-apps.spreadsheet", size: 0 }],
+    ]);
+    downloadDriveFiles(["sheetId"], metadata, "token");
+    const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
+    expect(calls[0].url).toContain("export?mimeType=text/csv");
+  });
+
+  it("uses alt=media for binary files", () => {
+    const mockBlob = {};
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      { getResponseCode: () => 200, getBlob: () => mockBlob },
+    ]);
+    const metadata = new Map([["pdfId", { mimeType: "application/pdf", size: 0 }]]);
+    downloadDriveFiles(["pdfId"], metadata, "token");
+    const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
+    expect(calls[0].url).toContain("?alt=media");
+  });
+
+  it("returns a map of fileId to Blob", () => {
+    const mockBlob = {};
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      { getResponseCode: () => 200, getBlob: () => mockBlob },
+    ]);
+    const metadata = new Map([["fileId", { mimeType: "application/pdf", size: 0 }]]);
+    const { bytes } = downloadDriveFiles(["fileId"], metadata, "token");
+    expect(bytes.get("fileId")).toBe(mockBlob);
+  });
+
+  it("returns empty map for empty input", () => {
+    expect(downloadDriveFiles([], new Map(), "token").bytes.size).toBe(0);
+  });
+
+  it("falls back to alt=media when fileId is not in metadata map", () => {
+    const mockBlob = {};
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      { getResponseCode: () => 200, getBlob: () => mockBlob },
+    ]);
+    downloadDriveFiles(["unknownId"], new Map(), "token");
+    const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
+    expect(calls[0].url).toContain("?alt=media");
+  });
+
+  it("records error in errors map when a download returns HTTP error", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      { getResponseCode: () => 403, getContent: () => [] },
+    ]);
+    const metadata = new Map([["fileId", { mimeType: "application/pdf", size: 0 }]]);
+    const { bytes, errors } = downloadDriveFiles(["fileId"], metadata, "token");
+    expect(bytes.size).toBe(0);
+    expect(errors.get("fileId")).toContain("403");
+  });
+
+  it("handles non-JSON error responses in downloadDriveFiles", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      { getResponseCode: () => 500, getContentText: () => "Server Error" },
+    ]);
+    const { errors } = downloadDriveFiles(["id"], new Map(), "token");
+    expect(errors.get("id")).toBe("HTTP 500");
+  });
+
+  it("handles JSON error responses missing message in downloadDriveFiles", () => {
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      { getResponseCode: () => 401, getContentText: () => JSON.stringify({ error: {} }) },
+    ]);
+    const { errors } = downloadDriveFiles(["id"], new Map(), "token");
+    expect(errors.get("id")).toBe("HTTP 401");
   });
 });

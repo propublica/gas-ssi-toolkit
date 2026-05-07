@@ -12,6 +12,7 @@ module.exports = {
     // since it never references DOM globals.
     "^.+\\.ts$": ["ts-jest", { tsconfig: "./tsconfig.client.json" }],
   },
+  cacheDirectory: "<rootDir>/.jest-cache",
   roots: ["<rootDir>/__tests__"],
   testPathIgnorePatterns: ["/node_modules/", "/__tests__/helpers/"],
   moduleNameMapper: {
@@ -38,6 +39,11 @@ module.exports = {
     "./src/server/api.ts": {
       statements: 95,
       branches: 90,
+      functions: 100,
+    },
+    "./src/server/files.ts": {
+      statements: 90,
+      branches: 80,
       functions: 100,
     },
     "./src/server/utils.ts": {

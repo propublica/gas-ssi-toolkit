@@ -30,6 +30,11 @@ function mountPanel(savedState?: unknown): HTMLElement {
   return container;
 }
 
+function selectColumn(container: HTMLElement, fieldId: string, value: string): void {
+  container.querySelector<HTMLElement>(`#${fieldId} .token-add-btn`)!.click();
+  container.querySelector<HTMLElement>(`#${fieldId} .token-option[data-value="${value}"]`)!.click();
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   (jobStoreModule.jobStore.dispatch as jest.Mock).mockResolvedValue(undefined);
@@ -72,7 +77,7 @@ describe("ExtractTextPanel", () => {
     const c = mountPanel();
     await Promise.resolve();
     // select source column but not output
-    c.querySelector<HTMLElement>("#source-col .tag")?.click();
+    selectColumn(c, "source-col", "source_drive");
     c.querySelector<HTMLButtonElement>("#extract-btn")!.click();
     expect(globalThis.alert).toHaveBeenCalledWith(expect.stringContaining("output column"));
   });
@@ -84,9 +89,8 @@ describe("ExtractTextPanel", () => {
     const c = mountPanel();
     await Promise.resolve();
 
-    // select first tag in each list independently
-    c.querySelector<HTMLElement>("#source-col .tag")?.click();
-    c.querySelector<HTMLElement>("#output-col .tag")?.click();
+    selectColumn(c, "source-col", "source_drive");
+    selectColumn(c, "output-col", "extracted_text");
 
     c.querySelector<HTMLButtonElement>("#extract-btn")!.click();
     expect(jobStoreModule.jobStore.dispatch).toHaveBeenCalledWith(
@@ -102,8 +106,8 @@ describe("ExtractTextPanel", () => {
     const c = mountPanel();
     await Promise.resolve();
 
-    c.querySelector<HTMLElement>("#source-col .tag")?.click();
-    c.querySelector<HTMLElement>("#output-col .tag")?.click();
+    selectColumn(c, "source-col", "source_drive");
+    selectColumn(c, "output-col", "extracted_text");
     // leave RowRange in default "Use sheet selection" mode
     c.querySelector<HTMLButtonElement>("#extract-btn")!.click();
 
@@ -119,8 +123,8 @@ describe("ExtractTextPanel", () => {
     const c = mountPanel();
     await Promise.resolve();
 
-    c.querySelector<HTMLElement>("#source-col .tag")?.click();
-    c.querySelector<HTMLElement>("#output-col .tag")?.click();
+    selectColumn(c, "source-col", "source_drive");
+    selectColumn(c, "output-col", "extracted_text");
 
     // switch to "Specify range" and fill in values
     const rangeRadio = c.querySelector<HTMLInputElement>("input[value='range']")!;
@@ -183,8 +187,8 @@ describe("ExtractTextPanel", () => {
     const c = mountPanel();
     await Promise.resolve();
 
-    c.querySelector<HTMLElement>("#source-col .tag")?.click();
-    c.querySelector<HTMLElement>("#output-col .tag")?.click();
+    selectColumn(c, "source-col", "source_drive");
+    selectColumn(c, "output-col", "extracted_text");
     c.querySelector<HTMLButtonElement>("#extract-btn")!.click();
     await new Promise((r) => setTimeout(r, 0));
     expect(globalThis.alert).toHaveBeenCalledWith("Error: job failed");

@@ -8,8 +8,7 @@ jest.mock("../../src/client/services", () => ({
 import { RecipePanel } from "../../src/client/panels/recipe";
 import * as services from "../../src/client/services";
 import type { PrepRecipeResult } from "../../src/shared/types";
-import type { RecipeParams } from "../../src/client/types";
-import type { NavigationContext, RecipeDefinition } from "../../src/client/types";
+import type { RecipeDefinition, NavigationContext } from "../../src/client/types";
 
 const mockPrepRecipe = services.prepRecipe as jest.Mock;
 
@@ -21,18 +20,37 @@ function makeNav(): jest.Mocked<NavigationContext> {
   };
 }
 
-function mount(params: RecipeParams, savedState?: unknown) {
+const baseDefinition: RecipeDefinition = {
+  id: "test-recipe",
+  name: "Test Recipe",
+  icon: "🧪",
+  description: "A test recipe",
+  inputs: [
+    { id: "folder", label: "Drive Folder", required: true, placeholder: "Paste folder URL" },
+    { id: "question", label: "What are you looking for?" },
+  ],
+  prepTemplate: [
+    {
+      colTitle: "Drive Link",
+      fillStrategy: { kind: "list-drive-folder", inputId: "folder" },
+      role: "file-prompt",
+    },
+    {
+      colTitle: "User Prompt",
+      fillStrategy: { kind: "template", template: "Summarize. Focus on: {{question}}" },
+      role: "text-prompt",
+    },
+    { colTitle: "Output", fillStrategy: { kind: "create-empty" }, role: "output" },
+  ],
+  settings: { tools: ["google_search"] },
+};
+
+const mockResult: PrepRecipeResult = { rowRange: { start: 2, end: 11 } };
+
+function mount(definition = baseDefinition, savedState?: unknown) {
   const container = document.createElement("div");
   const nav = makeNav();
   const panel = new RecipePanel();
-  const definition: RecipeDefinition = {
-    id: "test",
-    name: "Test Recipe",
-    icon: "🧪",
-    description: "Test",
-    panelId: "recipe",
-    params,
-  };
   panel.mount(container, nav, definition, savedState as never);
   return { container, nav, panel };
 }
@@ -42,168 +60,90 @@ async function flush() {
   await Promise.resolve();
 }
 
-// ── rendering ───────────────────────────────────────────────────
+// ── rendering ──────────────────────────────────────────────────
 
 describe("rendering", () => {
-  it("renders drive folder input when driveFolder param present", () => {
-    const { container } = mount({ driveFolder: { colTitle: "Drive Link" } });
-    expect(container.querySelector("#drive-folder-input")).not.toBeNull();
+  it("renders one input field per RecipeInput", () => {
+    const { container } = mount();
+    expect(container.querySelectorAll(".field-group")).toHaveLength(2);
   });
 
-  it("does not render drive folder input when driveFolder absent", () => {
-    const { container } = mount({});
-    expect(container.querySelector("#drive-folder-input")).toBeNull();
+  it("renders the label for each input", () => {
+    const { container } = mount();
+    const labels = Array.from(container.querySelectorAll(".field-label")).map(
+      (el) => el.textContent,
+    );
+    expect(labels).toContain("Drive Folder *");
+    expect(labels).toContain("What are you looking for? (optional)");
   });
 
-  it("renders system prompt fields when systemPrompt param present", () => {
-    const { container } = mount({
-      systemPrompt: {
-        colTitle: { value: "System Prompt", locked: true },
-        prompt: { value: "You are helpful.", locked: true },
-      },
-    });
-    expect(container.querySelector("#system-prompt-title-container")).not.toBeNull();
-    expect(container.querySelector("#system-prompt-value-container")).not.toBeNull();
+  it("renders placeholder on the input element", () => {
+    const { container } = mount();
+    const input = container.querySelector<HTMLInputElement>('[data-input-id="folder"]')!;
+    expect(input.placeholder).toBe("Paste folder URL");
   });
 
-  it("renders one user prompt section per userPrompts entry", () => {
-    const { container } = mount({
-      userPrompts: [
-        {
-          colTitle: { value: "User Prompt", locked: true },
-          prompt: { value: "Summarize.", locked: true },
-        },
-        {
-          colTitle: { value: "User Prompt 2", locked: true },
-          prompt: { value: "Also this.", locked: true },
-        },
-      ],
-    });
-    expect(container.querySelector("#user-prompt-title-0-container")).not.toBeNull();
-    expect(container.querySelector("#user-prompt-title-1-container")).not.toBeNull();
-  });
-});
-
-// ── LockableField defaults ────────────────────────────────────────
-
-describe("LockableField defaults", () => {
-  it("initialises fields with locked: true values from params", () => {
-    const { container } = mount({
-      outputCol: { colTitle: { value: "AI_Summarization", locked: true } },
-    });
-    const input = container.querySelector<HTMLInputElement>("#output-col-title-container input")!;
-    expect(input.value).toBe("AI_Summarization");
-    expect(input.disabled).toBe(true);
-  });
-
-  it("initialises fields with locked: false as unlocked", () => {
-    const { container } = mount({
-      outputCol: { colTitle: { value: "AI_Output", locked: false } },
-    });
-    const input = container.querySelector<HTMLInputElement>("#output-col-title-container input")!;
-    expect(input.disabled).toBe(false);
+  it("does not render column section cards", () => {
+    const { container } = mount();
+    expect(container.querySelector(".recipe-section-card")).toBeNull();
   });
 });
 
 // ── prep flow ──────────────────────────────────────────────────
 
 describe("Prep flow", () => {
-  beforeEach(() => {
-    mockPrepRecipe.mockClear();
-  });
-  const fullParams: RecipeParams = {
-    driveFolder: { colTitle: "Drive Link", helperText: "Check access" },
-    systemPrompt: {
-      colTitle: { value: "System Prompt", locked: true },
-      prompt: { value: "You are helpful.", locked: true },
-    },
-    userPrompts: [
-      {
-        colTitle: { value: "User Prompt", locked: true },
-        prompt: { value: "Summarize.", locked: true },
-      },
-    ],
-    outputCol: { colTitle: { value: "AI_Out", locked: true } },
-  };
+  beforeEach(() => mockPrepRecipe.mockClear());
 
-  const mockResult: PrepRecipeResult = {
-    rowRange: { start: 2, end: 11 },
-    colNames: {
-      driveLink: "Drive Link",
-      systemPrompt: "System Prompt",
-      userPrompts: ["User Prompt"],
-      outputCol: "AI_Out",
-    },
-  };
-
-  it("calls services.prepRecipe with resolved form values", async () => {
+  it("calls prepRecipe with prepTemplate and collected inputValues", async () => {
     mockPrepRecipe.mockResolvedValue(mockResult);
-    const { container } = mount(fullParams);
-    container.querySelector<HTMLInputElement>("#drive-folder-input")!.value =
-      "https://drive.google.com/drive/folders/abc123";
+    const { container } = mount();
+    container.querySelector<HTMLInputElement>('[data-input-id="folder"]')!.value =
+      "https://drive.google.com/drive/folders/abc";
+    container.querySelector<HTMLInputElement>('[data-input-id="question"]')!.value =
+      "fraud patterns";
     container.querySelector<HTMLButtonElement>("#prep-btn")!.click();
     await flush();
-    expect(mockPrepRecipe).toHaveBeenCalledWith(
-      expect.objectContaining({
-        driveFolder: expect.objectContaining({ colTitle: "Drive Link" }),
-        systemPrompt: { colTitle: "System Prompt", value: "You are helpful." },
-        userPrompts: [{ colTitle: "User Prompt", value: "Summarize." }],
-        outputCol: { colTitle: "AI_Out" },
-      }),
-    );
+    expect(mockPrepRecipe).toHaveBeenCalledWith({
+      cols: baseDefinition.prepTemplate,
+      inputValues: {
+        folder: "https://drive.google.com/drive/folders/abc",
+        question: "fraud patterns",
+      },
+    });
   });
 
-  it("shows alert and does not proceed if drive folder is empty", async () => {
+  it("shows alert and does not call prepRecipe when required input is empty", async () => {
     const alertMock = jest.fn();
     globalThis.alert = alertMock;
-    const { container } = mount(fullParams);
+    const { container } = mount();
+    // leave 'folder' empty
     container.querySelector<HTMLButtonElement>("#prep-btn")!.click();
     await flush();
     expect(alertMock).toHaveBeenCalledTimes(1);
-    expect(alertMock).toHaveBeenCalledWith(expect.stringContaining("folder"));
     expect(mockPrepRecipe).not.toHaveBeenCalled();
   });
 });
 
-// ── Cook flow ──────────────────────────────────────────────────
+// ── cook flow ──────────────────────────────────────────────────
 
 describe("Cook flow", () => {
-  it("navigates to configure-ai-run with preppedRunConfig assembled from PrepRecipeResult", async () => {
-    const result: PrepRecipeResult = {
-      rowRange: { start: 2, end: 5 },
-      colNames: {
-        driveLink: "Drive Link",
-        systemPrompt: "Sys",
-        userPrompts: ["User"],
-        outputCol: "Out",
-      },
-    };
-    mockPrepRecipe.mockResolvedValue(result);
-    const { container, nav } = mount({
-      driveFolder: { colTitle: "Drive Link" },
-      systemPrompt: {
-        colTitle: { value: "Sys", locked: true },
-        prompt: { value: "p", locked: true },
-      },
-      userPrompts: [
-        { colTitle: { value: "User", locked: true }, prompt: { value: "q", locked: true } },
-      ],
-      outputCol: { colTitle: { value: "Out", locked: true } },
-    });
-    container.querySelector<HTMLInputElement>("#drive-folder-input")!.value =
-      "https://drive.google.com/abc";
+  it("navigates to configure-ai-run with RunConfig derived from roles + settings + rowRange", async () => {
+    mockPrepRecipe.mockResolvedValue({ rowRange: { start: 2, end: 5 } });
+    const { container, nav } = mount();
+    container.querySelector<HTMLInputElement>('[data-input-id="folder"]')!.value =
+      "https://drive.google.com/drive/folders/abc";
     container.querySelector<HTMLButtonElement>("#prep-btn")!.click();
     await flush();
     container.querySelector<HTMLButtonElement>("#cook-btn")!.click();
     expect(nav.navigate).toHaveBeenCalledWith("configure-ai-run", {
       promptCols: [
-        { col: "User", kind: "text" },
         { col: "Drive Link", kind: "file" },
+        { col: "User Prompt", kind: "text" },
       ],
-      systemPromptCol: "Sys",
-      outputCol: "Out",
+      systemPromptCol: undefined,
+      outputCol: "Output",
+      tools: ["google_search"],
       rowRange: { start: 2, end: 5 },
-      tools: undefined,
     });
   });
 });
@@ -211,46 +151,34 @@ describe("Cook flow", () => {
 // ── saved state ────────────────────────────────────────────────
 
 describe("unmount / saved state", () => {
-  it("unmount returns form values and prepComplete: false when not prepped", () => {
-    const { container, panel } = mount({
-      driveFolder: { colTitle: "Drive Link" },
-      outputCol: { colTitle: { value: "AI_Out", locked: true } },
-    });
-    container.querySelector<HTMLInputElement>("#drive-folder-input")!.value = "my-folder";
+  it("unmount returns inputValues and prepComplete: false when not prepped", () => {
+    const { container, panel } = mount();
+    container.querySelector<HTMLInputElement>('[data-input-id="folder"]')!.value = "my-url";
     const state = panel.unmount();
     expect(state).toMatchObject({
-      driveFolderValue: "my-folder",
+      inputValues: { folder: "my-url", question: "" },
       prepComplete: false,
     });
   });
 
-  it("mounts with savedState — restores form values", () => {
+  it("restores input values from savedState", () => {
     const savedState = {
-      driveFolderValue: "restored-folder",
-      outputColTitle: "MyOutput",
+      inputValues: { folder: "restored-url", question: "restored-question" },
       prepComplete: false,
     };
-    const { container } = mount(
-      {
-        driveFolder: { colTitle: "Drive Link" },
-        outputCol: { colTitle: { value: "AI_Out", locked: true } },
-      },
-      savedState,
-    );
-    expect(container.querySelector<HTMLInputElement>("#drive-folder-input")!.value).toBe(
-      "restored-folder",
+    const { container } = mount(baseDefinition, savedState);
+    expect(container.querySelector<HTMLInputElement>('[data-input-id="folder"]')!.value).toBe(
+      "restored-url",
     );
   });
 
   it("mounts with savedState prepComplete: true — Cook is enabled", () => {
     const savedState = {
+      inputValues: {},
       prepComplete: true,
-      preppedRunConfig: { outputCol: "Out", promptCols: [{ col: "User", kind: "text" as const }] },
+      preppedRunConfig: { outputCol: "Output", promptCols: [] },
     };
-    const { container } = mount(
-      { outputCol: { colTitle: { value: "Out", locked: true } } },
-      savedState,
-    );
+    const { container } = mount(baseDefinition, savedState);
     expect(container.querySelector<HTMLButtonElement>("#cook-btn")!.disabled).toBe(false);
   });
 });

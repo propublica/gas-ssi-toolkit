@@ -100,6 +100,8 @@ function exportAndEncodeFile(
     // first sheet as CSV. Per-sheet export requires SpreadsheetApp to enumerate sheets
     // and get each sheet's values directly. This is a data-access use of SpreadsheetApp,
     // not a UI concern, so the index.ts-only rule does not apply here.
+    // NOTE: Multi-sheet Sheets files can only export the first sheet as CSV.
+    // Per-sheet parallelization is a known limitation (design doc deferred feature).
     const ss = SpreadsheetApp.openById(fileId);
     return ss.getSheets().map((sheet) => {
       const values = sheet.getDataRange().getValues();
@@ -217,4 +219,121 @@ export function prepareDriveAttachments(fileIds: string[]): GeminiInlineData[] {
   }
 
   return parts;
+}
+
+/**
+ * Fetch metadata for multiple Drive files in parallel using UrlFetchApp.fetchAll.
+ * Returns partial results — files that fail are recorded in `errors` rather than
+ * aborting the whole batch.
+ *
+ * Note: Google Workspace native files (Docs, Sheets, Slides) do not have a
+ * size field in the Drive API v3 response; size will be 0 for those types.
+ *
+ * @param fileIds - Array of Drive file IDs to fetch metadata for
+ * @param oauthToken - OAuth token with Drive API access
+ * @returns { metadata: Map of fileId to { mimeType, size }, errors: Map of fileId to error message }
+ */
+export function fetchDriveMetadata(
+  fileIds: string[],
+  oauthToken: string,
+): { metadata: Map<string, { mimeType: string; size: number }>; errors: Map<string, string> } {
+  if (fileIds.length === 0) return { metadata: new Map(), errors: new Map() };
+
+  const requests = fileIds.map((id) => ({
+    url: `https://www.googleapis.com/drive/v3/files/${id}?fields=id%2CmimeType%2Csize&supportsAllDrives=true`,
+    method: "get" as const,
+    headers: { Authorization: `Bearer ${oauthToken}` },
+    muteHttpExceptions: true,
+  }));
+
+  const responses = UrlFetchApp.fetchAll(requests);
+  const metadata = new Map<string, { mimeType: string; size: number }>();
+  const errors = new Map<string, string>();
+
+  responses.forEach((response, i) => {
+    const code = response.getResponseCode();
+    if (code >= 400) {
+      let message = `HTTP ${code}`;
+      try {
+        const parsed = JSON.parse(response.getContentText()) as { error?: { message: string } };
+        if (parsed.error?.message) message = parsed.error.message;
+      } catch (_e) {
+        // ignore parse errors, use HTTP code in message
+      }
+      errors.set(fileIds[i], message);
+      return;
+    }
+    const json = JSON.parse(response.getContentText()) as {
+      mimeType?: string;
+      size?: string;
+    };
+    metadata.set(fileIds[i], {
+      mimeType: json.mimeType ?? "application/octet-stream",
+      size: parseInt(json.size ?? "0", 10),
+    });
+  });
+
+  return { metadata, errors };
+}
+
+/**
+ * Download multiple Drive files in parallel using UrlFetchApp.fetchAll.
+ * Handles format conversion for Google Docs (→ PDF) and Sheets (→ CSV).
+ * Returns partial results — files that fail are recorded in `errors` rather than
+ * aborting the whole batch.
+ *
+ * @param fileIds - Array of Drive file IDs to download
+ * @param metadata - Map of fileId to { mimeType, size } from fetchDriveMetadata
+ * @param oauthToken - OAuth token with Drive API access
+ * @returns { bytes: Map of fileId to Uint8Array, errors: Map of fileId to error message }
+ */
+export function downloadDriveFiles(
+  fileIds: string[],
+  metadata: Map<string, { mimeType: string; size: number }>,
+  oauthToken: string,
+): { bytes: Map<string, GoogleAppsScript.Base.Blob>; errors: Map<string, string> } {
+  if (fileIds.length === 0) return { bytes: new Map(), errors: new Map() };
+
+  const DOCS_MIME = "application/vnd.google-apps.document";
+  const SHEETS_MIME = "application/vnd.google-apps.spreadsheet";
+
+  const requests = fileIds.map((id) => {
+    const mimeType = metadata.get(id)?.mimeType ?? "";
+    let url: string;
+    if (mimeType === DOCS_MIME) {
+      url = `https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=application/pdf&supportsAllDrives=true`;
+    } else if (mimeType === SHEETS_MIME) {
+      url = `https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=text/csv&supportsAllDrives=true`;
+    } else {
+      url = `https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`;
+    }
+    return {
+      url,
+      method: "get" as const,
+      headers: { Authorization: `Bearer ${oauthToken}` },
+      muteHttpExceptions: true,
+    };
+  });
+
+  const responses = UrlFetchApp.fetchAll(requests);
+  const bytes = new Map<string, GoogleAppsScript.Base.Blob>();
+  const errors = new Map<string, string>();
+
+  responses.forEach((response, i) => {
+    const code = response.getResponseCode();
+    if (code >= 400) {
+      let message = `HTTP ${code}`;
+      try {
+        const parsed = JSON.parse(response.getContentText()) as { error?: { message: string } };
+        if (parsed.error?.message) message = parsed.error.message;
+      } catch (_e) {
+        // ignore parse errors, use HTTP code in message
+      }
+      errors.set(fileIds[i], message);
+      return;
+    }
+    bytes.set(fileIds[i], response.getBlob());
+  });
+
+  return { bytes, errors };
 }

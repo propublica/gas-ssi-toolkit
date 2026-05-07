@@ -23,6 +23,9 @@ Thumbs.db
 # Gemini CLI internal
 .gemini/
 
+# Jest cache (redirect from system temp for sandbox compatibility)
+.jest-cache/
+
 # Git worktrees
 .worktrees/
 

@@ -2,8 +2,16 @@
             --primary-blue: #1a73e8;
             --hover-blue: #f1f3f4;
             --border-color: #dadce0;
-            --text-main: #3c4043;
-            --text-secondary: #5f6368;
+            --text-main: rgb(31, 31, 31);
+            --text-secondary: rgb(57, 57, 57);
+
+            --font-family: "Google Sans Flex", Roboto, sans-serif;
+
+            --font-size-100: 11px;
+            --font-size-200: 12px;
+            --font-size-300: 14px;
+            --font-size-400: 16px;
+            --font-size-500: 18px;
         }
 
         html, body {
@@ -15,9 +23,10 @@
             padding: 0;
             display: flex;
             flex-direction: column;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            font-family: var(--font-family);
             background-color: #ffffff;
             color: var(--text-main);
+            font-optical-sizing: auto;
         }
 
         #app {
@@ -32,7 +41,7 @@
         .section { margin-bottom: 28px; }
 
         h3 {
-            font-size: 11px;
+            font-size: var(--font-size-100);
             font-style: italic;
             font-weight: 500;
             color: var(--text-secondary);
@@ -53,8 +62,8 @@
             background: white;
             cursor: pointer;
             transition: all 0.2s ease;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            font-size: 14px;
+            font-family: var(--font-family);
+            font-size: var(--font-size-300);
             font-weight: 500;
             color: var(--text-main);
         }
@@ -67,13 +76,13 @@
 
         .tool-btn:active { background-color: #e8eaed; transform: scale(0.98); }
 
-        .icon { margin-right: 12px; font-size: 18px; width: 24px; text-align: center; }
+        .icon { margin-right: 12px; font-size: var(--font-size-500); width: 24px; text-align: center; }
 
         .status-footer {
             margin-top: 40px;
             padding: 16px;
             border-top: 1px solid #eee;
-            font-size: 11px;
+            font-size: var(--font-size-100);
             font-style: italic;
             color: var(--text-secondary);
             text-align: center;
@@ -96,8 +105,8 @@
             border: none;
             color: var(--primary-blue);
             cursor: pointer;
-            font-size: 14px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            font-size: var(--font-size-300);
+            font-family: var(--font-family);
             padding: 0;
         }
 
@@ -106,7 +115,7 @@
             border: none;
             color: var(--text-secondary);
             cursor: pointer;
-            font-size: 16px;
+            font-size: var(--font-size-400);
             padding: 0;
             margin-left: auto;
             line-height: 1;
@@ -169,7 +178,7 @@
         }
 
         .panel-loader__message {
-            font-size: 12px;
+            font-size: var(--font-size-200);
             color: #5f6368;
             margin: 0;
             text-align: center;
@@ -181,23 +190,25 @@
             color: var(--text-secondary);
         }
 
-        .panel-title { font-weight: 500; font-size: 15px; }
+        .panel-title { font-weight: 500; font-size: var(--font-size-400); }
 
         .field-group { margin-bottom: 16px; }
 
+        .field-group + .field-group {
+            border-top: 1px solid var(--border-color);
+            padding-top: 16px;
+        }
+
         .field-label {
             display: block;
-            font-size: 11px;
-            font-style: italic;
+            font-size: var(--font-size-300);
             font-weight: 500;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.7px;
+            color: var(--text-main);
             margin-bottom: 6px;
         }
 
         .required { color: #d93025; }
-        .optional { color: var(--text-secondary); font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 11px; }
+        .optional { color: var(--text-secondary); font-weight: 400; text-transform: none; letter-spacing: 0; font-size: var(--font-size-200); }
 
         .tag-list {
             display: flex;
@@ -211,8 +222,8 @@
             border: 1px solid var(--border-color);
             background: white;
             color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            font-size: 12px;
+            font-family: var(--font-family);
+            font-size: var(--font-size-200);
             cursor: pointer;
             transition: all 0.15s;
             max-width: 100%;
@@ -238,8 +249,8 @@
             padding: 7px 8px;
             border: 1px solid var(--border-color);
             border-radius: 4px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            font-size: 13px;
+            font-family: var(--font-family);
+            font-size: var(--font-size-300);
             color: var(--text-main);
             box-sizing: border-box;
         }
@@ -249,8 +260,8 @@
             padding: 7px 8px;
             border: 1px solid var(--border-color);
             border-radius: 4px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            font-size: 13px;
+            font-family: var(--font-family);
+            font-size: var(--font-size-300);
             margin-top: 6px;
             box-sizing: border-box;
         }
@@ -259,7 +270,7 @@
             display: flex;
             flex-direction: column;
             gap: 6px;
-            font-size: 13px;
+            font-size: var(--font-size-300);
         }
 
         .row-range-options label {
@@ -275,8 +286,8 @@
             padding: 6px 8px;
             border: 1px solid var(--border-color);
             border-radius: 4px;
-            font-size: 13px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            font-size: var(--font-size-300);
+            font-family: var(--font-family);
             box-sizing: border-box;
         }
 
@@ -289,9 +300,9 @@
             color: white;
             border: none;
             border-radius: 4px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            font-family: var(--font-family);
             font-weight: 500;
-            font-size: 14px;
+            font-size: var(--font-size-300);
             cursor: pointer;
         }
 
@@ -305,9 +316,9 @@
             color: var(--primary-blue);
             border: 1px solid var(--primary-blue);
             border-radius: 4px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            font-family: var(--font-family);
             font-weight: 500;
-            font-size: 14px;
+            font-size: var(--font-size-300);
             cursor: pointer;
         }
 
@@ -320,13 +331,13 @@
             color: var(--text-main);
             border: 1px solid var(--border-color);
             border-radius: 4px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            font-size: 14px;
+            font-family: var(--font-family);
+            font-size: var(--font-size-300);
             cursor: pointer;
         }
 
         .no-headers-msg {
-            font-size: 13px;
+            font-size: var(--font-size-300);
             color: var(--text-secondary);
             text-align: center;
             padding: 24px 0;
@@ -337,7 +348,7 @@
             display: flex;
             align-items: center;
             gap: 6px;
-            font-size: 11px;
+            font-size: var(--font-size-100);
             font-style: italic;
             color: var(--text-secondary);
             margin-top: 10px;
@@ -348,7 +359,7 @@
         .grounding-col-badge {
             display: inline-block;
             font-family: "SFMono-Regular", "Consolas", monospace;
-            font-size: 10px;
+            font-size: var(--font-size-100);
             background: #f1f3f4;
             border: 1px solid var(--border-color);
             border-radius: 3px;
@@ -368,8 +379,7 @@
         }
 
         .tool-btn-sub {
-            font-size: 11px;
-            font-style: italic;
+            font-size: var(--font-size-200);
             color: var(--text-secondary);
             font-weight: 400;
             line-height: 1.3;
@@ -389,8 +399,8 @@
             border: 1px dashed var(--border-color);
             background: #f8f9fa;
             color: var(--text-secondary);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            font-size: 14px;
+            font-family: var(--font-family);
+            font-size: var(--font-size-300);
             font-style: italic;
             cursor: default;
             box-sizing: border-box;
@@ -406,7 +416,7 @@
         }
 
         .recipe-section-card-title {
-            font-size: 10px;
+            font-size: var(--font-size-100);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.8px;
@@ -415,11 +425,17 @@
         }
 
         .field-helper {
-            font-size: 11px;
-            font-style: italic;
+            font-size: var(--font-size-200);
             color: var(--text-secondary);
-            margin: 0 0 8px 0;
+            margin: 2px 0 8px 0;
             line-height: 1.4;
+        }
+
+        .recipe-intro {
+            font-size: var(--font-size-200);
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin: 0 0 16px 0;
         }
 
         /* ── LockableField layouts ── */
@@ -459,12 +475,12 @@
             border: 1px solid var(--border-color);
             border-radius: 4px;
             color: var(--text-secondary);
-            font-size: 11px;
+            font-size: var(--font-size-100);
             font-style: italic;
             cursor: pointer;
             padding: 3px 6px;
             white-space: nowrap;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            font-family: var(--font-family);
             line-height: 1.4;
         }
 
@@ -492,7 +508,7 @@
           display: flex;
           align-items: center;
           gap: 6px;
-          font-size: 11px;
+          font-size: var(--font-size-100);
           color: #5f6368;
         }
 
@@ -522,4 +538,242 @@
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+        }
+
+.job-strip__cancel {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: var(--font-size-100);
+  line-height: 1;
+  opacity: 0.6;
+  padding: 0 2px;
+}
+
+.job-strip__cancel:hover {
+  opacity: 1;
+}
+
+.job-strip__cancelling {
+  font-size: var(--font-size-100);
+  font-style: italic;
+  opacity: 0.6;
+}
+
+        /* ── Token Input ─────────────────────────────────────────────────────────── */
+
+        .token-field {
+            position: relative;
+            width: 100%;
+        }
+
+        .token-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .token-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .token-chip-remove {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #1a73e8;
+            font-size: var(--font-size-300);
+            line-height: 1;
+            padding: 0 0 0 2px;
+            opacity: 0.7;
+        }
+
+        .token-chip-remove:hover {
+            opacity: 1;
+        }
+
+        .token-chip-input {
+            border: none;
+            outline: none;
+            font-size: var(--font-size-200);
+            color: #1a73e8;
+            width: 120px;
+            background: transparent;
+        }
+
+        .token-add-btn {
+            color: var(--text-secondary) !important;
+        }
+
+        .token-search {
+            display: block;
+            width: 100%;
+            border: none;
+            outline: none;
+            border-bottom: 1px solid #dadce0;
+            padding: 6px 10px;
+            font-size: var(--font-size-300);
+            color: #202124;
+            background: transparent;
+            box-sizing: border-box;
+        }
+
+        .token-search::placeholder {
+            color: #9aa0a6;
+        }
+
+        .token-dropdown {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            max-height: 220px;
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .token-option {
+            padding: 7px 12px;
+            font-size: var(--font-size-300);
+            cursor: pointer;
+            color: #202124;
+        }
+
+        .token-option:hover {
+            background: #f1f3f4;
+        }
+
+        .token-no-match {
+            padding: 7px 12px;
+            font-size: var(--font-size-300);
+            color: #9aa0a6;
+            font-style: italic;
+        }
+
+        /* ── Prompt Column List ──────────────────────────────────────────────────── */
+
+        .pcol-list { display: flex; flex-direction: column; gap: 4px; }
+
+        .pcol-row {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .pcol-col-picker {
+          flex: 1 1 0;
+          min-width: 0;
+        }
+
+        .pcol-kind-toggle {
+          flex-shrink: 0;
+          background: none;
+          border: 1px solid var(--border-color);
+          border-radius: 12px;
+          padding: 2px 8px;
+          font-size: var(--font-size-100);
+          color: var(--text-secondary);
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .pcol-kind-toggle:hover {
+          border-color: var(--primary-blue);
+          color: var(--primary-blue);
+        }
+
+        .pcol-btn-up,
+        .pcol-btn-down,
+        .pcol-btn-remove {
+          flex-shrink: 0;
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: var(--text-secondary);
+          font-size: var(--font-size-300);
+          padding: 2px 4px;
+          line-height: 1;
+        }
+
+        .pcol-btn-up:hover,
+        .pcol-btn-down:hover { color: var(--primary-blue); }
+        .pcol-btn-remove:hover { color: #d93025; }
+        .pcol-btn-up:disabled,
+        .pcol-btn-down:disabled { opacity: 0.25; cursor: default; }
+
+        .pcol-add-btn {
+          width: 100%;
+          margin-top: 4px;
+          background: none;
+          border: 1px solid var(--border-color);
+          border-radius: 4px;
+          color: var(--text-secondary);
+          font-size: var(--font-size-200);
+          padding: 5px 8px;
+          cursor: pointer;
+          font-family: var(--font-family);
+          box-sizing: border-box;
+        }
+
+        .pcol-add-btn:hover { border-color: var(--primary-blue); color: var(--primary-blue); }
+
+        .collapsible-header {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            box-sizing: border-box;
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            text-align: left;
+            gap: 6px;
+            margin-bottom: 0;
+        }
+
+        .collapsible-header:hover .collapsible-label {
+            color: var(--primary-blue);
+        }
+
+        .collapsible-label {
+            font-size: var(--font-size-100);
+            font-style: italic;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .collapsible-summary {
+            flex: 1;
+            min-width: 0;
+            font-size: var(--font-size-100);
+            color: var(--text-secondary);
+            font-style: italic;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .collapsible-chevron {
+            font-size: var(--font-size-100);
+            color: var(--text-secondary);
+            transition: transform 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .collapsible-header[aria-expanded="true"] .collapsible-chevron {
+            transform: rotate(90deg);
+        }
+
+        .collapsible-content {
+            padding-top: 8px;
         }

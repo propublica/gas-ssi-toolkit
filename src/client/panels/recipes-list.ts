@@ -8,7 +8,7 @@ export class RecipesListPanel implements Panel {
     RECIPES.forEach((recipe) => {
       container
         .querySelector(`#btn-${recipe.id}`)
-        ?.addEventListener("click", () => nav.navigate(recipe.panelId, recipe));
+        ?.addEventListener("click", () => nav.navigate("recipe", recipe));
     });
   }
 

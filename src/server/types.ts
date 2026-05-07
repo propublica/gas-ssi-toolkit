@@ -31,7 +31,6 @@ export interface AppConfig {
   INLINE_MAX_TOTAL_BYTES: number; // 95MB (100MB ceiling × 0.95)
   INLINE_MAX_PDF_BYTES: number; // 47MB (50MB ceiling × 0.95)
   INLINE_PREFLIGHT_FACTOR: number; // exact base64 expansion ratio (4/3)
-  MAX_OUTPUT_TOKENS: number;
 }
 
 export interface GeminiInlineData {
@@ -134,6 +133,8 @@ export type GeminiTool =
 export type PromptInput = {
   kind: PromptColumnSpec["kind"];
   value: unknown;
+  /** Optional label prepended to text parts as "<label>: <value>". If absent or empty, no prefix is applied. Ignored for file inputs. */
+  label?: string;
 };
 
 export interface DriveFileInfo {
