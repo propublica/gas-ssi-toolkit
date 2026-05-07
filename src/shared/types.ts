@@ -68,6 +68,7 @@ export interface PrepColSpec {
 export interface PrepRecipeParams {
   cols: PrepColSpec[];
   inputValues: Record<string, string>;
+  rowRange?: { start: number; end: number };
 }
 
 export interface PrepRecipeResult {

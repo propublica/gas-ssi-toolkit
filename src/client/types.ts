@@ -71,6 +71,9 @@ export type PanelId =
   | "configure-ai-run"
   | "recipes-list"
   | "recipe"
+  | "recipe-v1"
+  | "recipe-v2"
+  | "recipe-v3"
   | "import-drive-links"
   | "extract-text";
 
@@ -101,6 +104,8 @@ export interface RecipeDefinition {
   description: string;
   /** Optional longer description rendered at the top of the recipe panel. */
   intro?: string;
+  /** Routes RecipesListPanel to the appropriate variant panel. Absent = standard RecipePanel. */
+  variant?: "v1" | "v2" | "v3";
   /** Journalist-facing form fields. Drives RecipePanel rendering. */
   inputs: RecipeInput[];
   /**
