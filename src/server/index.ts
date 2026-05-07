@@ -78,7 +78,7 @@ export function getSheetHeaders(): string[] {
 
 export function showSidebar(): void {
   const html = HtmlService.createTemplateFromFile("Sidebar");
-  const output = html.evaluate().setTitle("SSI Toolkit").setWidth(360);
+  const output = html.evaluate().setTitle("SSI Toolkit").setWidth(420);
   SpreadsheetApp.getUi().showSidebar(output);
 }
 
