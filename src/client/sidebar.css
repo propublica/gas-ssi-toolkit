@@ -293,10 +293,13 @@
 
         .panel-buttons { display: flex; gap: 8px; margin-top: 24px; }
 
-        .recipe-action-stack { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; }
+        .recipe-action-stack { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
         .recipe-action-stack .btn-run,
-        .recipe-action-stack .btn-outline { width: 100%; text-align: left; }
-        .recipe-action-item .field-helper { margin-top: 3px; margin-bottom: 6px; }
+        .recipe-action-stack .btn-outline { width: 100%; }
+        .recipe-action-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+        .recipe-btn-main { font-size: var(--font-size-300); font-weight: 500; line-height: 1.3; }
+        .recipe-btn-sub { font-size: var(--font-size-200); font-weight: 400; opacity: 0.8; line-height: 1.4; }
+        .prep-status-msg { font-size: var(--font-size-200); color: #34a853; margin: 2px 0 6px 0; }
 
         .btn-run {
             flex: 1;

@@ -59,18 +59,21 @@ export class RecipeV2Panel implements Panel<
   private applyState(container: HTMLElement): void {
     const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
     const cookBtn = container.querySelector<HTMLButtonElement>("#cook-btn")!;
+    const btn = (main: string, sub: string): string =>
+      `<span class="recipe-btn-main">${main}</span><span class="recipe-btn-sub">${sub}</span>`;
+
     testBtn.disabled = false;
     cookBtn.disabled = false;
-    testBtn.textContent = "1. Test ▸ 5 rows";
-    cookBtn.textContent = "2. Cook ▸ All rows";
+    testBtn.innerHTML = btn("1. Test", "Set up columns and check quality on the first 5 rows");
+    cookBtn.innerHTML = btn("2. Cook", "Set up columns and process all files in the folder");
     if (this.v2State === "testing") {
       testBtn.disabled = true;
-      testBtn.innerHTML = `<span class="btn-spinner"></span>Testing…`;
+      testBtn.innerHTML = `<span class="btn-spinner"></span><span class="recipe-btn-main">Testing…</span>`;
       cookBtn.disabled = true;
     } else if (this.v2State === "cooking") {
       testBtn.disabled = true;
       cookBtn.disabled = true;
-      cookBtn.innerHTML = `<span class="btn-spinner"></span>Cooking…`;
+      cookBtn.innerHTML = `<span class="btn-spinner"></span><span class="recipe-btn-main">Cooking…</span>`;
     }
   }
 
@@ -187,14 +190,14 @@ export class RecipeV2Panel implements Panel<
       ${introHtml}
       ${inputsHtml}
       <div class="recipe-action-stack">
-        <div class="recipe-action-item">
-          <button id="test-btn" class="btn-outline">1. Test ▸ 5 rows</button>
-          <p class="field-helper">Sets up columns and runs the AI on the first 5 rows so you can check quality before committing.</p>
-        </div>
-        <div class="recipe-action-item">
-          <button id="cook-btn" class="btn-run">2. Cook ▸ All rows</button>
-          <p class="field-helper">Sets up columns and runs the AI on every file in the folder. Keep the sidebar open.</p>
-        </div>
+        <button id="test-btn" class="btn-outline recipe-action-btn">
+          <span class="recipe-btn-main">1. Test</span>
+          <span class="recipe-btn-sub">Set up columns and check quality on the first 5 rows</span>
+        </button>
+        <button id="cook-btn" class="btn-run recipe-action-btn">
+          <span class="recipe-btn-main">2. Cook</span>
+          <span class="recipe-btn-sub">Set up columns and process all files in the folder</span>
+        </button>
       </div>`;
   }
 }

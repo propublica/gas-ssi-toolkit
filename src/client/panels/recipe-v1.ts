@@ -67,6 +67,8 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
         this.v1State = "idle";
         this.rowRange = null;
         this.preppedRunConfig = null;
+        const status = container.querySelector<HTMLElement>("#prep-status");
+        if (status) status.hidden = true;
         this.applyState(container);
       });
     }
@@ -93,22 +95,26 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
     const cookBtn = container.querySelector<HTMLButtonElement>("#cook-btn")!;
     const configBtn = container.querySelector<HTMLButtonElement>("#configure-btn")!;
 
+    const btn = (main: string, sub: string): string =>
+      `<span class="recipe-btn-main">${main}</span><span class="recipe-btn-sub">${sub}</span>`;
+
     prepBtn.disabled = false;
     testBtn.disabled = true;
     cookBtn.disabled = true;
     configBtn.disabled = true;
-    prepBtn.textContent = "1. Prep Recipe";
-    testBtn.textContent = "2. Test ▸ 5 rows";
-    cookBtn.textContent = "3. Cook ▸ All";
-    cookBtn.className = "btn-run";
+    prepBtn.innerHTML = btn("1. Prep Recipe", "Set up columns and import files from Drive");
+    testBtn.innerHTML = btn("2. Test", "Check quality on the first 5 rows");
+    cookBtn.innerHTML = btn("3. Cook", "Process all imported files");
+    cookBtn.className = "btn-run recipe-action-btn";
+    configBtn.innerHTML = btn("Configure AI", "Review or adjust settings before running");
 
     switch (this.v1State) {
       case "prepping":
         prepBtn.disabled = true;
-        prepBtn.innerHTML = `<span class="btn-spinner"></span>Prepping…`;
+        prepBtn.innerHTML = `<span class="btn-spinner"></span><span class="recipe-btn-main">Prepping…</span>`;
         break;
       case "prepped":
-        prepBtn.textContent = "1. Re-prep";
+        prepBtn.innerHTML = btn("1. Re-prep", "Set up columns and import files from Drive");
         testBtn.disabled = false;
         cookBtn.disabled = false;
         configBtn.disabled = false;
@@ -116,7 +122,7 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
       case "testing":
         prepBtn.disabled = true;
         testBtn.disabled = true;
-        testBtn.innerHTML = `<span class="btn-spinner"></span>Testing…`;
+        testBtn.innerHTML = `<span class="btn-spinner"></span><span class="recipe-btn-main">Testing…</span>`;
         cookBtn.disabled = true;
         configBtn.disabled = true;
         break;
@@ -124,7 +130,7 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
         prepBtn.disabled = true;
         testBtn.disabled = true;
         cookBtn.disabled = true;
-        cookBtn.innerHTML = `<span class="btn-spinner"></span>Cooking…`;
+        cookBtn.innerHTML = `<span class="btn-spinner"></span><span class="recipe-btn-main">Cooking…</span>`;
         configBtn.disabled = true;
         break;
     }
@@ -169,6 +175,12 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
         this.preppedRunConfig = template as RunConfig;
         this.v1State = "prepped";
         this.applyState(container);
+        const count = result.rowRange.end - result.rowRange.start + 1;
+        const status = container.querySelector<HTMLElement>("#prep-status");
+        if (status) {
+          status.textContent = `✓ ${count} row${count !== 1 ? "s" : ""} ready to process`;
+          status.hidden = false;
+        }
       },
       (err: Error | null) => {
         if (err !== null) globalThis.alert("Error: " + err.message);
@@ -257,22 +269,23 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
       ${introHtml}
       ${inputsHtml}
       <div class="recipe-action-stack">
-        <div class="recipe-action-item">
-          <button id="prep-btn" class="btn-outline">1. Prep Recipe</button>
-          <p class="field-helper">Sets up your spreadsheet columns and imports files from Drive.</p>
-        </div>
-        <div class="recipe-action-item">
-          <button id="test-btn" class="btn-outline" disabled>2. Test ▸ 5 rows</button>
-          <p class="field-helper">Runs the AI on the first 5 rows so you can check quality before committing.</p>
-        </div>
-        <div class="recipe-action-item">
-          <button id="cook-btn" class="btn-run" disabled>3. Cook ▸ All</button>
-          <p class="field-helper">Runs the AI on every imported file. Keep the sidebar open until it finishes.</p>
-        </div>
-        <div class="recipe-action-item">
-          <button id="configure-btn" class="btn-outline" disabled>Configure AI</button>
-          <p class="field-helper">Opens the full settings panel to review or adjust before running.</p>
-        </div>
+        <button id="prep-btn" class="btn-outline recipe-action-btn">
+          <span class="recipe-btn-main">1. Prep Recipe</span>
+          <span class="recipe-btn-sub">Set up columns and import files from Drive</span>
+        </button>
+        <p id="prep-status" class="prep-status-msg" hidden></p>
+        <button id="test-btn" class="btn-outline recipe-action-btn" disabled>
+          <span class="recipe-btn-main">2. Test</span>
+          <span class="recipe-btn-sub">Check quality on the first 5 rows</span>
+        </button>
+        <button id="cook-btn" class="btn-run recipe-action-btn" disabled>
+          <span class="recipe-btn-main">3. Cook</span>
+          <span class="recipe-btn-sub">Process all imported files</span>
+        </button>
+        <button id="configure-btn" class="btn-outline recipe-action-btn" disabled>
+          <span class="recipe-btn-main">Configure AI</span>
+          <span class="recipe-btn-sub">Review or adjust settings before running</span>
+        </button>
       </div>`;
   }
 }

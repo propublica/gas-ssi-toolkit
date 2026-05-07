@@ -98,21 +98,25 @@ export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
       const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
       const cookBtn = container.querySelector<HTMLButtonElement>("#cook-btn")!;
       const configBtn = container.querySelector<HTMLButtonElement>("#configure-btn")!;
+      const btn = (main: string, sub: string): string =>
+        `<span class="recipe-btn-main">${main}</span><span class="recipe-btn-sub">${sub}</span>`;
+
       if (this.runState === "idle") {
         testBtn.disabled = locked;
         cookBtn.disabled = locked;
         configBtn.disabled = locked;
-        testBtn.textContent = "1. Test ▸ 5 rows";
-        cookBtn.textContent = "2. Cook ▸ All";
+        testBtn.innerHTML = btn("1. Test", "Check quality on the first 5 rows");
+        cookBtn.innerHTML = btn("2. Cook", "Process all imported files");
+        configBtn.innerHTML = btn("Configure AI", "Review or adjust settings before running");
       } else if (this.runState === "testing") {
         testBtn.disabled = true;
-        testBtn.innerHTML = `<span class="btn-spinner"></span>Testing…`;
+        testBtn.innerHTML = `<span class="btn-spinner"></span><span class="recipe-btn-main">Testing…</span>`;
         cookBtn.disabled = true;
         configBtn.disabled = true;
       } else if (this.runState === "cooking") {
         testBtn.disabled = true;
         cookBtn.disabled = true;
-        cookBtn.innerHTML = `<span class="btn-spinner"></span>Cooking…`;
+        cookBtn.innerHTML = `<span class="btn-spinner"></span><span class="recipe-btn-main">Cooking…</span>`;
         configBtn.disabled = true;
       }
       const lock = step3Section.querySelector<HTMLElement>(".v3-lock");
@@ -342,18 +346,18 @@ export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
       <div data-step="3" class="v3-step">
         <p class="v3-step-label"><strong>Step 3: Run</strong> <span class="v3-lock">🔒</span></p>
         <div class="recipe-action-stack">
-          <div class="recipe-action-item">
-            <button id="test-btn" class="btn-outline">1. Test ▸ 5 rows</button>
-            <p class="field-helper">Runs the AI on the first 5 rows so you can check quality before committing.</p>
-          </div>
-          <div class="recipe-action-item">
-            <button id="cook-btn" class="btn-run">2. Cook ▸ All</button>
-            <p class="field-helper">Runs the AI on every file. Keep the sidebar open until it finishes.</p>
-          </div>
-          <div class="recipe-action-item">
-            <button id="configure-btn" class="btn-outline">Configure AI</button>
-            <p class="field-helper">Opens the full settings panel to review or adjust before running.</p>
-          </div>
+          <button id="test-btn" class="btn-outline recipe-action-btn">
+            <span class="recipe-btn-main">1. Test</span>
+            <span class="recipe-btn-sub">Check quality on the first 5 rows</span>
+          </button>
+          <button id="cook-btn" class="btn-run recipe-action-btn">
+            <span class="recipe-btn-main">2. Cook</span>
+            <span class="recipe-btn-sub">Process all imported files</span>
+          </button>
+          <button id="configure-btn" class="btn-outline recipe-action-btn">
+            <span class="recipe-btn-main">Configure AI</span>
+            <span class="recipe-btn-sub">Review or adjust settings before running</span>
+          </button>
         </div>
       </div>`;
   }
