@@ -35,7 +35,7 @@
             padding-bottom: 16px;
         }
 
-        .container { padding: 16px; }
+        .container { padding: 12px 12px 16px; }
 
 
         .section { margin-bottom: 28px; }
@@ -302,12 +302,12 @@
         .prep-status-msg { font-size: var(--font-size-200); color: #34a853; margin: 2px 0 6px 0; }
 
         /* V3 step stepper */
-        .v3-step { display: flex; gap: 14px; }
-        .v3-step-left { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 24px; }
+        .v3-step { display: flex; gap: 10px; }
+        .v3-step-left { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 20px; }
         .v3-step-badge {
-            width: 24px; height: 24px; border-radius: 50%;
+            width: 20px; height: 20px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            font-size: var(--font-size-200); font-weight: 600; flex-shrink: 0;
+            font-size: var(--font-size-100); font-weight: 600; flex-shrink: 0;
             transition: background 0.15s, border-color 0.15s;
         }
         .v3-step-connector { flex: 1; width: 2px; min-height: 12px; margin: 4px 0; background: var(--border-color); }
