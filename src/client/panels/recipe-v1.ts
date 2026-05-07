@@ -103,8 +103,8 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
     cookBtn.disabled = true;
     configBtn.disabled = true;
     prepBtn.innerHTML = btn("1. Prep Recipe", "Set up columns and import files from Drive");
-    testBtn.innerHTML = btn("2. Test", "Check quality on the first 5 rows");
-    cookBtn.innerHTML = btn("3. Cook", "Process all imported files");
+    testBtn.innerHTML = btn("Test", "Check quality on the first 5 rows");
+    cookBtn.innerHTML = btn("Cook", "Process all imported files");
     cookBtn.className = "btn-run recipe-action-btn";
     configBtn.innerHTML = btn("Configure AI", "Review or adjust settings before running");
 
@@ -275,11 +275,11 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
         </button>
         <p id="prep-status" class="prep-status-msg" hidden></p>
         <button id="test-btn" class="btn-outline recipe-action-btn" disabled>
-          <span class="recipe-btn-main">2. Test</span>
+          <span class="recipe-btn-main">Test</span>
           <span class="recipe-btn-sub">Check quality on the first 5 rows</span>
         </button>
         <button id="cook-btn" class="btn-run recipe-action-btn" disabled>
-          <span class="recipe-btn-main">3. Cook</span>
+          <span class="recipe-btn-main">Cook</span>
           <span class="recipe-btn-sub">Process all imported files</span>
         </button>
         <button id="configure-btn" class="btn-outline recipe-action-btn" disabled>

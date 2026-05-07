@@ -64,8 +64,8 @@ export class RecipeV2Panel implements Panel<
 
     testBtn.disabled = false;
     cookBtn.disabled = false;
-    testBtn.innerHTML = btn("1. Test", "Set up columns and check quality on the first 5 rows");
-    cookBtn.innerHTML = btn("2. Cook", "Set up columns and process all files in the folder");
+    testBtn.innerHTML = btn("Test", "Set up columns and check quality on the first 5 rows");
+    cookBtn.innerHTML = btn("Cook", "Set up columns and process all files in the folder");
     if (this.v2State === "testing") {
       testBtn.disabled = true;
       testBtn.innerHTML = `<span class="btn-spinner"></span><span class="recipe-btn-main">Testing…</span>`;
@@ -191,11 +191,11 @@ export class RecipeV2Panel implements Panel<
       ${inputsHtml}
       <div class="recipe-action-stack">
         <button id="test-btn" class="btn-outline recipe-action-btn">
-          <span class="recipe-btn-main">1. Test</span>
+          <span class="recipe-btn-main">Test</span>
           <span class="recipe-btn-sub">Set up columns and check quality on the first 5 rows</span>
         </button>
         <button id="cook-btn" class="btn-run recipe-action-btn">
-          <span class="recipe-btn-main">2. Cook</span>
+          <span class="recipe-btn-main">Cook</span>
           <span class="recipe-btn-sub">Set up columns and process all files in the folder</span>
         </button>
       </div>`;

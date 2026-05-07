@@ -124,8 +124,8 @@ export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
         testBtn.disabled = locked;
         cookBtn.disabled = locked;
         configBtn.disabled = locked;
-        testBtn.innerHTML = btn("1. Test", "Check quality on the first 5 rows");
-        cookBtn.innerHTML = btn("2. Cook", "Process all imported files");
+        testBtn.innerHTML = btn("Test", "Check quality on the first 5 rows");
+        cookBtn.innerHTML = btn("Cook", "Process all imported files");
         configBtn.innerHTML = btn("Configure AI", "Review or adjust settings before running");
       } else if (this.runState === "testing") {
         testBtn.disabled = true;
@@ -381,11 +381,11 @@ export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
           <p class="v3-step-label"><strong>Run</strong></p>
           <div class="recipe-action-stack">
             <button id="test-btn" class="btn-outline recipe-action-btn">
-              <span class="recipe-btn-main">1. Test</span>
+              <span class="recipe-btn-main">Test</span>
               <span class="recipe-btn-sub">Check quality on the first 5 rows</span>
             </button>
             <button id="cook-btn" class="btn-run recipe-action-btn">
-              <span class="recipe-btn-main">2. Cook</span>
+              <span class="recipe-btn-main">Cook</span>
               <span class="recipe-btn-sub">Process all imported files</span>
             </button>
             <button id="configure-btn" class="btn-outline recipe-action-btn">
