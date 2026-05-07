@@ -67,7 +67,8 @@ export const RECIPES: RecipeDefinition[] = [
     name: "Document Summarization (V1)",
     icon: "📄",
     variant: "v1" as const,
-    description: "Summarize Drive files — 4-button flow with inline Test and Cook",
+    description:
+      "Summarize files in a Google Drive folder — understand your documents at a glance.",
     intro:
       "This recipe reads every file in a Drive folder and generates a tight, scannable summary for each one. " +
       "Prep sets up your columns, then Test a single row, Cook everything, or Configure AI for full control.",
@@ -129,7 +130,8 @@ export const RECIPES: RecipeDefinition[] = [
     name: "Document Summarization (V2)",
     icon: "📄",
     variant: "v2" as const,
-    description: "Summarize Drive files — one-click Test or Cook, no prep step",
+    description:
+      "Summarize files in a Google Drive folder — understand your documents at a glance.",
     intro:
       "This recipe reads every file in a Drive folder and generates a tight, scannable summary for each one. " +
       "Test runs on the first 10 rows so you can check quality. Cook processes everything in one shot.",
@@ -191,7 +193,8 @@ export const RECIPES: RecipeDefinition[] = [
     name: "Document Summarization (V3)",
     icon: "📄",
     variant: "v3" as const,
-    description: "Summarize Drive files — step-by-step guided setup",
+    description:
+      "Summarize files in a Google Drive folder — understand your documents at a glance.",
     intro:
       "This recipe walks you through each stage of setup before running the AI. " +
       "Import your files, configure your prompt, then Test or Cook when you're ready.",
