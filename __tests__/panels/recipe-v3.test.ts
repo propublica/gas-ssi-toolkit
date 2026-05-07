@@ -170,6 +170,15 @@ describe("Step 2 import", () => {
     expect(calledCols.some((c: { role?: string }) => c.role === "system-prompt")).toBe(true);
   });
 
+  it("passes step 1 rowRange to step 2 prepRecipe call", async () => {
+    const { container } = mount();
+    await completeStep1(container);
+    mockPrepRecipe.mockResolvedValueOnce(step1Result);
+    container.querySelector<HTMLButtonElement>("#step2-btn")!.click();
+    await flush();
+    expect(mockPrepRecipe.mock.calls[1][0].rowRange).toEqual(step1Result.rowRange);
+  });
+
   it("unlocks step 3 after step 2 import succeeds", async () => {
     const { container } = mount();
     await completeStep1(container);

@@ -159,6 +159,7 @@ export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
         (col) => col.role === "system-prompt" || col.role === "text-prompt",
       ),
       inputValues,
+      rowRange: this.rowRange ?? undefined,
     };
   }
 
