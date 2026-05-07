@@ -6,6 +6,10 @@ jest.mock("../../src/client/services", () => ({
   runBatchAI: jest.fn(),
 }));
 
+jest.mock("../../src/client/job-store", () => ({
+  jobStore: { dispatch: jest.fn() },
+}));
+
 jest.mock("../../src/client/panels/recipe", () => ({
   buildRunTemplate: jest.fn().mockReturnValue({
     promptCols: [{ col: "Drive Link", kind: "file" }],
@@ -166,12 +170,13 @@ describe("Test flow", () => {
     return { container, nav };
   }
 
-  it("calls runBatchAI with rowRange covering only the first data row", async () => {
+  it("calls runBatchAI with rowRange covering the first 5 data rows", async () => {
     const { container } = await prepAndGetContainer();
     container.querySelector<HTMLButtonElement>("#test-btn")!.click();
     await flush();
     expect(mockRunBatchAI).toHaveBeenCalledWith(
-      expect.objectContaining({ rowRange: { start: 2, end: 2 } }),
+      expect.objectContaining({ rowRange: { start: 2, end: 6 } }),
+      expect.any(String),
     );
   });
 
@@ -213,6 +218,7 @@ describe("Cook flow", () => {
     await flush();
     expect(mockRunBatchAI).toHaveBeenCalledWith(
       expect.objectContaining({ rowRange: { start: 2, end: 11 } }),
+      expect.any(String),
     );
   });
 });

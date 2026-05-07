@@ -2,6 +2,7 @@ import type { NavigationContext, Panel, RecipeDefinition } from "../types";
 import type { PrepRecipeParams, RunConfig } from "../../shared/types";
 import { prepRecipe, runBatchAI } from "../services";
 import { buildRunTemplate } from "./recipe";
+import { jobStore } from "../job-store";
 
 type V3RunState = "idle" | "testing" | "cooking";
 
@@ -101,8 +102,8 @@ export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
         testBtn.disabled = locked;
         cookBtn.disabled = locked;
         configBtn.disabled = locked;
-        testBtn.textContent = "Test ▸ row 2";
-        cookBtn.textContent = "Cook ▸ All";
+        testBtn.textContent = "1. Test ▸ 5 rows";
+        cookBtn.textContent = "2. Cook ▸ All";
       } else if (this.runState === "testing") {
         testBtn.disabled = true;
         testBtn.innerHTML = `<span class="btn-spinner"></span>Testing…`;
@@ -239,11 +240,17 @@ export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
     if (!this.rowRange || !this.preppedRunConfig) return;
     const config: RunConfig = {
       ...this.preppedRunConfig,
-      rowRange: { start: this.rowRange.start, end: this.rowRange.start },
+      rowRange: {
+        start: this.rowRange.start,
+        end: Math.min(this.rowRange.start + 4, this.rowRange.end),
+      },
     };
     this.runState = "testing";
     this.applyLockState(container);
-    runBatchAI(config).then(
+    const jobId = `batch-ai-${Date.now()}`;
+    const runPromise = runBatchAI(config, jobId);
+    jobStore.dispatch(jobId, "Testing 5 rows…", runPromise);
+    runPromise.then(
       () => {
         this.runState = "idle";
         this.applyLockState(container);
@@ -261,7 +268,10 @@ export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
     const config: RunConfig = { ...this.preppedRunConfig, rowRange: this.rowRange };
     this.runState = "cooking";
     this.applyLockState(container);
-    runBatchAI(config).then(
+    const jobId = `batch-ai-${Date.now()}`;
+    const runPromise = runBatchAI(config, jobId);
+    jobStore.dispatch(jobId, "Running AI…", runPromise);
+    runPromise.then(
       () => {
         this.runState = "idle";
         this.applyLockState(container);
@@ -331,16 +341,20 @@ export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
       </div>
       <div data-step="3" class="v3-step">
         <p class="v3-step-label"><strong>Step 3: Run</strong> <span class="v3-lock">🔒</span></p>
-        <div class="panel-buttons">
-          <button id="test-btn" class="btn-outline">Test ▸ row 2</button>
-          <button id="cook-btn" class="btn-run">Cook ▸ All</button>
-          <button id="configure-btn" class="btn-outline">Configure AI</button>
+        <div class="recipe-action-stack">
+          <div class="recipe-action-item">
+            <button id="test-btn" class="btn-outline">1. Test ▸ 5 rows</button>
+            <p class="field-helper">Runs the AI on the first 5 rows so you can check quality before committing.</p>
+          </div>
+          <div class="recipe-action-item">
+            <button id="cook-btn" class="btn-run">2. Cook ▸ All</button>
+            <p class="field-helper">Runs the AI on every file. Keep the sidebar open until it finishes.</p>
+          </div>
+          <div class="recipe-action-item">
+            <button id="configure-btn" class="btn-outline">Configure AI</button>
+            <p class="field-helper">Opens the full settings panel to review or adjust before running.</p>
+          </div>
         </div>
-        <p class="field-helper">
-          <strong>Test</strong> — runs the AI on the first row only so you can check quality before committing.
-          <strong>Cook</strong> — runs the AI on every file. Keep the sidebar open until it finishes.
-          <strong>Configure AI</strong> — opens the full settings panel to review or adjust before running.
-        </p>
       </div>`;
   }
 }

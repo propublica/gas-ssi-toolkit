@@ -2,6 +2,7 @@ import type { NavigationContext, Panel, RecipeDefinition } from "../types";
 import type { PrepRecipeParams, RunConfig } from "../../shared/types";
 import { prepRecipe, runBatchAI } from "../services";
 import { buildRunTemplate } from "./recipe";
+import { jobStore } from "../job-store";
 
 type V1State = "idle" | "prepping" | "prepped" | "testing" | "cooking";
 
@@ -96,9 +97,9 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
     testBtn.disabled = true;
     cookBtn.disabled = true;
     configBtn.disabled = true;
-    prepBtn.textContent = "Prep Recipe";
-    testBtn.textContent = "Test ▸ row 2";
-    cookBtn.textContent = "Cook ▸ All";
+    prepBtn.textContent = "1. Prep Recipe";
+    testBtn.textContent = "2. Test ▸ 5 rows";
+    cookBtn.textContent = "3. Cook ▸ All";
     cookBtn.className = "btn-run";
 
     switch (this.v1State) {
@@ -107,7 +108,7 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
         prepBtn.innerHTML = `<span class="btn-spinner"></span>Prepping…`;
         break;
       case "prepped":
-        prepBtn.textContent = "Re-prep";
+        prepBtn.textContent = "1. Re-prep";
         testBtn.disabled = false;
         cookBtn.disabled = false;
         configBtn.disabled = false;
@@ -181,11 +182,17 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
     if (!this.rowRange || !this.preppedRunConfig) return;
     const config = {
       ...this.preppedRunConfig,
-      rowRange: { start: this.rowRange.start, end: this.rowRange.start },
+      rowRange: {
+        start: this.rowRange.start,
+        end: Math.min(this.rowRange.start + 4, this.rowRange.end),
+      },
     };
     this.v1State = "testing";
     this.applyState(container);
-    runBatchAI(config).then(
+    const jobId = `batch-ai-${Date.now()}`;
+    const runPromise = runBatchAI(config, jobId);
+    jobStore.dispatch(jobId, "Testing 5 rows…", runPromise);
+    runPromise.then(
       () => {
         this.v1State = "prepped";
         this.applyState(container);
@@ -203,7 +210,10 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
     const config = { ...this.preppedRunConfig, rowRange: this.rowRange };
     this.v1State = "cooking";
     this.applyState(container);
-    runBatchAI(config).then(
+    const jobId = `batch-ai-${Date.now()}`;
+    const runPromise = runBatchAI(config, jobId);
+    jobStore.dispatch(jobId, "Running AI…", runPromise);
+    runPromise.then(
       () => {
         this.v1State = "prepped";
         this.applyState(container);
@@ -246,17 +256,23 @@ export class RecipeV1Panel implements Panel<RecipeDefinition, SavedState> {
       </div>
       ${introHtml}
       ${inputsHtml}
-      <div class="panel-buttons">
-        <button id="prep-btn" class="btn-outline">Prep Recipe</button>
-        <button id="test-btn" class="btn-outline" disabled>Test ▸ row 2</button>
-        <button id="cook-btn" class="btn-run" disabled>Cook ▸ All</button>
-        <button id="configure-btn" class="btn-outline" disabled>Configure AI</button>
-      </div>
-      <p class="field-helper">
-        <strong>Prep</strong> — sets up your spreadsheet columns and imports files from Drive.
-        <strong>Test</strong> — runs the AI on the first row only so you can check quality before committing.
-        <strong>Cook</strong> — runs the AI on every file. Keep the sidebar open until it finishes.
-        <strong>Configure AI</strong> — opens the full settings panel to review or adjust before running.
-      </p>`;
+      <div class="recipe-action-stack">
+        <div class="recipe-action-item">
+          <button id="prep-btn" class="btn-outline">1. Prep Recipe</button>
+          <p class="field-helper">Sets up your spreadsheet columns and imports files from Drive.</p>
+        </div>
+        <div class="recipe-action-item">
+          <button id="test-btn" class="btn-outline" disabled>2. Test ▸ 5 rows</button>
+          <p class="field-helper">Runs the AI on the first 5 rows so you can check quality before committing.</p>
+        </div>
+        <div class="recipe-action-item">
+          <button id="cook-btn" class="btn-run" disabled>3. Cook ▸ All</button>
+          <p class="field-helper">Runs the AI on every imported file. Keep the sidebar open until it finishes.</p>
+        </div>
+        <div class="recipe-action-item">
+          <button id="configure-btn" class="btn-outline" disabled>Configure AI</button>
+          <p class="field-helper">Opens the full settings panel to review or adjust before running.</p>
+        </div>
+      </div>`;
   }
 }

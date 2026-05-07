@@ -293,6 +293,11 @@
 
         .panel-buttons { display: flex; gap: 8px; margin-top: 24px; }
 
+        .recipe-action-stack { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; }
+        .recipe-action-stack .btn-run,
+        .recipe-action-stack .btn-outline { width: 100%; text-align: left; }
+        .recipe-action-item .field-helper { margin-top: 3px; margin-bottom: 6px; }
+
         .btn-run {
             flex: 1;
             padding: 10px;

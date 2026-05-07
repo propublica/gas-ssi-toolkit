@@ -6,6 +6,10 @@ jest.mock("../../src/client/services", () => ({
   runBatchAI: jest.fn(),
 }));
 
+jest.mock("../../src/client/job-store", () => ({
+  jobStore: { dispatch: jest.fn() },
+}));
+
 jest.mock("../../src/client/panels/recipe", () => ({
   buildRunTemplate: jest.fn().mockReturnValue({
     promptCols: [{ col: "Drive Link", kind: "file" }],
@@ -76,7 +80,7 @@ describe("initial state", () => {
 });
 
 describe("Test flow", () => {
-  it("calls prepRecipe then runBatchAI with first 10 data rows", async () => {
+  it("calls prepRecipe then runBatchAI with first 5 data rows", async () => {
     mockPrepRecipe.mockResolvedValue({ rowRange: { start: 2, end: 50 } });
     mockRunBatchAI.mockResolvedValue(undefined);
     const { container } = mount();
@@ -86,12 +90,13 @@ describe("Test flow", () => {
     await flush();
     expect(mockPrepRecipe).toHaveBeenCalledTimes(1);
     expect(mockRunBatchAI).toHaveBeenCalledWith(
-      expect.objectContaining({ rowRange: { start: 2, end: 11 } }),
+      expect.objectContaining({ rowRange: { start: 2, end: 6 } }),
+      expect.any(String),
     );
   });
 
-  it("clamps Test rowRange to actual end when fewer than 10 rows exist", async () => {
-    mockPrepRecipe.mockResolvedValue({ rowRange: { start: 2, end: 5 } });
+  it("clamps Test rowRange to actual end when fewer than 5 rows exist", async () => {
+    mockPrepRecipe.mockResolvedValue({ rowRange: { start: 2, end: 4 } });
     mockRunBatchAI.mockResolvedValue(undefined);
     const { container } = mount();
     container.querySelector<HTMLInputElement>('[data-input-id="folder"]')!.value =
@@ -99,7 +104,8 @@ describe("Test flow", () => {
     container.querySelector<HTMLButtonElement>("#test-btn")!.click();
     await flush();
     expect(mockRunBatchAI).toHaveBeenCalledWith(
-      expect.objectContaining({ rowRange: { start: 2, end: 5 } }),
+      expect.objectContaining({ rowRange: { start: 2, end: 4 } }),
+      expect.any(String),
     );
   });
 
@@ -151,6 +157,7 @@ describe("Cook flow", () => {
     await flush();
     expect(mockRunBatchAI).toHaveBeenCalledWith(
       expect.objectContaining({ rowRange: { start: 2, end: 50 } }),
+      expect.any(String),
     );
   });
 

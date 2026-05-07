@@ -6,6 +6,10 @@ jest.mock("../../src/client/services", () => ({
   runBatchAI: jest.fn(),
 }));
 
+jest.mock("../../src/client/job-store", () => ({
+  jobStore: { dispatch: jest.fn() },
+}));
+
 jest.mock("../../src/client/panels/recipe", () => ({
   buildRunTemplate: jest.fn().mockReturnValue({
     promptCols: [{ col: "Drive Link", kind: "file" }],
@@ -251,14 +255,15 @@ describe("Step 3 buttons", () => {
     void nav;
   }
 
-  it("Test calls runBatchAI with only the first data row", async () => {
+  it("Test calls runBatchAI with the first 5 data rows", async () => {
     mockRunBatchAI.mockResolvedValue(undefined);
     const { container, nav } = mount();
     await fullyPrepped(container, nav);
     container.querySelector<HTMLButtonElement>("#test-btn")!.click();
     await flush();
     expect(mockRunBatchAI).toHaveBeenCalledWith(
-      expect.objectContaining({ rowRange: { start: 2, end: 2 } }),
+      expect.objectContaining({ rowRange: { start: 2, end: 6 } }),
+      expect.any(String),
     );
   });
 
@@ -270,6 +275,7 @@ describe("Step 3 buttons", () => {
     await flush();
     expect(mockRunBatchAI).toHaveBeenCalledWith(
       expect.objectContaining({ rowRange: { start: 2, end: 11 } }),
+      expect.any(String),
     );
   });
 

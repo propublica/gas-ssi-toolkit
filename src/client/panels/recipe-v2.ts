@@ -2,6 +2,7 @@ import type { NavigationContext, Panel, RecipeDefinition } from "../types";
 import type { PrepRecipeParams, RunConfig } from "../../shared/types";
 import { prepRecipe, runBatchAI } from "../services";
 import { buildRunTemplate } from "./recipe";
+import { jobStore } from "../job-store";
 
 type V2State = "idle" | "testing" | "cooking";
 
@@ -60,8 +61,8 @@ export class RecipeV2Panel implements Panel<
     const cookBtn = container.querySelector<HTMLButtonElement>("#cook-btn")!;
     testBtn.disabled = false;
     cookBtn.disabled = false;
-    testBtn.textContent = "Test ▸ first 10 rows";
-    cookBtn.textContent = "Cook ▸ All rows";
+    testBtn.textContent = "1. Test ▸ 5 rows";
+    cookBtn.textContent = "2. Cook ▸ All rows";
     if (this.v2State === "testing") {
       testBtn.disabled = true;
       testBtn.innerHTML = `<span class="btn-spinner"></span>Testing…`;
@@ -112,10 +113,13 @@ export class RecipeV2Panel implements Panel<
           ...this.definition?.settings,
           rowRange: {
             start: result.rowRange.start,
-            end: Math.min(result.rowRange.start + 9, result.rowRange.end),
+            end: Math.min(result.rowRange.start + 4, result.rowRange.end),
           },
         } as RunConfig;
-        return runBatchAI(config);
+        const jobId = `batch-ai-${Date.now()}`;
+        const runPromise = runBatchAI(config, jobId);
+        jobStore.dispatch(jobId, "Testing 5 rows…", runPromise);
+        return runPromise;
       })
       .then(finish)
       .catch((err: Error) => {
@@ -146,7 +150,10 @@ export class RecipeV2Panel implements Panel<
           ...this.definition?.settings,
           rowRange: result.rowRange,
         } as RunConfig;
-        return runBatchAI(config);
+        const jobId = `batch-ai-${Date.now()}`;
+        const runPromise = runBatchAI(config, jobId);
+        jobStore.dispatch(jobId, "Running AI…", runPromise);
+        return runPromise;
       })
       .then(finish)
       .catch((err: Error) => {
@@ -179,13 +186,15 @@ export class RecipeV2Panel implements Panel<
       </div>
       ${introHtml}
       ${inputsHtml}
-      <div class="panel-buttons">
-        <button id="test-btn" class="btn-outline">Test ▸ first 10 rows</button>
-        <button id="cook-btn" class="btn-run">Cook ▸ All rows</button>
-      </div>
-      <p class="field-helper">
-        <strong>Test</strong> — sets up columns and runs the AI on the first 10 rows so you can check quality before committing.
-        <strong>Cook</strong> — sets up columns and runs the AI on every file in the folder. Keep the sidebar open.
-      </p>`;
+      <div class="recipe-action-stack">
+        <div class="recipe-action-item">
+          <button id="test-btn" class="btn-outline">1. Test ▸ 5 rows</button>
+          <p class="field-helper">Sets up columns and runs the AI on the first 5 rows so you can check quality before committing.</p>
+        </div>
+        <div class="recipe-action-item">
+          <button id="cook-btn" class="btn-run">2. Cook ▸ All rows</button>
+          <p class="field-helper">Sets up columns and runs the AI on every file in the folder. Keep the sidebar open.</p>
+        </div>
+      </div>`;
   }
 }
