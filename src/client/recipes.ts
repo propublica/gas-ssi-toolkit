@@ -3,7 +3,7 @@ import type { RecipeDefinition } from "./types";
 export const RECIPES: RecipeDefinition[] = [
   {
     id: "document-summarization",
-    name: "Document Summarization",
+    name: "Document Summarization (V0)",
     icon: "📄",
     description: "Summarize files in a Google Drive folder",
     intro:
