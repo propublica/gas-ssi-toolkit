@@ -61,6 +61,7 @@ export const RECIPES: RecipeDefinition[] = [
         role: "output",
       },
     ],
+    settings: { applyMarkdown: true },
   },
   {
     id: "document-summarization-v1",
@@ -124,6 +125,7 @@ export const RECIPES: RecipeDefinition[] = [
         role: "output",
       },
     ],
+    settings: { applyMarkdown: true },
   },
   {
     id: "document-summarization-v2",
@@ -187,6 +189,7 @@ export const RECIPES: RecipeDefinition[] = [
         role: "output",
       },
     ],
+    settings: { applyMarkdown: true },
   },
   {
     id: "document-summarization-v3",
@@ -250,5 +253,6 @@ export const RECIPES: RecipeDefinition[] = [
         role: "output",
       },
     ],
+    settings: { applyMarkdown: true },
   },
 ];
