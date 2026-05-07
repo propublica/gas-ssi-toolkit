@@ -79,9 +79,28 @@ export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
   }
 
   private applyLockState(container: HTMLElement): void {
-    const step2Section = container.querySelector<HTMLElement>("[data-step='2']");
-    const step3Section = container.querySelector<HTMLElement>("[data-step='3']");
+    // Update step state badges and data attributes
+    const step1El = container.querySelector<HTMLElement>("[data-step='1']");
+    const step2El = container.querySelector<HTMLElement>("[data-step='2']");
+    const step3El = container.querySelector<HTMLElement>("[data-step='3']");
+    const step1Badge = container.querySelector<HTMLElement>("#step1-badge");
+    const step2Badge = container.querySelector<HTMLElement>("#step2-badge");
 
+    if (step1El) step1El.dataset.stepState = this.step1Complete ? "complete" : "active";
+    if (step1Badge) step1Badge.textContent = this.step1Complete ? "✓" : "1";
+
+    if (step2El)
+      step2El.dataset.stepState = !this.step1Complete
+        ? "locked"
+        : this.step2Complete
+          ? "complete"
+          : "active";
+    if (step2Badge) step2Badge.textContent = this.step2Complete ? "✓" : "2";
+
+    if (step3El) step3El.dataset.stepState = this.step3Unlocked ? "active" : "locked";
+
+    // Step 2 inputs/button disabled state
+    const step2Section = container.querySelector<HTMLElement>("[data-step='2']");
     if (step2Section) {
       const locked = !this.step1Complete;
       step2Section
@@ -89,10 +108,10 @@ export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
         .forEach((el) => {
           el.disabled = locked;
         });
-      const lock = step2Section.querySelector<HTMLElement>(".v3-lock");
-      if (lock) lock.hidden = !locked;
     }
 
+    // Step 3 buttons
+    const step3Section = container.querySelector<HTMLElement>("[data-step='3']");
     if (step3Section) {
       const locked = !this.step3Unlocked;
       const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
@@ -119,8 +138,6 @@ export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
         cookBtn.innerHTML = `<span class="btn-spinner"></span><span class="recipe-btn-main">Cooking…</span>`;
         configBtn.disabled = true;
       }
-      const lock = step3Section.querySelector<HTMLElement>(".v3-lock");
-      if (lock) lock.hidden = !locked;
     }
   }
 
@@ -330,35 +347,52 @@ export class RecipeV3Panel implements Panel<RecipeDefinition, never> {
         <span class="panel-title">${title}</span>
       </div>
       ${introHtml}
-      <div data-step="1" class="v3-step">
-        <p class="v3-step-label"><strong>Step 1: Import your documents</strong></p>
-        <p class="field-helper">Import files from a Drive folder into your spreadsheet. Each file gets its own row.</p>
-        ${step1Inputs}
-        <button id="step1-btn" class="btn-outline">Import Files</button>
-        <p id="step1-status" class="field-helper" hidden></p>
+      <div data-step="1" class="v3-step" data-step-state="active">
+        <div class="v3-step-left">
+          <div class="v3-step-badge" id="step1-badge">1</div>
+          <div class="v3-step-connector"></div>
+        </div>
+        <div class="v3-step-content">
+          <p class="v3-step-label"><strong>Import your documents</strong></p>
+          <p class="field-helper">Import files from a Drive folder into your spreadsheet. Each file gets its own row.</p>
+          ${step1Inputs}
+          <button id="step1-btn" class="btn-outline">Import Files</button>
+          <p id="step1-status" class="field-helper" hidden></p>
+        </div>
       </div>
-      <div data-step="2" class="v3-step">
-        <p class="v3-step-label"><strong>Step 2: Set up your prompt</strong> <span class="v3-lock">🔒</span></p>
-        <p class="field-helper">Configure how the AI should read and summarize your documents.</p>
-        ${step2Inputs}
-        <button id="step2-btn" class="btn-outline">Import Prompt</button>
-        <p id="step2-status" class="field-helper" hidden></p>
+      <div data-step="2" class="v3-step" data-step-state="locked">
+        <div class="v3-step-left">
+          <div class="v3-step-badge" id="step2-badge">2</div>
+          <div class="v3-step-connector"></div>
+        </div>
+        <div class="v3-step-content">
+          <p class="v3-step-label"><strong>Set up your prompt</strong></p>
+          <p class="field-helper">Configure how the AI should read and summarize your documents.</p>
+          ${step2Inputs}
+          <button id="step2-btn" class="btn-outline">Import Prompt</button>
+          <p id="step2-status" class="field-helper" hidden></p>
+        </div>
       </div>
-      <div data-step="3" class="v3-step">
-        <p class="v3-step-label"><strong>Step 3: Run</strong> <span class="v3-lock">🔒</span></p>
-        <div class="recipe-action-stack">
-          <button id="test-btn" class="btn-outline recipe-action-btn">
-            <span class="recipe-btn-main">1. Test</span>
-            <span class="recipe-btn-sub">Check quality on the first 5 rows</span>
-          </button>
-          <button id="cook-btn" class="btn-run recipe-action-btn">
-            <span class="recipe-btn-main">2. Cook</span>
-            <span class="recipe-btn-sub">Process all imported files</span>
-          </button>
-          <button id="configure-btn" class="btn-outline recipe-action-btn">
-            <span class="recipe-btn-main">Configure AI</span>
-            <span class="recipe-btn-sub">Review or adjust settings before running</span>
-          </button>
+      <div data-step="3" class="v3-step" data-step-state="locked">
+        <div class="v3-step-left">
+          <div class="v3-step-badge">3</div>
+        </div>
+        <div class="v3-step-content">
+          <p class="v3-step-label"><strong>Run</strong></p>
+          <div class="recipe-action-stack">
+            <button id="test-btn" class="btn-outline recipe-action-btn">
+              <span class="recipe-btn-main">1. Test</span>
+              <span class="recipe-btn-sub">Check quality on the first 5 rows</span>
+            </button>
+            <button id="cook-btn" class="btn-run recipe-action-btn">
+              <span class="recipe-btn-main">2. Cook</span>
+              <span class="recipe-btn-sub">Process all imported files</span>
+            </button>
+            <button id="configure-btn" class="btn-outline recipe-action-btn">
+              <span class="recipe-btn-main">Configure AI</span>
+              <span class="recipe-btn-sub">Review or adjust settings before running</span>
+            </button>
+          </div>
         </div>
       </div>`;
   }
