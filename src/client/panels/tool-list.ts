@@ -16,7 +16,7 @@ export class ToolListPanel implements Panel {
   private wireEvents(container: HTMLElement, nav: NavigationContext): void {
     const documentSummarization = RECIPES.find((r) => r.id === "document-summarization");
     container.querySelector("#btn-document-summarization")?.addEventListener("click", () => {
-      nav.navigate("recipe", documentSummarization);
+      if (documentSummarization) nav.navigate("recipe", documentSummarization);
     });
     container.querySelector("#btn-run-ai")?.addEventListener("click", () => {
       nav.navigate("configure-ai-run");
@@ -35,7 +35,10 @@ export class ToolListPanel implements Panel {
   private dispatchTool(e: MouseEvent, fn: string): void {
     const btn = e.currentTarget as HTMLButtonElement;
     const jobId = `${fn}-${Date.now()}`;
-    const label = btn.textContent?.trim() ?? fn;
+    const label =
+      btn
+        .querySelector<HTMLSpanElement>(".tool-btn-text > span:first-child")
+        ?.textContent?.trim() ?? fn;
     jobStore
       .dispatch(jobId, label, runTool(fn, jobId))
       .catch((err: Error) => globalThis.alert("Error: " + err.message));
