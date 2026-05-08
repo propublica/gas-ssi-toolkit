@@ -40,6 +40,13 @@
 
         .section { margin-bottom: 28px; }
 
+        .home-prompt {
+            font-size: var(--font-size-300);
+            font-style: italic;
+            color: var(--text-secondary);
+            margin: 0 0 16px 4px;
+        }
+
         h3 {
             font-size: var(--font-size-100);
             font-style: italic;
