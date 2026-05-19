@@ -264,7 +264,15 @@ The proxy MITM-inspects TLS using a trusted CA (`Docker Sandboxes Proxy CA` is i
 
 **Why `gh` CLI doesn't work here (even though it uses the REST API):** `gh` fails at the network layer, not the auth layer. The sandbox routes all traffic through an HTTP proxy at `localhost:3128`. curl (libcurl) successfully tunnels through it; `gh`'s Go `net/http` client fails to establish the CONNECT tunnel and reports "error connecting to localhost." The proxy's credential injection only fires once the tunnel is up — `gh` never gets that far. (`gh auth status` has a separate, earlier failure: it validates `GH_TOKEN` locally and rejects the sentinel before making any network call.)
 
-**Why `git push`/`git pull` work fine:** Git uses libcurl for HTTPS transport — the same library curl uses — so it tunnels through the proxy correctly and gets credentials injected transparently. No `git config credential.*` setup is needed. If `git push` does fail with `fatal: could not read Username`, it means the sandbox secret hasn't been set on the host yet. Fix by running on the host:
+**Why `git push`/`git pull` work fine (HTTPS remotes only):** Git uses libcurl for HTTPS transport — the same library curl uses — so it tunnels through the proxy correctly and gets credentials injected transparently. No `git config credential.*` setup is needed. Make sure your remote uses HTTPS, not SSH:
+
+```bash
+git remote set-url origin https://github.com/propublica/gas-ssi-toolkit.git
+```
+
+SSH remotes (`git@github.com:...`) require additional host-side setup (SSH agent forwarding + network policy changes) and don't work out of the box — see the [Docker Sandbox credentials docs](https://docs.docker.com/ai/sandboxes/security/credentials/#ssh-agent).
+
+If `git push` does fail with `fatal: could not read Username`, it means the sandbox secret hasn't been set on the host yet. Fix by running on the host:
 
 ```bash
 sbx secret set <sandbox-name> github -t "$(gh auth token)"
