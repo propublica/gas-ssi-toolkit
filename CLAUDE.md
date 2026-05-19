@@ -254,14 +254,38 @@ The Gemini API key must be set as a Script Property (`GEMINI_API_KEY`) in Apps S
 
 ## GitHub
 
-### Creating PRs
+### Docker Sandbox authentication
 
-The `gh` CLI may fail with a TLS certificate error (`OSStatus -26276`) on this machine. Use the GitHub API directly via curl instead:
+> Non-sandbox setups (local dev, direct `gh` auth) can use `gh pr create`, `gh` CLI, or any standard approach and can skip this section.
+
+The sandbox proxy intercepts outbound requests to `api.github.com` and `github.com` and injects the real GitHub token at the network level — the actual credential never enters the sandbox. `GH_TOKEN` inside the sandbox holds a sentinel placeholder (`gho_sbxproxymanaged...`), not the real token, which is why `gh auth status` reports "The token in GH_TOKEN is invalid." That's expected and doesn't affect git or curl operations.
+
+The proxy MITM-inspects TLS using a trusted CA (`Docker Sandboxes Proxy CA` is in the system cert store), so no `-k` flag is needed for curl calls to GitHub.
+
+**Why `gh` CLI doesn't work here (even though it uses the REST API):** `gh` fails at the network layer, not the auth layer. The sandbox routes all traffic through an HTTP proxy at `localhost:3128`. curl (libcurl) successfully tunnels through it; `gh`'s Go `net/http` client fails to establish the CONNECT tunnel and reports "error connecting to localhost." The proxy's credential injection only fires once the tunnel is up — `gh` never gets that far. (`gh auth status` has a separate, earlier failure: it validates `GH_TOKEN` locally and rejects the sentinel before making any network call.)
+
+**Why `git push`/`git pull` work fine (HTTPS remotes only):** Git uses libcurl for HTTPS transport — the same library curl uses — so it tunnels through the proxy correctly and gets credentials injected transparently. No `git config credential.*` setup is needed. Make sure your remote uses HTTPS, not SSH:
 
 ```bash
-TOKEN=$(gh auth token)
-curl -s -k -X POST \
-  -H "Authorization: token $TOKEN" \
+git remote set-url origin https://github.com/propublica/gas-ssi-toolkit.git
+```
+
+SSH remotes (`git@github.com:...`) require additional host-side setup (SSH agent forwarding + network policy changes) and don't work out of the box — see the [Docker Sandbox credentials docs](https://docs.docker.com/ai/sandboxes/security/credentials/#ssh-agent).
+
+If `git push` does fail with `fatal: could not read Username`, it means the sandbox secret hasn't been set on the host yet. Fix by running on the host:
+
+```bash
+sbx secret set <sandbox-name> github -t "$(gh auth token)"
+```
+
+where `<sandbox-name>` is the value of `$SANDBOX_VM_ID` inside the sandbox.
+
+### Creating PRs
+
+Use curl without an Authorization header — the proxy injects credentials automatically:
+
+```bash
+curl -s -X POST \
   -H "Accept: application/vnd.github.v3+json" \
   https://api.github.com/repos/propublica/gas-ssi-toolkit/pulls \
   -d "{
@@ -272,7 +296,7 @@ curl -s -k -X POST \
   }" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('html_url') or d)"
 ```
 
-PRs target `develop` by default; use `"base": "main"` for hotfixes. The `-k` flag skips TLS verification (safe for GitHub's well-known API).
+PRs target `develop` by default; use `"base": "main"` for hotfixes.
 
 ## Code Style
 

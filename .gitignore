@@ -9,8 +9,19 @@ coverage/
 .clasprc.json
 
 # IDE
-.vscode/
-.idea/
+.vscode
+.idea
+
+# Docker Sandbox environment artifacts (dotfiles written to project root by sandbox init)
+.bash_profile
+.bashrc
+.zshrc
+.zprofile
+.profile
+.gitconfig
+.gitmodules
+.mcp.json
+.ripgreprc
 
 # OS
 .DS_Store
