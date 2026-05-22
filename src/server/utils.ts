@@ -178,3 +178,24 @@ export function writeColumn(
     range.setWrapStrategy(wrapStrategy);
   }
 }
+
+/**
+ * Protect the output column header and data rows during an AI run.
+ * Returns both Protection objects so the caller can remove them in a finally block.
+ * Two separate ranges are used because the header (row 1) and data rows are
+ * non-contiguous when startRow > 2.
+ */
+export function protectAIOutputRange(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  colIdx: number,
+  startRow: number,
+  numRows: number,
+): GoogleAppsScript.Spreadsheet.Protection[] {
+  const desc = "AI run in progress — please wait";
+  const headerProtection = sheet.getRange(1, colIdx).protect().setDescription(desc);
+  const dataProtection = sheet
+    .getRange(startRow, colIdx, numRows, 1)
+    .protect()
+    .setDescription(desc);
+  return [headerProtection, dataProtection];
+}
