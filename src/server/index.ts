@@ -363,8 +363,9 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
     })),
   );
 
-  const protections = protectAIOutputRange(sheet, outputIdx + 1, startRow, numRows);
+  let protections: GoogleAppsScript.Spreadsheet.Protection[] = [];
   try {
+    protections = protectAIOutputRange(sheet, outputIdx + 1, startRow, numRows);
     // Wave 1 — file work (multimodal chunks only)
     const fileUriMap = new Map<string, { uri: string; mimeType: string }>();
     let fileErrors = new Map<string, string>();
