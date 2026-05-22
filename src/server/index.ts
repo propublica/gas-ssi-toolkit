@@ -477,6 +477,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
     if (requests.length === 0 && directWrites.size === 0) {
       SpreadsheetApp.getActive().toast("No rows to process.", "Info", 5);
+      SpreadsheetApp.flush();
       return;
     }
 

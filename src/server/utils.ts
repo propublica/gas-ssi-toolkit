@@ -181,6 +181,7 @@ export function writeColumn(
 
 /**
  * Two separate ranges because the header (row 1) and data rows are non-contiguous when startRow > 2.
+ * Returns both Protection objects for cleanup in a finally block.
  */
 export function protectAIOutputRange(
   sheet: GoogleAppsScript.Spreadsheet.Sheet,
@@ -197,6 +198,9 @@ export function protectAIOutputRange(
   return [headerProtection, dataProtection];
 }
 
+/**
+ * Idempotent — re-applied on each chunk; header colour and note content never change between calls.
+ */
 export function markAIOutputRange(
   sheet: GoogleAppsScript.Spreadsheet.Sheet,
   colIdx: number,
