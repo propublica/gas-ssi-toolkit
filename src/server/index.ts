@@ -52,8 +52,8 @@ import type { DriveFileInfo, PromptInput, GeminiRequest } from "./types";
 
 export function onOpen(): void {
   SpreadsheetApp.getUi()
-    .createMenu("⚡ SSI Toolkit")
-    .addItem("🚀 Open SSI Toolkit", "showSidebar")
+    .createMenu("📐 SSI Toolkit")
+    .addItem("📐 Open SSI Toolkit", "showSidebar")
     .addToUi();
 }
 
