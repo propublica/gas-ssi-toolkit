@@ -180,10 +180,7 @@ export function writeColumn(
 }
 
 /**
- * Protect the output column header and data rows during an AI run.
- * Returns both Protection objects so the caller can remove them in a finally block.
- * Two separate ranges are used because the header (row 1) and data rows are
- * non-contiguous when startRow > 2.
+ * Two separate ranges because the header (row 1) and data rows are non-contiguous when startRow > 2.
  */
 export function protectAIOutputRange(
   sheet: GoogleAppsScript.Spreadsheet.Sheet,
