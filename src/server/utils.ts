@@ -180,25 +180,6 @@ export function writeColumn(
 }
 
 /**
- * Two separate ranges because the header (row 1) and data rows are non-contiguous when startRow > 2.
- * Returns both Protection objects for cleanup in a finally block.
- */
-export function protectAIOutputRange(
-  sheet: GoogleAppsScript.Spreadsheet.Sheet,
-  colIdx: number,
-  startRow: number,
-  numRows: number,
-): GoogleAppsScript.Spreadsheet.Protection[] {
-  const desc = "AI run in progress — please wait";
-  const headerProtection = sheet.getRange(1, colIdx).protect().setDescription(desc);
-  const dataProtection = sheet
-    .getRange(startRow, colIdx, numRows, 1)
-    .protect()
-    .setDescription(desc);
-  return [headerProtection, dataProtection];
-}
-
-/**
  * Idempotent — re-applied on each chunk; header colour and note content never change between calls.
  */
 export function markAIOutputRange(
