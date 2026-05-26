@@ -64,7 +64,7 @@ export class ToolListPanel implements Panel {
       </div>
       <div class="status-footer">
         <strong>SSI Tools v2.1</strong><br>
-        Powered by Gemini 3.1 Flash Lite Preview<br>
+        Powered by Gemini 3.1 Flash Lite<br>
         Evaluation Unrestricted Mode
       </div>
     `;
