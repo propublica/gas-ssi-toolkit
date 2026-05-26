@@ -28,7 +28,7 @@ describe("markAIOutputRange", () => {
     expect(mockSheet.getRange).toHaveBeenNthCalledWith(1, 1, 3);
     expect(headerRange.setBackground).toHaveBeenCalledWith("#F9AB00");
     expect(headerRange.setNote).toHaveBeenCalledWith(
-      "AI-generated — exercise good judgement when using",
+      "Some cells in this column may be AI-generated — exercise good judgement when using",
     );
 
     expect(mockSheet.getRange).toHaveBeenNthCalledWith(2, 5, 3, 10, 1);

@@ -209,6 +209,8 @@ export function markAIOutputRange(
 ): void {
   const header = sheet.getRange(1, colIdx);
   header.setBackground("#F9AB00");
-  header.setNote("AI-generated — exercise good judgement when using");
+  header.setNote(
+    "Some cells in this column may be AI-generated — exercise good judgement when using",
+  );
   sheet.getRange(startRow, colIdx, numRows, 1).setBackground("#FFF8E1");
 }
