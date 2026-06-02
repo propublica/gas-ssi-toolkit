@@ -316,10 +316,7 @@ Read `.github/PULL_REQUEST_TEMPLATE.md` to get the section structure. Assemble t
 
 - **Manual QA — two parts in this order:**
   1. *Feature-specific steps* — numbered steps a human can follow to manually verify this PR's specific changes. Write from the diff. Be concrete (name the menu item, the sidebar panel, the column, etc.).
-  2. *Regression checklist* — paste the 7-item checklist from the template verbatim. For PRs targeting `develop`, prepend:
-     ```
-     > Targeting `develop` — mark regression items N/A unless you're able to test end-to-end.
-     ```
+  2. *Regression checklist* — paste the regression checklist from the template verbatim (the template already includes a note about N/A for `develop`-targeting PRs; do not add a second one).
 
 - **Notes:** Fill in only if a reviewer needs specific information (migration steps, known limitations, deploy dependencies). Otherwise leave the HTML comment placeholder from the template unchanged.
 
