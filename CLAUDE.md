@@ -290,7 +290,7 @@ AI-{issue-number}-short-description
 
 Examples: `AI-42-add-token-input`, `AI-107-fix-recipe-prep-crash`
 
-Linear's GitHub integration auto-detects branches with the issue ID pattern and links them to the issue on the Linear side. This is a public repo — no Linear URLs go in PR bodies.
+Linear's GitHub integration auto-detects branches with the issue ID pattern and links them to the issue on the Linear side. This is a public repo — no Linear URLs go in PR bodies. The branch name alone is sufficient to trigger the integration; no additional issue reference is needed in the PR body.
 
 **When creating a new branch:** Ask for the Linear issue ID if none is evident from context. Suggest the `AI-{n}-description` name before running `git checkout -b`.
 
