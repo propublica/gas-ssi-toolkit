@@ -315,7 +315,7 @@ Read `.github/PULL_REQUEST_TEMPLATE.md` to get the section structure. Assemble t
 - **Summary:** 2–4 bullets from `git log <base>..HEAD --oneline` and `git diff <base>..HEAD`. Focus on motivation and impact — not just a restatement of commit titles. Use `develop` as `<base>` for PRs targeting develop, `main` for PRs targeting main.
 
 - **Manual QA — two parts in this order:**
-  1. *Feature-specific steps* — numbered steps a human can follow to manually verify this PR's specific changes. Write from the diff. Be concrete (name the menu item, the sidebar panel, the column, etc.).
+  1. *Feature-specific steps* — add numbered steps above the regression checklist items (not under a separate heading) that a human can follow to manually verify this PR's specific changes. Write from the diff. Be concrete (name the menu item, the sidebar panel, the column, etc.).
   2. *Regression checklist* — paste the regression checklist from the template verbatim (the template already includes a note about N/A for `develop`-targeting PRs; do not add a second one).
 
 - **Notes:** Fill in only if a reviewer needs specific information (migration steps, known limitations, deploy dependencies). Otherwise leave the HTML comment placeholder from the template unchanged.
