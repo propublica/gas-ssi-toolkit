@@ -280,6 +280,26 @@ sbx secret set <sandbox-name> github -t "$(gh auth token)"
 
 where `<sandbox-name>` is the value of `$SANDBOX_VM_ID` inside the sandbox.
 
+### Branch Naming
+
+All feature and fix branches must follow this format:
+
+```
+AI-{issue-number}-short-description
+```
+
+Examples: `AI-42-add-token-input`, `AI-107-fix-recipe-prep-crash`
+
+Linear's GitHub integration auto-detects branches with the issue ID pattern and links them to the issue on the Linear side. This is a public repo — no Linear URLs go in PR bodies.
+
+**When creating a new branch:** Ask for the Linear issue ID if none is evident from context. Suggest the `AI-{n}-description` name before running `git checkout -b`.
+
+**When creating a PR:** Check the branch name against `AI-\d+`. If absent, pause and say:
+
+> "This branch name doesn't contain a Linear issue ID (`AI-123-...`). Is there an associated Linear issue? If not, say 'no issue' to proceed."
+
+Wait for confirmation before creating the PR.
+
 ### Creating PRs
 
 Use curl without an Authorization header — the proxy injects credentials automatically:
