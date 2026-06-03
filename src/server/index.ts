@@ -369,6 +369,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
   if (hasFileInputs) {
     const oauthToken = ScriptApp.getOAuthToken();
 
+    // Collect unique Drive file IDs across all rows in this chunk
     const allFileIds = new Set<string>();
     for (const inputs of allPromptInputs) {
       for (const input of inputs) {
@@ -390,11 +391,18 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
       }
       const { metadata, errors: metadataErrors } = fetchDriveMetadata(fileIds, oauthToken);
 
+      // Only attempt to download files whose metadata was successfully fetched
       const downloadIds = fileIds.filter((id) => metadata.has(id));
 
+      // Translate Drive native MIME types to exported MIME types.
+      // downloadDriveFiles exports Docs as PDF and Sheets as CSV.
       const DOCS_DRIVE_MIME = "application/vnd.google-apps.document";
       const SHEETS_DRIVE_MIME = "application/vnd.google-apps.spreadsheet";
 
+      // Process files in sub-batches: download → upload → clear → next sub-batch.
+      // Peak memory is bounded to FILE_PIPELINE_BATCH_SIZE files at a time rather
+      // than all files in the chunk, preventing JS runtime crashes from the
+      // Uint8Array→Byte[] expansion that UrlFetchApp payloads require (~8× overhead).
       const allDownloadErrors = new Map<string, string>();
       const allUploadErrors = new Map<string, string>();
       for (let bStart = 0; bStart < downloadIds.length; bStart += FILE_PIPELINE_BATCH_SIZE) {
@@ -427,7 +435,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
           batchMimeTypes,
           apiKey,
         );
-        batchBytes.clear();
+        batchBytes.clear(); // release immediately — only one sub-batch in memory at a time
         for (const [id, info] of batchUploads) fileUriMap.set(id, info);
         for (const [id, err] of batchUploadErrors) allUploadErrors.set(id, err);
       }
@@ -444,9 +452,13 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
   const requests: GeminiRequest[] = [];
   const rowIndices: number[] = [];
+  // File-error rows are deferred here and written in the same post-batch loop as
+  // inference results, so the entire chunk lands in a single SpreadsheetApp.flush().
   const directWrites = new Map<number, string>();
 
   for (let i = 0; i < allPromptInputs.length; i++) {
+    // If any file input for this row failed to fetch/download/upload, defer an
+    // error string for the post-batch write loop and skip inference.
     if (fileErrors.size > 0) {
       const failedIds = allPromptInputs[i]
         .filter((inp) => inp.kind === "file")
@@ -479,6 +491,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
   const results = requests.length > 0 ? callGeminiAPIBatch(requests) : [];
 
+  // Write all results and file errors in a single batch — one flush at end of chunk.
   for (let j = 0; j < results.length; j++) {
     const i = rowIndices[j];
     const realRowIndex = startRow + i;
