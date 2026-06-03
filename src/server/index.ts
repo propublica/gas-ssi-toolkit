@@ -35,6 +35,7 @@ import {
   writeJobProgress,
   interpolateTemplate,
   flattenArg,
+  markAIOutputRange,
 } from "./utils";
 import { CONFIG } from "./config";
 import type {
@@ -484,6 +485,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
   if (requests.length === 0 && directWrites.size === 0) {
     SpreadsheetApp.getActive().toast("No rows to process.", "Info", 5);
+    SpreadsheetApp.flush();
     return;
   }
 
@@ -522,6 +524,8 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
   }
 
   SpreadsheetApp.flush();
+  markAIOutputRange(sheet, outputIdx + 1, startRow, numRows);
+
   const successCount = results.filter((r) => !r.text.startsWith("Error:")).length;
   const errorCount = results.length - successCount + directWrites.size;
   SpreadsheetApp.getActive().toast(

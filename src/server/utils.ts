@@ -178,3 +178,20 @@ export function writeColumn(
     range.setWrapStrategy(wrapStrategy);
   }
 }
+
+/**
+ * Idempotent — re-applied on each chunk; header colour and note content never change between calls.
+ */
+export function markAIOutputRange(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  colIdx: number,
+  startRow: number,
+  numRows: number,
+): void {
+  const header = sheet.getRange(1, colIdx);
+  header.setBackground("#F9AB00");
+  header.setNote(
+    "Some cells in this column may be AI-generated — exercise good judgement when using",
+  );
+  sheet.getRange(startRow, colIdx, numRows, 1).setBackground("#FFF8E1");
+}
