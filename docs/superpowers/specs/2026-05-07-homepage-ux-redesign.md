@@ -24,7 +24,7 @@ I want to...
    For FOIA drops, court filings, doc sets
 
 ▶  Run AI across my spreadsheet
-   Prompts, data, tools — totally freeform
+   Your prompts, your data, your tools — totally freeform
 
 📂 Import files from a Drive folder
    Track progress through doc dumps
