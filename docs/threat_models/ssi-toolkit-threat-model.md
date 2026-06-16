@@ -251,6 +251,17 @@ First draft — not yet formally reviewed by the security team.
 | Low | Open | — | User-facing data notice | Write guidance for journalists covering data sent to Gemini, prompt injection risk, and `url_context` egress (R3, R11, R13) |
 | Low | Open | — | GCP budget alerts and quota caps | Configure spend alerts and per-key daily quotas in Google Cloud Console (R16, R17) |
 
+### Planned Threat Models
+
+Two additional threat models are scoped for future sessions:
+
+| Document | Perspective | Focus |
+| --- | --- | --- |
+| `journalist-threat-model.md` | Journalist / user | Threats to the reporting process — source exposure via AI inference, data leakage in workflow, AI-generated errors affecting published work |
+| `source-threat-model.md` | Source | Threats to a source's identity — information that could identify a source via AI inference, Drive file metadata, prompt logs, Gemini data retention |
+
+These cover the *human* security surface. The current document covers the *tool's* security surface.
+
 ### Notes
 
 This is a living document. Threats and mitigations should be revisited when:
