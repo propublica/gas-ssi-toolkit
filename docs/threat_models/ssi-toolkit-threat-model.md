@@ -257,8 +257,8 @@ Two additional threat models are scoped for future sessions:
 
 | Document | Perspective | Focus |
 | --- | --- | --- |
-| `journalist-threat-model.md` | Journalist / user | Threats to the reporting process — source exposure via AI inference, data leakage in workflow, AI-generated errors affecting published work |
-| `source-threat-model.md` | Source | Threats to a source's identity — information that could identify a source via AI inference, Drive file metadata, prompt logs, Gemini data retention |
+| `ssi-toolkit-threat-model-journalist.md` | Journalist / user | Threats to the reporting process — source exposure via AI inference, data leakage in workflow, AI-generated errors affecting published work |
+| `ssi-toolkit-threat-model-source.md` | Source | Threats to a source's identity — information that could identify a source via AI inference, Drive file metadata, prompt logs, Gemini data retention |
 
 These cover the *human* security surface. The current document covers the *tool's* security surface.
 
