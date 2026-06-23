@@ -269,27 +269,24 @@ export function formatMarkdownSelection(): void {
     ui.alert("Select one or more cells first.");
     return;
   }
-  try {
-    const values = range.getValues() as unknown[][];
-    let count = 0;
-    for (let r = 0; r < values.length; r++) {
-      for (let c = 0; c < values[r].length; c++) {
-        const value = values[r][c];
-        if (typeof value !== "string" || value.trim() === "") continue;
-        const cell = range.getCell(r + 1, c + 1);
-        const content = parseMarkdown(value);
-        try {
-          cell.setRichTextValue(toCellValue(content));
-        } catch (_e) {
-          cell.setValue(content.text);
-        }
+  const values = range.getValues() as unknown[][];
+  const existingRichText = range.getRichTextValues();
+  let count = 0;
+  const grid = existingRichText.map((row, r) =>
+    row.map((existing, c) => {
+      const value = values[r][c];
+      if (typeof value !== "string" || value.trim() === "") return existing;
+      try {
+        const richText = toCellValue(parseMarkdown(value));
         count++;
+        return richText;
+      } catch (_e) {
+        return existing;
       }
-    }
-    ui.alert(`Formatted ${count} cell(s).`);
-  } catch (e) {
-    ui.alert(`Error: ${(e as Error).message}`);
-  }
+    }),
+  ) as GoogleAppsScript.Spreadsheet.RichTextValue[][];
+  range.setRichTextValues(grid);
+  ui.alert(`Formatted ${count} cell(s).`);
 }
 
 // Max files to download + upload per sub-batch in Wave 1.
