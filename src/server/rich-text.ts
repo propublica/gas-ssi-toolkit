@@ -188,7 +188,7 @@ export function parseMarkdown(text: string): CellContent {
 
     if (isHeading) {
       const fontSize =
-        headingDepth === 1 ? 18 : headingDepth === 2 ? 16 : headingDepth === 3 ? 14 : undefined;
+        headingDepth === 1 ? 14 : headingDepth === 2 ? 13 : headingDepth === 3 ? 12 : undefined;
       const range: TextRange = { startIndex: spanStart, endIndex: cleanLen, bold: true };
       if (fontSize !== undefined) range.fontSize = fontSize;
       ranges.push(range);

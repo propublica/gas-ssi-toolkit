@@ -29,7 +29,16 @@ export class ToolListPanel implements Panel {
       nav.navigate("extract-text");
     });
     container.querySelector("#btn-format-markdown")?.addEventListener("click", () => {
-      formatMarkdownSelection().catch((err: Error) => globalThis.alert("Error: " + err.message));
+      const btn = container.querySelector<HTMLButtonElement>("#btn-format-markdown")!;
+      const originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="icon">📝</span> Formatting...';
+      formatMarkdownSelection()
+        .catch((err: Error) => globalThis.alert("Error: " + err.message))
+        .finally(() => {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        });
     });
   }
 

@@ -59,7 +59,7 @@ describe("buildRichInferenceCellContent", () => {
       makeResponse({ text: "## Section Title\nBody text." }),
     );
     expect(result.text).toBe("Section Title\nBody text.");
-    expect(result.ranges[0]).toEqual({ startIndex: 0, endIndex: 13, bold: true, fontSize: 16 });
+    expect(result.ranges[0]).toEqual({ startIndex: 0, endIndex: 13, bold: true, fontSize: 13 });
   });
 
   it("adds url range for a citation, remapped through markdown position map", () => {
@@ -311,7 +311,7 @@ describe("buildRichInferenceCellContent markdown edge cases", () => {
   it("handles # heading at the very start", () => {
     const result = buildRichInferenceCellContent(makeResponse({ text: "# Title" }));
     expect(result.text).toBe("Title");
-    expect(result.ranges[0]).toEqual({ startIndex: 0, endIndex: 5, bold: true, fontSize: 18 });
+    expect(result.ranges[0]).toEqual({ startIndex: 0, endIndex: 5, bold: true, fontSize: 14 });
   });
 
   it("handles multiple bold spans", () => {
@@ -543,22 +543,22 @@ describe("parseMarkdown — extended features", () => {
     });
   });
 
-  it("applies fontSize 18 and bold to h1", () => {
+  it("applies fontSize 14 and bold to h1", () => {
     const result = parseMarkdown("# Title");
     expect(result.text).toBe("Title");
-    expect(result.ranges).toContainEqual({ startIndex: 0, endIndex: 5, bold: true, fontSize: 18 });
+    expect(result.ranges).toContainEqual({ startIndex: 0, endIndex: 5, bold: true, fontSize: 14 });
   });
 
-  it("applies fontSize 16 and bold to h2", () => {
+  it("applies fontSize 13 and bold to h2", () => {
     const result = parseMarkdown("## Section");
     expect(result.text).toBe("Section");
-    expect(result.ranges).toContainEqual({ startIndex: 0, endIndex: 7, bold: true, fontSize: 16 });
+    expect(result.ranges).toContainEqual({ startIndex: 0, endIndex: 7, bold: true, fontSize: 13 });
   });
 
-  it("applies fontSize 14 and bold to h3", () => {
+  it("applies fontSize 12 and bold to h3", () => {
     const result = parseMarkdown("### Sub");
     expect(result.text).toBe("Sub");
-    expect(result.ranges).toContainEqual({ startIndex: 0, endIndex: 3, bold: true, fontSize: 14 });
+    expect(result.ranges).toContainEqual({ startIndex: 0, endIndex: 3, bold: true, fontSize: 12 });
   });
 
   it("applies bold only (no fontSize) to h4 and deeper", () => {
