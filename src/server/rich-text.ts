@@ -116,7 +116,7 @@ function processInline(segment: string, offset: number): { text: string; ranges:
     // ~~strikethrough~~ — must check before plain ~ fallback
     if (segment[i] === "~" && segment[i + 1] === "~") {
       const closeIdx = segment.indexOf("~~", i + 2);
-      if (closeIdx > i + 1) {
+      if (closeIdx > i + 2) {
         const spanStart = cleanLen;
         const inner = segment.slice(i + 2, closeIdx);
         parts.push(inner);
@@ -130,7 +130,7 @@ function processInline(segment: string, offset: number): { text: string; ranges:
     // `inline code` — single-backtick span
     if (segment[i] === "`") {
       const closeIdx = segment.indexOf("`", i + 1);
-      if (closeIdx > i) {
+      if (closeIdx > i + 1) {
         const spanStart = cleanLen;
         const inner = segment.slice(i + 1, closeIdx);
         parts.push(inner);

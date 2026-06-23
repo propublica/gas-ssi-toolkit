@@ -278,12 +278,13 @@ export function formatMarkdownSelection(): void {
         const value = values[r][c];
         if (typeof value !== "string" || value.trim() === "") continue;
         const cell = range.getCell(r + 1, c + 1);
+        const content = parseMarkdown(value);
         try {
-          cell.setRichTextValue(toCellValue(parseMarkdown(value)));
-          count++;
+          cell.setRichTextValue(toCellValue(content));
         } catch (_e) {
-          cell.setValue(parseMarkdown(value).text);
+          cell.setValue(content.text);
         }
+        count++;
       }
     }
     ui.alert(`Formatted ${count} cell(s).`);
