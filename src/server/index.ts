@@ -21,6 +21,7 @@ import { buildInferenceRequest } from "./inference";
 import {
   buildRichInferenceCellContent,
   buildRichGroundingCellContent,
+  parseMarkdown,
   type CellContent,
 } from "./rich-text";
 import {
@@ -55,6 +56,7 @@ export function onOpen(): void {
   SpreadsheetApp.getUi()
     .createMenu("📐 SSI Toolkit")
     .addItem("📐 Open SSI Toolkit", "showSidebar")
+    .addItem("📝 Format Markdown", "formatMarkdownSelection")
     .addToUi();
 }
 
@@ -244,16 +246,50 @@ export function sampleRowsToEvaluation(_jobId?: string): void {
 
 function toCellValue(content: CellContent): GoogleAppsScript.Spreadsheet.RichTextValue {
   const builder = SpreadsheetApp.newRichTextValue().setText(content.text);
-  content.ranges.forEach(({ startIndex, endIndex, bold, italic, url }) => {
-    if (bold === true || italic === true) {
-      const style = SpreadsheetApp.newTextStyle();
-      if (bold === true) style.setBold(true);
-      if (italic === true) style.setItalic(true);
-      builder.setTextStyle(startIndex, endIndex, style.build());
-    }
-    if (url) builder.setLinkUrl(startIndex, endIndex, url);
-  });
+  content.ranges.forEach(
+    ({ startIndex, endIndex, bold, italic, strikethrough, fontFamily, fontSize, url }) => {
+      if (bold || italic || strikethrough || fontFamily || fontSize) {
+        const style = SpreadsheetApp.newTextStyle();
+        if (bold) style.setBold(true);
+        if (italic) style.setItalic(true);
+        if (strikethrough) style.setStrikethrough(true);
+        if (fontFamily) style.setFontFamily(fontFamily);
+        if (fontSize) style.setFontSize(fontSize);
+        builder.setTextStyle(startIndex, endIndex, style.build());
+      }
+      if (url) builder.setLinkUrl(startIndex, endIndex, url);
+    },
+  );
   return builder.build();
+}
+
+export function formatMarkdownSelection(): void {
+  const ui = SpreadsheetApp.getUi();
+  const range = SpreadsheetApp.getActiveRange();
+  if (!range) {
+    ui.alert("Select one or more cells first.");
+    return;
+  }
+  try {
+    const values = range.getValues() as unknown[][];
+    let count = 0;
+    for (let r = 0; r < values.length; r++) {
+      for (let c = 0; c < values[r].length; c++) {
+        const value = values[r][c];
+        if (typeof value !== "string" || value.trim() === "") continue;
+        const cell = range.getCell(r + 1, c + 1);
+        try {
+          cell.setRichTextValue(toCellValue(parseMarkdown(value)));
+          count++;
+        } catch (_e) {
+          cell.setValue(parseMarkdown(value).text);
+        }
+      }
+    }
+    ui.alert(`Formatted ${count} cell(s).`);
+  } catch (e) {
+    ui.alert(`Error: ${(e as Error).message}`);
+  }
 }
 
 // Max files to download + upload per sub-batch in Wave 1.
