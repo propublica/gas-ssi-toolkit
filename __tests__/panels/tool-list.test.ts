@@ -4,6 +4,7 @@
 
 jest.mock("../../src/client/services", () => ({
   runTool: jest.fn(),
+  formatMarkdownSelection: jest.fn(),
 }));
 
 jest.mock("../../src/client/job-store", () => ({
@@ -67,6 +68,13 @@ describe("ToolListPanel", () => {
     const c = mountPanel();
     c.querySelector<HTMLButtonElement>("#btn-extract-text")!.click();
     expect(mockNav.navigate).toHaveBeenCalledWith("extract-text");
+  });
+
+  it("clicking Format Markdown calls services.formatMarkdownSelection", () => {
+    (services.formatMarkdownSelection as jest.Mock).mockResolvedValue(undefined);
+    const c = mountPanel();
+    c.querySelector<HTMLButtonElement>("#btn-format-markdown")!.click();
+    expect(services.formatMarkdownSelection).toHaveBeenCalledTimes(1);
   });
 
   it("unmount() returns undefined", () => {

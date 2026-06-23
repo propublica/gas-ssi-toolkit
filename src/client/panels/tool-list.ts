@@ -1,5 +1,5 @@
 import type { NavigationContext, Panel } from "../types";
-import { runTool } from "../services";
+import { runTool, formatMarkdownSelection } from "../services";
 import { jobStore } from "../job-store";
 
 export class ToolListPanel implements Panel {
@@ -27,6 +27,9 @@ export class ToolListPanel implements Panel {
     });
     container.querySelector("#btn-extract-text")?.addEventListener("click", () => {
       nav.navigate("extract-text");
+    });
+    container.querySelector("#btn-format-markdown")?.addEventListener("click", () => {
+      formatMarkdownSelection().catch((err: Error) => globalThis.alert("Error: " + err.message));
     });
   }
 
@@ -60,6 +63,9 @@ export class ToolListPanel implements Panel {
         </button>
         <button id="btn-extract-text" class="tool-btn">
           <span class="icon">📜</span> Extract Text
+        </button>
+        <button id="btn-format-markdown" class="tool-btn">
+          <span class="icon">📝</span> Format Markdown
         </button>
       </div>
       <div class="status-footer">

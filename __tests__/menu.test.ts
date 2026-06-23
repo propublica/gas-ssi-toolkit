@@ -82,11 +82,10 @@ describe("onOpen", () => {
     expect(mockCreateMenu).toHaveBeenCalledWith("📐 SSI Toolkit");
   });
 
-  it("adds menu items for Open Toolkit and Format Markdown", () => {
+  it("adds a single item that opens the sidebar", () => {
     onOpen();
-    expect(mockAddItem).toHaveBeenCalledTimes(2);
+    expect(mockAddItem).toHaveBeenCalledTimes(1);
     expect(mockAddItem).toHaveBeenCalledWith("📐 Open SSI Toolkit", "showSidebar");
-    expect(mockAddItem).toHaveBeenCalledWith("📝 Format Markdown", "formatMarkdownSelection");
   });
 
   it("adds the menu to the UI", () => {

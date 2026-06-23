@@ -56,7 +56,6 @@ export function onOpen(): void {
   SpreadsheetApp.getUi()
     .createMenu("📐 SSI Toolkit")
     .addItem("📐 Open SSI Toolkit", "showSidebar")
-    .addItem("📝 Format Markdown", "formatMarkdownSelection")
     .addToUi();
 }
 
