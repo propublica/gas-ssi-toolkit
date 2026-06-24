@@ -77,6 +77,53 @@ describe("ToolListPanel", () => {
     expect(services.formatMarkdownSelection).toHaveBeenCalledTimes(1);
   });
 
+  it("disables Format Markdown button while in-flight and re-enables on success", async () => {
+    let resolve!: () => void;
+    (services.formatMarkdownSelection as jest.Mock).mockReturnValue(
+      new Promise<void>((res) => {
+        resolve = res;
+      }),
+    );
+    const c = mountPanel();
+    const btn = c.querySelector<HTMLButtonElement>("#btn-format-markdown")!;
+
+    btn.click();
+    expect(btn.disabled).toBe(true);
+    expect(btn.textContent).toContain("Formatting...");
+
+    resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(btn.disabled).toBe(false);
+    expect(btn.textContent).toContain("Format Markdown");
+  });
+
+  it("re-enables Format Markdown button and alerts on error", async () => {
+    let reject!: (err: Error) => void;
+    (services.formatMarkdownSelection as jest.Mock).mockReturnValue(
+      new Promise<void>((_, rej) => {
+        reject = rej;
+      }),
+    );
+    const mockAlert = jest.fn();
+    const origAlert = globalThis.alert;
+    globalThis.alert = mockAlert;
+
+    const c = mountPanel();
+    const btn = c.querySelector<HTMLButtonElement>("#btn-format-markdown")!;
+
+    btn.click();
+    expect(btn.disabled).toBe(true);
+
+    reject(new Error("GAS error"));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(btn.disabled).toBe(false);
+    expect(mockAlert).toHaveBeenCalledWith("Error: GAS error");
+
+    globalThis.alert = origAlert;
+  });
+
   it("unmount() returns undefined", () => {
     document.body.innerHTML = '<div id="app"></div>';
     const panel = new ToolListPanel();
