@@ -238,19 +238,19 @@ First draft — not yet formally reviewed by the security team.
 
 ### Open Items
 
-| Priority | Status | Linear | Item | Description |
-| --- | --- | --- | --- | --- |
-| High | Open | — | Fix T6 — formula injection | Implement `sanitizeForCell()` in `src/server/utils.ts`: reject web-fetch formulas (anywhere in formula body, including nested) with an error string; prefix other formula-triggered values with `'`; wire into all `setValue()` calls on the AI output column in `index.ts` (R8) |
-| Medium | Open | — | Branch protection audit | Confirm required-review rules are active on `main` and `develop` (R5) |
-| Medium | Open | — | Access audit | Review and document who has Apps Script project editor access (R1) |
-| Medium | Open | — | Stackdriver log audit | Review exception handling in `index.ts` to confirm no cell values or file names reach Stackdriver logs (R14) |
-| Medium | Open | — | Add `npm audit` to CI | Fail CI on high/critical npm vulnerabilities (R12) |
-| Medium | Open | — | Fix T15 — OCR temp doc cleanup | Wrap deletion in `finally`, alert user on cleanup failure, prefix temp doc names with `[SSI-TEMP]` (R19) |
-| Low | Open | — | 2FA verification | Confirm 2FA is enforced on all accounts with deploy access (R9) |
-| Medium | Open | — | T11 sidebar warning — specify both url_context vectors | Update the `url_context` warning copy to explicitly state that URLs already in dataset cells will be fetched, and that attacker-controlled URLs can inject instructions via their response (R13) |
-| Low | Open | — | Post-MVP: pre-inference URL scan | Before a `url_context` run, scan prompt column cells for URLs and surface an alert listing them so the user can confirm before proceeding (R13, deferred) |
-| Low | Open | — | User-facing data notice | Write guidance for journalists covering data sent to Gemini, prompt injection risk, and `url_context` egress (R3, R11, R13) |
-| Low | Open | — | GCP budget alerts and quota caps | Configure spend alerts and per-key daily quotas in Google Cloud Console (R16, R17) |
+| Priority | Status | Linear | PR | Item | Description |
+| --- | --- | --- | --- | --- | --- |
+| High | Resolved | [AI-56](https://linear.app/propublica/issue/AI-56/address-ai-generated-import-sheets-functions) | [#112](https://github.com/propublica/gas-ssi-toolkit/pull/112) | Fix T6 — formula injection | `sanitizeForCell()` in `src/server/utils.ts`: rejects web-fetch formulas (anywhere in formula body, including nested) with an error string; prefixes other formula-triggered values with `'`; wired into all `setValue()` calls on the AI output column in `index.ts` (R8) |
+| Medium | Open | — | — | Branch protection audit | Confirm required-review rules are active on `main` and `develop` (R5) |
+| Medium | Open | — | — | Access audit | Review and document who has Apps Script project editor access (R1) |
+| Medium | Open | — | — | Stackdriver log audit | Review exception handling in `index.ts` to confirm no cell values or file names reach Stackdriver logs (R14) |
+| Medium | Open | — | — | Add `npm audit` to CI | Fail CI on high/critical npm vulnerabilities (R12) |
+| Medium | Open | — | — | Fix T15 — OCR temp doc cleanup | Wrap deletion in `finally`, alert user on cleanup failure, prefix temp doc names with `[SSI-TEMP]` (R19) |
+| Low | Open | — | — | 2FA verification | Confirm 2FA is enforced on all accounts with deploy access (R9) |
+| Medium | Open | — | — | T11 sidebar warning — specify both url_context vectors | Update the `url_context` warning copy to explicitly state that URLs already in dataset cells will be fetched, and that attacker-controlled URLs can inject instructions via their response (R13) |
+| Low | Open | — | — | Post-MVP: pre-inference URL scan | Before a `url_context` run, scan prompt column cells for URLs and surface an alert listing them so the user can confirm before proceeding (R13, deferred) |
+| Low | Open | — | — | User-facing data notice | Write guidance for journalists covering data sent to Gemini, prompt injection risk, and `url_context` egress (R3, R11, R13) |
+| Low | Open | — | — | GCP budget alerts and quota caps | Configure spend alerts and per-key daily quotas in Google Cloud Console (R16, R17) |
 
 ### Planned Threat Models
 
