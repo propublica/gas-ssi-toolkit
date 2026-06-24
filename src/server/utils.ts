@@ -195,3 +195,27 @@ export function markAIOutputRange(
   );
   sheet.getRange(startRow, colIdx, numRows, 1).setBackground("#FFF8E1");
 }
+
+// Sheets functions that make outbound HTTP requests — the exfiltration vector for formula injection.
+// We scan the whole formula body so nested calls like =IF(1=1,IMAGE("evil"),0) are caught too.
+const WEB_FETCH_PATTERN = /\b(image|importdata|importxml|importhtml|importrange|importfeed)\s*\(/i;
+
+/**
+ * Prevent formula injection when writing AI-generated text to a Sheets cell.
+ *
+ * Sheets evaluates values beginning with =, +, or - as formulas. If the formula
+ * contains a web-fetch function (IMAGE, IMPORTDATA, IMPORTXML, IMPORTHTML, IMPORTRANGE,
+ * IMPORTFEED) — anywhere in the formula, including nested positions — it could make an
+ * outbound HTTP request that exfiltrates adjacent cell data. Those values are rejected
+ * with an explicit error string.
+ *
+ * Other formula-prefixed values (=SUM, -IF, etc.) are safe to prefix with ' so Sheets
+ * treats them as literal text instead of evaluating them.
+ */
+export function sanitizeForCell(value: string): string {
+  if (!value.length || !/^[=+-]/.test(value[0])) return value;
+  if (WEB_FETCH_PATTERN.test(value)) {
+    return "[SSI Error: AI response contained an external request formula — output rejected]";
+  }
+  return `'${value}`;
+}

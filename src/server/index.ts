@@ -36,6 +36,7 @@ import {
   interpolateTemplate,
   flattenArg,
   markAIOutputRange,
+  sanitizeForCell,
 } from "./utils";
 import { CONFIG } from "./config";
 import type {
@@ -503,10 +504,10 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
           .getRange(realRowIndex, outputIdx + 1)
           .setRichTextValue(toCellValue(buildRichInferenceCellContent(result)));
       } catch (_e) {
-        sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
+        sheet.getRange(realRowIndex, outputIdx + 1).setValue(sanitizeForCell(result.text));
       }
     } else {
-      sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
+      sheet.getRange(realRowIndex, outputIdx + 1).setValue(sanitizeForCell(result.text));
     }
 
     if (config.includeGrounding && groundingIdx >= 0) {
