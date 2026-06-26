@@ -38,6 +38,7 @@ import {
   flattenArg,
   markAIOutputRange,
   sanitizeForCell,
+  resolveGroundingUris,
 } from "./utils";
 import { CONFIG } from "./config";
 import type {
@@ -521,6 +522,12 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
   const results = requests.length > 0 ? callGeminiAPIBatch(requests) : [];
 
+  const resolvedUris =
+    (config.applyMarkdown || config.includeGrounding) &&
+    results.some((r) => (r.groundingMetadata?.groundingChunks?.length ?? 0) > 0)
+      ? resolveGroundingUris(results)
+      : new Map<string, string>();
+
   // Write all results and file errors in a single batch — one flush at end of chunk.
   for (let j = 0; j < results.length; j++) {
     const i = rowIndices[j];
@@ -531,7 +538,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
       try {
         sheet
           .getRange(realRowIndex, outputIdx + 1)
-          .setRichTextValue(toCellValue(buildRichInferenceCellContent(result)));
+          .setRichTextValue(toCellValue(buildRichInferenceCellContent(result, resolvedUris)));
       } catch (_e) {
         sheet.getRange(realRowIndex, outputIdx + 1).setValue(sanitizeForCell(result.text));
       }
@@ -540,7 +547,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
     }
 
     if (config.includeGrounding && groundingIdx >= 0) {
-      const groundingContent = buildRichGroundingCellContent(result);
+      const groundingContent = buildRichGroundingCellContent(result, resolvedUris);
       if (groundingContent !== null) {
         sheet
           .getRange(realRowIndex, groundingIdx + 1)
