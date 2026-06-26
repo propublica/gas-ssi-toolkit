@@ -266,7 +266,11 @@ function toCellValue(content: CellContent): GoogleAppsScript.Spreadsheet.RichTex
 
 export function formatMarkdownSelection(): void {
   const ui = SpreadsheetApp.getUi();
-  const range = SpreadsheetApp.getActiveRange()!;
+  const range = SpreadsheetApp.getActiveRange();
+  if (!range) {
+    ui.alert("Select one or more cells first.");
+    return;
+  }
   const values = range.getValues() as unknown[][];
   const existingRichText = range.getRichTextValues();
   let count = 0;
