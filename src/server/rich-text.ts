@@ -204,7 +204,10 @@ export function parseMarkdown(text: string): CellContent {
 }
 
 /** Extract citation ranges from groundingMetadata. Normalises absent startIndex to 0. */
-function getCitations(response: GeminiResponse): CitationRange[] {
+function getCitations(
+  response: GeminiResponse,
+  resolvedUris?: Map<string, string>,
+): CitationRange[] {
   const supports = response.groundingMetadata?.groundingSupports ?? [];
   const chunks = response.groundingMetadata?.groundingChunks ?? [];
   return supports.map((s: GeminiGroundingSupport) => ({
@@ -213,7 +216,10 @@ function getCitations(response: GeminiResponse): CitationRange[] {
     sources: s.groundingChunkIndices
       .map((idx) => {
         const chunk = chunks[idx];
-        return chunk?.web ?? chunk?.retrievedContext ?? null;
+        const src = chunk?.web ?? chunk?.retrievedContext ?? null;
+        if (!src) return null;
+        const uri = resolvedUris?.get(src.uri) ?? src.uri;
+        return { ...src, uri };
       })
       .filter((src): src is { uri: string; title: string } => src !== null),
   }));
@@ -271,16 +277,25 @@ function injectCitationLinks(
   return result;
 }
 
-function getAllSources(response: GeminiResponse): Array<{ uri: string; title: string }> {
+function getAllSources(
+  response: GeminiResponse,
+  resolvedUris?: Map<string, string>,
+): Array<{ uri: string; title: string }> {
   return (response.groundingMetadata?.groundingChunks ?? [])
     .map((chunk) => chunk.web ?? chunk.retrievedContext ?? null)
-    .filter((src): src is { uri: string; title: string } => src !== null);
+    .filter((src): src is { uri: string; title: string } => src !== null)
+    .map((src) => ({ ...src, uri: resolvedUris?.get(src.uri) ?? src.uri }));
 }
 
 // ---- Public builders ----
 
-export function buildRichInferenceCellContent(response: GeminiResponse): CellContent {
-  const citations = getCitations(response).sort((a, b) => a.startIndex - b.startIndex);
+export function buildRichInferenceCellContent(
+  response: GeminiResponse,
+  resolvedUris?: Map<string, string>,
+): CellContent {
+  const citations = getCitations(response, resolvedUris).sort(
+    (a, b) => a.startIndex - b.startIndex,
+  );
   const merged = mergeCitations(citations);
 
   if (merged.length === 0) {
@@ -292,8 +307,11 @@ export function buildRichInferenceCellContent(response: GeminiResponse): CellCon
   return parseMarkdown(preprocessed);
 }
 
-export function buildRichGroundingCellContent(response: GeminiResponse): CellContent | null {
-  const sources = getAllSources(response);
+export function buildRichGroundingCellContent(
+  response: GeminiResponse,
+  resolvedUris?: Map<string, string>,
+): CellContent | null {
+  const sources = getAllSources(response, resolvedUris);
   const queries = response.groundingMetadata?.webSearchQueries ?? [];
   const codePairs = response.codePairs ?? [];
 

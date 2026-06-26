@@ -130,6 +130,47 @@ describe("buildRichInferenceCellContent", () => {
     const result = buildRichInferenceCellContent(makeResponse({ text: "Plain text." }));
     expect(result.ranges.filter((r) => r.url)).toHaveLength(0);
   });
+
+  it("uses resolved URI from map for inline citation link", () => {
+    const redirectUri = "https://vertexaisearch.cloud.google.com/redirect/abc";
+    const actualUri = "https://example.com/real-article";
+    const response: GeminiResponse = {
+      text: "Hello world.",
+      groundingMetadata: {
+        groundingChunks: [{ web: { uri: redirectUri, title: "Real Article" } }],
+        groundingSupports: [
+          {
+            segment: { startIndex: 0, endIndex: 5, text: "Hello" },
+            groundingChunkIndices: [0],
+          },
+        ],
+      },
+    };
+    const resolvedUris = new Map([[redirectUri, actualUri]]);
+    const result = buildRichInferenceCellContent(response, resolvedUris);
+    const citationRange = result.ranges.find((r) => r.url !== undefined);
+    expect(citationRange?.url).toBe(actualUri);
+  });
+
+  it("falls back to redirect URI when map has no entry for it", () => {
+    const redirectUri = "https://vertexaisearch.cloud.google.com/redirect/abc";
+    const response: GeminiResponse = {
+      text: "Hello world.",
+      groundingMetadata: {
+        groundingChunks: [{ web: { uri: redirectUri, title: "Article" } }],
+        groundingSupports: [
+          {
+            segment: { startIndex: 0, endIndex: 5, text: "Hello" },
+            groundingChunkIndices: [0],
+          },
+        ],
+      },
+    };
+    const resolvedUris = new Map<string, string>(); // empty — URI not resolved
+    const result = buildRichInferenceCellContent(response, resolvedUris);
+    const citationRange = result.ranges.find((r) => r.url !== undefined);
+    expect(citationRange?.url).toBe(redirectUri);
+  });
 });
 
 // ============================================================
@@ -294,6 +335,23 @@ describe("buildRichGroundingCellContent", () => {
     expect(result.text).not.toContain("Search queries");
     expect(result.text).not.toContain("Sources");
     expect(result.text).toContain("Code");
+  });
+
+  it("uses resolved URI from map in grounding source list", () => {
+    const redirectUri = "https://vertexaisearch.cloud.google.com/redirect/abc";
+    const actualUri = "https://example.com/real-article";
+    const response: GeminiResponse = {
+      text: "Answer.",
+      groundingMetadata: {
+        groundingChunks: [{ web: { uri: redirectUri, title: "Real Article" } }],
+        groundingSupports: [],
+      },
+    };
+    const resolvedUris = new Map([[redirectUri, actualUri]]);
+    const result = buildRichGroundingCellContent(response, resolvedUris);
+    expect(result).not.toBeNull();
+    const sourceRange = result!.ranges.find((r) => r.url !== undefined);
+    expect(sourceRange?.url).toBe(actualUri);
   });
 });
 
