@@ -6,7 +6,7 @@
  * Functions that operate purely on plain values have no GAS dependency at all.
  */
 
-import type { DriveFileInfo } from "./types";
+import type { DriveFileInfo, GeminiResponse } from "./types";
 
 /**
  * Extract a Google Drive file/folder ID from a URL or raw ID string.
@@ -218,4 +218,46 @@ export function sanitizeForCell(value: string): string {
     return "[SSI Error: AI response contained an external request formula — output rejected]";
   }
   return `'${value}`;
+}
+
+/**
+ * Resolve Vertex AI Search redirect URIs to their actual destination URLs.
+ * Fires one UrlFetchApp.fetchAll for all unique URIs across all responses,
+ * reading the Location header from each 3xx reply. Non-redirect responses
+ * (e.g. expired URLs) are silently omitted — callers fall back to the
+ * redirect URI via `resolvedUris?.get(uri) ?? uri`.
+ */
+export function resolveGroundingUris(responses: GeminiResponse[]): Map<string, string> {
+  const redirectUris = new Set<string>();
+  for (const response of responses) {
+    for (const chunk of response.groundingMetadata?.groundingChunks ?? []) {
+      const src = chunk.web ?? chunk.retrievedContext;
+      if (src?.uri) redirectUris.add(src.uri);
+    }
+  }
+
+  if (redirectUris.size === 0) return new Map();
+
+  const uriArray = Array.from(redirectUris);
+  const fetchRequests: GoogleAppsScript.URL_Fetch.URLFetchRequest[] = uriArray.map((uri) => ({
+    url: uri,
+    method: "get" as GoogleAppsScript.URL_Fetch.HttpMethod,
+    followRedirects: false,
+    muteHttpExceptions: true,
+  }));
+
+  const fetchResponses = UrlFetchApp.fetchAll(fetchRequests);
+  const resolved = new Map<string, string>();
+
+  for (let i = 0; i < uriArray.length; i++) {
+    const resp = fetchResponses[i];
+    const status = resp.getResponseCode();
+    if (status >= 300 && status < 400) {
+      const headers = resp.getHeaders() as Record<string, string>;
+      const location = headers["Location"] ?? headers["location"];
+      if (location) resolved.set(uriArray[i], location);
+    }
+  }
+
+  return resolved;
 }

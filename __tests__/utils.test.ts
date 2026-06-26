@@ -20,8 +20,9 @@ import {
   writeJobProgress,
   interpolateTemplate,
   sanitizeForCell,
+  resolveGroundingUris,
 } from "../src/server/utils";
-import type { DriveFileInfo } from "../src/server/types";
+import type { DriveFileInfo, GeminiResponse } from "../src/server/types";
 
 describe("extractId", () => {
   it("extracts ID from a standard Drive file URL", () => {
@@ -572,5 +573,108 @@ describe("sanitizeForCell", () => {
   it("preserves the full response when prepending apostrophe to a safe multiline formula", () => {
     const input = "=SUM(A1:A10)\nNote: this formula sums the range";
     expect(sanitizeForCell(input)).toBe(`'${input}`);
+  });
+});
+
+describe("resolveGroundingUris", () => {
+  const mockFetchAll = jest.fn();
+
+  beforeEach(() => {
+    mockFetchAll.mockReset();
+    (globalThis as unknown as { UrlFetchApp: unknown }).UrlFetchApp = {
+      fetchAll: mockFetchAll,
+    };
+  });
+
+  it("returns empty map and skips fetchAll when no responses have groundingChunks", () => {
+    const responses: GeminiResponse[] = [{ text: "hello" }];
+    const result = resolveGroundingUris(responses);
+    expect(result.size).toBe(0);
+    expect(mockFetchAll).not.toHaveBeenCalled();
+  });
+
+  it("deduplicates the same URI appearing in multiple responses", () => {
+    const sharedUri = "https://vertexaisearch.cloud.google.com/redirect/abc";
+    const responses: GeminiResponse[] = [
+      {
+        text: "a",
+        groundingMetadata: {
+          groundingChunks: [{ web: { uri: sharedUri, title: "A" } }],
+        },
+      },
+      {
+        text: "b",
+        groundingMetadata: {
+          groundingChunks: [{ web: { uri: sharedUri, title: "A" } }],
+        },
+      },
+    ];
+    mockFetchAll.mockReturnValue([
+      {
+        getResponseCode: () => 301,
+        getHeaders: () => ({ Location: "https://example.com" }),
+      },
+    ]);
+    resolveGroundingUris(responses);
+    const calls = mockFetchAll.mock.calls[0][0] as Array<{ url: string }>;
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe(sharedUri);
+  });
+
+  it("maps redirect URI to the Location header value on 3xx response", () => {
+    const redirectUri = "https://vertexaisearch.cloud.google.com/redirect/abc";
+    const actualUri = "https://example.com/article";
+    const responses: GeminiResponse[] = [
+      {
+        text: "a",
+        groundingMetadata: {
+          groundingChunks: [{ web: { uri: redirectUri, title: "A" } }],
+        },
+      },
+    ];
+    mockFetchAll.mockReturnValue([
+      {
+        getResponseCode: () => 301,
+        getHeaders: () => ({ Location: actualUri }),
+      },
+    ]);
+    const result = resolveGroundingUris(responses);
+    expect(result.get(redirectUri)).toBe(actualUri);
+  });
+
+  it("omits URI from map when response is not a redirect (e.g. expired URL returns 404)", () => {
+    const redirectUri = "https://vertexaisearch.cloud.google.com/redirect/expired";
+    const responses: GeminiResponse[] = [
+      {
+        text: "a",
+        groundingMetadata: {
+          groundingChunks: [{ web: { uri: redirectUri, title: "A" } }],
+        },
+      },
+    ];
+    mockFetchAll.mockReturnValue([{ getResponseCode: () => 404, getHeaders: () => ({}) }]);
+    const result = resolveGroundingUris(responses);
+    expect(result.has(redirectUri)).toBe(false);
+  });
+
+  it("resolves URIs from retrievedContext chunks as well as web chunks", () => {
+    const redirectUri = "https://vertexaisearch.cloud.google.com/redirect/ctx";
+    const actualUri = "https://example.com/ctx-article";
+    const responses: GeminiResponse[] = [
+      {
+        text: "a",
+        groundingMetadata: {
+          groundingChunks: [{ retrievedContext: { uri: redirectUri, title: "Ctx" } }],
+        },
+      },
+    ];
+    mockFetchAll.mockReturnValue([
+      {
+        getResponseCode: () => 302,
+        getHeaders: () => ({ Location: actualUri }),
+      },
+    ]);
+    const result = resolveGroundingUris(responses);
+    expect(result.get(redirectUri)).toBe(actualUri);
   });
 });
