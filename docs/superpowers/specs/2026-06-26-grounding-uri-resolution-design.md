@@ -103,4 +103,3 @@ No changes to `src/server/types.ts`, `src/server/api.ts`, `src/client/`, or `src
 
 - The `SSI` custom function (`customFunctions.ts`) calls `invokeGemini` directly and returns a plain string — it bypasses the rich-text pipeline entirely and is unaffected
 - Refactoring `runBatchAI` into named phase helpers (tracked in [issue #116](https://github.com/propublica/gas-ssi-toolkit/issues/116))
-
