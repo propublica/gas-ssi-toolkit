@@ -7,11 +7,12 @@
 
 Gemini's grounding API returns citation URLs as Vertex AI Search redirect URLs:
 
-```
+```text
 https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGRLv...
 ```
 
 These URLs have two problems for journalists:
+
 1. **They expire** — the opaque token has a TTL, so saved spreadsheets contain dead links
 2. **They're opaque** — you can't tell the source from the URL itself
 
@@ -27,7 +28,7 @@ Add a dedicated resolution phase in `runBatchAI` between the batch Gemini call a
 
 ### New execution phase in `runBatchAI`
 
-```
+```text
 1. callGeminiAPIBatch(requests)        → GeminiResponse[]  (redirect URIs intact)
 2. resolveGroundingUris(responses)     → Map<redirectUri, actualUri>   ← new
 3. for loop: buildRichInferenceCellContent(result, resolvedUris)
@@ -69,7 +70,7 @@ The map is threaded down to the two private helpers that first read URIs from th
 ## File Inventory
 
 | File | Change |
-|------|--------|
+| --- | --- |
 | `src/server/utils.ts` | Add `resolveGroundingUris(responses): Map<string, string>` |
 | `src/server/rich-text.ts` | Add optional `resolvedUris?` to both builders; thread to `getCitations` + `getAllSources` |
 | `src/server/index.ts` | Add guarded resolution phase between `callGeminiAPIBatch` and write loop |
@@ -85,12 +86,14 @@ No changes to `src/server/types.ts`, `src/server/api.ts`, `src/client/`, or `src
 ## Testing
 
 **`utils.ts`** (new tests):
+
 - Mock `UrlFetchApp.fetchAll`; verify deduplication (N responses with same URI → 1 fetch request)
 - Verify 3xx with `Location` header → correct map entry
 - Verify non-3xx → no map entry (graceful fallback)
 - Verify empty responses array → empty map, no fetch call
 
 **`rich-text.ts`** (additive tests):
+
 - Existing tests all pass unchanged (parameter is optional)
 - New: `buildRichInferenceCellContent` with a populated map uses resolved URI in citation link
 - New: `buildRichGroundingCellContent` with a populated map uses resolved URI in source list
@@ -100,3 +103,4 @@ No changes to `src/server/types.ts`, `src/server/api.ts`, `src/client/`, or `src
 
 - The `SSI` custom function (`customFunctions.ts`) calls `invokeGemini` directly and returns a plain string — it bypasses the rich-text pipeline entirely and is unaffected
 - Refactoring `runBatchAI` into named phase helpers (tracked in [issue #116](https://github.com/propublica/gas-ssi-toolkit/issues/116))
+
