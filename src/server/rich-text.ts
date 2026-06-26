@@ -22,6 +22,9 @@ export interface TextRange {
   endIndex: number; // exclusive
   bold?: boolean;
   italic?: boolean;
+  strikethrough?: boolean;
+  fontFamily?: string;
+  fontSize?: number;
   url?: string;
 }
 
@@ -110,6 +113,34 @@ function processInline(segment: string, offset: number): { text: string; ranges:
       }
     }
 
+    // ~~strikethrough~~ — must check before plain ~ fallback
+    if (segment[i] === "~" && segment[i + 1] === "~") {
+      const closeIdx = segment.indexOf("~~", i + 2);
+      if (closeIdx > i + 2) {
+        const spanStart = cleanLen;
+        const inner = segment.slice(i + 2, closeIdx);
+        parts.push(inner);
+        cleanLen += inner.length;
+        ranges.push({ startIndex: spanStart, endIndex: cleanLen, strikethrough: true });
+        i = closeIdx + 2;
+        continue;
+      }
+    }
+
+    // `inline code` — single-backtick span
+    if (segment[i] === "`") {
+      const closeIdx = segment.indexOf("`", i + 1);
+      if (closeIdx > i + 1) {
+        const spanStart = cleanLen;
+        const inner = segment.slice(i + 1, closeIdx);
+        parts.push(inner);
+        cleanLen += inner.length;
+        ranges.push({ startIndex: spanStart, endIndex: cleanLen, fontFamily: "Courier New" });
+        i = closeIdx + 1;
+        continue;
+      }
+    }
+
     // Plain character
     parts.push(segment[i]);
     cleanLen++;
@@ -123,7 +154,7 @@ function processInline(segment: string, offset: number): { text: string; ranges:
  * Parse markdown text into CellContent. Handles headings, bullets, bold, italic,
  * and [text](url) links. No position remapping — tracks clean-text position directly.
  */
-function parseMarkdown(text: string): CellContent {
+export function parseMarkdown(text: string): CellContent {
   const ranges: TextRange[] = [];
   const cleanParts: string[] = [];
   let cleanLen = 0;
@@ -133,12 +164,14 @@ function parseMarkdown(text: string): CellContent {
     const line = lines[lineIdx];
     let content = line;
     let isHeading = false;
+    let headingDepth = 0;
 
     // Structural prefix: heading (# Title → bold)
     const headingMatch = line.match(/^(#{1,6}) /);
     if (headingMatch) {
       content = line.slice(headingMatch[1].length + 1);
       isHeading = true;
+      headingDepth = headingMatch[1].length;
     }
     // Structural prefix: bullet (* item or - item → • item)
     else if (/^\* /.test(line) || /^- /.test(line)) {
@@ -154,7 +187,11 @@ function parseMarkdown(text: string): CellContent {
     ranges.push(...inlineRanges);
 
     if (isHeading) {
-      ranges.push({ startIndex: spanStart, endIndex: cleanLen, bold: true });
+      const fontSize =
+        headingDepth === 1 ? 13 : headingDepth === 2 ? 12 : headingDepth === 3 ? 11 : undefined;
+      const range: TextRange = { startIndex: spanStart, endIndex: cleanLen, bold: true };
+      if (fontSize !== undefined) range.fontSize = fontSize;
+      ranges.push(range);
     }
 
     if (lineIdx < lines.length - 1) {

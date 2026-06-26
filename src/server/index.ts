@@ -21,6 +21,7 @@ import { buildInferenceRequest } from "./inference";
 import {
   buildRichInferenceCellContent,
   buildRichGroundingCellContent,
+  parseMarkdown,
   type CellContent,
 } from "./rich-text";
 import {
@@ -245,16 +246,44 @@ export function sampleRowsToEvaluation(_jobId?: string): void {
 
 function toCellValue(content: CellContent): GoogleAppsScript.Spreadsheet.RichTextValue {
   const builder = SpreadsheetApp.newRichTextValue().setText(content.text);
-  content.ranges.forEach(({ startIndex, endIndex, bold, italic, url }) => {
-    if (bold === true || italic === true) {
-      const style = SpreadsheetApp.newTextStyle();
-      if (bold === true) style.setBold(true);
-      if (italic === true) style.setItalic(true);
-      builder.setTextStyle(startIndex, endIndex, style.build());
-    }
-    if (url) builder.setLinkUrl(startIndex, endIndex, url);
-  });
+  content.ranges.forEach(
+    ({ startIndex, endIndex, bold, italic, strikethrough, fontFamily, fontSize, url }) => {
+      if (bold || italic || strikethrough || fontFamily || fontSize) {
+        const style = SpreadsheetApp.newTextStyle();
+        if (bold) style.setBold(true);
+        if (italic) style.setItalic(true);
+        if (strikethrough) style.setStrikethrough(true);
+        if (fontFamily) style.setFontFamily(fontFamily);
+        if (fontSize) style.setFontSize(fontSize);
+        builder.setTextStyle(startIndex, endIndex, style.build());
+      }
+      if (url) builder.setLinkUrl(startIndex, endIndex, url);
+    },
+  );
   return builder.build();
+}
+
+export function formatMarkdownSelection(): void {
+  const ui = SpreadsheetApp.getUi();
+  const range = SpreadsheetApp.getActiveRange()!;
+  const values = range.getValues() as unknown[][];
+  const existingRichText = range.getRichTextValues();
+  let count = 0;
+  const grid = existingRichText.map((row, r) =>
+    row.map((existing, c) => {
+      const value = values[r][c];
+      if (typeof value !== "string" || value.trim() === "") return existing;
+      try {
+        const richText = toCellValue(parseMarkdown(value));
+        count++;
+        return richText;
+      } catch (_e) {
+        return existing;
+      }
+    }),
+  ) as GoogleAppsScript.Spreadsheet.RichTextValue[][];
+  range.setRichTextValues(grid);
+  ui.alert(`Formatted ${count} cell(s).`);
 }
 
 // Max files to download + upload per sub-batch in Wave 1.
