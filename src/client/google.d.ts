@@ -18,6 +18,7 @@ declare global {
     prepRecipe(params: PrepRecipeParams): PrepRecipeResult;
     getJobProgress(jobId: string): void;
     getActiveRangeInfo(): void;
+    formatMarkdownSelection(): void;
   }
 
   const google: {

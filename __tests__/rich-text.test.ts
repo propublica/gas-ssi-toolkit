@@ -3,6 +3,7 @@ import type { GeminiGroundingSupport, GeminiResponse } from "../src/server/types
 import {
   buildRichInferenceCellContent,
   buildRichGroundingCellContent,
+  parseMarkdown,
 } from "../src/server/rich-text";
 
 // ---- helpers ----
@@ -58,7 +59,7 @@ describe("buildRichInferenceCellContent", () => {
       makeResponse({ text: "## Section Title\nBody text." }),
     );
     expect(result.text).toBe("Section Title\nBody text.");
-    expect(result.ranges[0]).toEqual({ startIndex: 0, endIndex: 13, bold: true });
+    expect(result.ranges[0]).toEqual({ startIndex: 0, endIndex: 13, bold: true, fontSize: 12 });
   });
 
   it("adds url range for a citation, remapped through markdown position map", () => {
@@ -310,7 +311,7 @@ describe("buildRichInferenceCellContent markdown edge cases", () => {
   it("handles # heading at the very start", () => {
     const result = buildRichInferenceCellContent(makeResponse({ text: "# Title" }));
     expect(result.text).toBe("Title");
-    expect(result.ranges[0]).toEqual({ startIndex: 0, endIndex: 5, bold: true });
+    expect(result.ranges[0]).toEqual({ startIndex: 0, endIndex: 5, bold: true, fontSize: 13 });
   });
 
   it("handles multiple bold spans", () => {
@@ -518,5 +519,53 @@ describe("buildRichInferenceCellContent — citation injection", () => {
     const citation = result.ranges.find((r) => r.url === "https://citation.com");
     expect(inlineLink).toBeDefined();
     expect(citation).toBeDefined();
+  });
+});
+
+// ============================================================
+// parseMarkdown — extended features
+// ============================================================
+
+describe("parseMarkdown — extended features", () => {
+  it("wraps ~~text~~ as a strikethrough range", () => {
+    const result = parseMarkdown("before ~~struck~~ after");
+    expect(result.text).toBe("before struck after");
+    expect(result.ranges).toContainEqual({ startIndex: 7, endIndex: 13, strikethrough: true });
+  });
+
+  it("wraps `code` as a Courier New font-family range", () => {
+    const result = parseMarkdown("run `npm test` now");
+    expect(result.text).toBe("run npm test now");
+    expect(result.ranges).toContainEqual({
+      startIndex: 4,
+      endIndex: 12,
+      fontFamily: "Courier New",
+    });
+  });
+
+  it("applies fontSize 13 and bold to h1", () => {
+    const result = parseMarkdown("# Title");
+    expect(result.text).toBe("Title");
+    expect(result.ranges).toContainEqual({ startIndex: 0, endIndex: 5, bold: true, fontSize: 13 });
+  });
+
+  it("applies fontSize 12 and bold to h2", () => {
+    const result = parseMarkdown("## Section");
+    expect(result.text).toBe("Section");
+    expect(result.ranges).toContainEqual({ startIndex: 0, endIndex: 7, bold: true, fontSize: 12 });
+  });
+
+  it("applies fontSize 11 and bold to h3", () => {
+    const result = parseMarkdown("### Sub");
+    expect(result.text).toBe("Sub");
+    expect(result.ranges).toContainEqual({ startIndex: 0, endIndex: 3, bold: true, fontSize: 11 });
+  });
+
+  it("applies bold only (no fontSize) to h4 and deeper", () => {
+    const result = parseMarkdown("#### Deep");
+    expect(result.text).toBe("Deep");
+    const headingRange = result.ranges.find((r) => r.bold);
+    expect(headingRange).toBeDefined();
+    expect(headingRange?.fontSize).toBeUndefined();
   });
 });
