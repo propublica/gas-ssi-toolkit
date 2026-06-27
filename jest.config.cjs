@@ -127,9 +127,14 @@ module.exports = {
       functions: 95,
       lines: 95,
     },
-    "./src/server/rich-text.ts": {
-      statements: 94,
-      branches: 82,
+    "./src/server/gemini-grounding.ts": {
+      statements: 95,
+      branches: 85,
+      functions: 100,
+    },
+    "./src/server/markdown-to-rich-text.ts": {
+      statements: 95,
+      branches: 95,
       functions: 100,
     },
   },
