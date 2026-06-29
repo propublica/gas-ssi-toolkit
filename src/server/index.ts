@@ -18,11 +18,8 @@ import {
 } from "./drive";
 import { uploadFilesToGemini } from "./files";
 import { buildInferenceRequest } from "./inference";
-import {
-  buildRichInferenceCellContent,
-  buildRichGroundingCellContent,
-  type CellContent,
-} from "./rich-text";
+import { parseMarkdown, type RichSpan } from "./markdown-to-rich-text";
+import { injectCitations, groundingToMarkdown } from "./gemini-grounding";
 import {
   extractId,
   isValidDriveLink,
@@ -36,6 +33,8 @@ import {
   interpolateTemplate,
   flattenArg,
   markAIOutputRange,
+  sanitizeForCell,
+  resolveGroundingUris,
 } from "./utils";
 import { CONFIG } from "./config";
 import type {
@@ -242,18 +241,55 @@ export function sampleRowsToEvaluation(_jobId?: string): void {
 // 🧠 TOOL 4: AI BATCH PROCESSOR
 // ==========================================
 
-function toCellValue(content: CellContent): GoogleAppsScript.Spreadsheet.RichTextValue {
-  const builder = SpreadsheetApp.newRichTextValue().setText(content.text);
-  content.ranges.forEach(({ startIndex, endIndex, bold, italic, url }) => {
-    if (bold === true || italic === true) {
+function toCellValue(spans: RichSpan[]): GoogleAppsScript.Spreadsheet.RichTextValue {
+  const text = spans.map((s) => s.text).join("");
+  const builder = SpreadsheetApp.newRichTextValue().setText(text);
+  let pos = 0;
+  for (const { text: spanText, bold, italic, strikethrough, fontFamily, fontSize, url } of spans) {
+    const start = pos;
+    const end = pos + spanText.length;
+    if (bold || italic || strikethrough || fontFamily || fontSize) {
       const style = SpreadsheetApp.newTextStyle();
-      if (bold === true) style.setBold(true);
-      if (italic === true) style.setItalic(true);
-      builder.setTextStyle(startIndex, endIndex, style.build());
+      if (bold) style.setBold(true);
+      if (italic) style.setItalic(true);
+      if (strikethrough) style.setStrikethrough(true);
+      if (fontFamily) style.setFontFamily(fontFamily);
+      if (fontSize) style.setFontSize(fontSize);
+      builder.setTextStyle(start, end, style.build());
     }
-    if (url) builder.setLinkUrl(startIndex, endIndex, url);
-  });
+    if (url) builder.setLinkUrl(start, end, url);
+    pos = end;
+  }
   return builder.build();
+}
+
+export function formatMarkdownSelection(): void {
+  const ui = SpreadsheetApp.getUi();
+  const range = SpreadsheetApp.getActiveRange();
+  if (!range) {
+    ui.alert("Select one or more cells first.");
+    return;
+  }
+  const values = range.getValues() as unknown[][];
+  const existingRichText = range.getRichTextValues();
+  let count = 0;
+  const grid = existingRichText.map((row, r) =>
+    row.map((existing, c) => {
+      const value = values[r][c];
+      if (typeof value !== "string" || value.trim() === "") return existing;
+      try {
+        const parsed = parseMarkdown(value);
+        if (parsed.length === 0) return existing;
+        const richText = toCellValue(parsed);
+        count++;
+        return richText;
+      } catch (_e) {
+        return existing;
+      }
+    }),
+  ) as GoogleAppsScript.Spreadsheet.RichTextValue[][];
+  range.setRichTextValues(grid);
+  ui.alert(`Formatted ${count} cell(s).`);
 }
 
 // Max files to download + upload per sub-batch in Wave 1.
@@ -491,6 +527,12 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
   const results = requests.length > 0 ? callGeminiAPIBatch(requests) : [];
 
+  const resolvedUris =
+    (config.applyMarkdown || config.includeGrounding) &&
+    results.some((r) => (r.groundingMetadata?.groundingChunks?.length ?? 0) > 0)
+      ? resolveGroundingUris(results)
+      : new Map<string, string>();
+
   // Write all results and file errors in a single batch — one flush at end of chunk.
   for (let j = 0; j < results.length; j++) {
     const i = rowIndices[j];
@@ -501,20 +543,20 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
       try {
         sheet
           .getRange(realRowIndex, outputIdx + 1)
-          .setRichTextValue(toCellValue(buildRichInferenceCellContent(result)));
+          .setRichTextValue(toCellValue(parseMarkdown(injectCitations(result, resolvedUris))));
       } catch (_e) {
-        sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
+        sheet.getRange(realRowIndex, outputIdx + 1).setValue(sanitizeForCell(result.text));
       }
     } else {
-      sheet.getRange(realRowIndex, outputIdx + 1).setValue(result.text);
+      sheet.getRange(realRowIndex, outputIdx + 1).setValue(sanitizeForCell(result.text));
     }
 
     if (config.includeGrounding && groundingIdx >= 0) {
-      const groundingContent = buildRichGroundingCellContent(result);
-      if (groundingContent !== null) {
+      const groundingMarkdown = groundingToMarkdown(result, resolvedUris);
+      if (groundingMarkdown !== null) {
         sheet
           .getRange(realRowIndex, groundingIdx + 1)
-          .setRichTextValue(toCellValue(groundingContent));
+          .setRichTextValue(toCellValue(parseMarkdown(groundingMarkdown)));
       }
     }
   }

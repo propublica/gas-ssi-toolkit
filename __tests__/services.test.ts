@@ -13,6 +13,7 @@ const mockRun = {
   getJobProgress: jest.fn(),
   importDriveLinks: jest.fn(),
   extractText: jest.fn(),
+  formatMarkdownSelection: jest.fn(),
 };
 (globalThis as unknown as { google: unknown }).google = { script: { run: mockRun } };
 
@@ -230,5 +231,22 @@ describe("getActiveRangeInfo", () => {
     const promise = services.getActiveRangeInfo();
     handlers.reject(new Error("range error"));
     await expect(promise).rejects.toThrow("range error");
+  });
+});
+
+describe("formatMarkdownSelection", () => {
+  it("calls google.script.run.formatMarkdownSelection and resolves", async () => {
+    const handlers = captureHandlers();
+    const promise = services.formatMarkdownSelection();
+    handlers.resolve(undefined);
+    await expect(promise).resolves.toBeUndefined();
+    expect(mockRun.formatMarkdownSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects when the RPC fails", async () => {
+    const handlers = captureHandlers();
+    const promise = services.formatMarkdownSelection();
+    handlers.reject(new Error("GAS error"));
+    await expect(promise).rejects.toThrow("GAS error");
   });
 });

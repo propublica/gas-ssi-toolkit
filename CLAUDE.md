@@ -292,6 +292,10 @@ sbx secret set <sandbox-name> github -t "$(gh auth token)"
 
 where `<sandbox-name>` is the value of `$SANDBOX_VM_ID` inside the sandbox.
 
+### Session Start
+
+At the start of any session where implementation work is about to begin, run `git branch --show-current`. If the current branch is `develop` or `main`, **do not write any code yet** — ask for a Linear issue ID and create a new feature branch first (following [Branch Naming](#branch-naming) below). Only develop directly on `develop` if the user explicitly says to.
+
 ### Branch Naming
 
 All feature and fix branches must follow this format:
