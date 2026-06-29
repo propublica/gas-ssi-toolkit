@@ -252,6 +252,18 @@ The Gemini API key must be set as a Script Property (`GEMINI_API_KEY`) in Apps S
 - `PropertiesService.getScriptProperties()` is available in custom functions once the add-on has been authorized by the user (opening the menu triggers authorization)
 - `.clasp.json` is committed to the repo and points to the single add-on script project
 
+## Security
+
+The threat model lives at `docs/threat_models/ssi-toolkit-threat-model.md`. Before opening a PR targeting `develop` or `main`, check whether the changes affect any documented threat or introduce a new one — and update the threat model in the same PR if so.
+
+Changes that always warrant a threat model review before submitting a PR:
+
+- **New data flows** — a new external API call, a new Drive/Sheets/Docs operation, or a new `google.script.run` RPC endpoint
+- **AI output written to the sheet** — any change to how Gemini responses are written back must go through `sanitizeForCell()` (`src/server/utils.ts`) before calling `setValue()`. It rejects values containing web-fetch functions (IMAGE, IMPORTDATA, IMPORTXML, IMPORTHTML, IMPORTRANGE, IMPORTFEED) anywhere in the formula body with an explicit error string, and prefixes other formula-triggered values (`=`, `+`, `-`) with `'` so Sheets renders them as literals (T6)
+- **`appsscript.json` OAuth scope changes** — expanding scopes affects T4 (scope expansion variant) and T5; note the change and the justification in the threat model
+- **New npm dependencies** — affects T10 (build dependency compromise); flag in the PR security checklist
+- **New or changed GCP integrations** — any new Google Cloud service, new Gemini endpoint, new data types sent, or changes to the Files API upload path; review T2, T3, T11, and T14 as a starting point
+
 ## GitHub
 
 ### Docker Sandbox authentication
