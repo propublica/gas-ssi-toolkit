@@ -557,10 +557,9 @@ describe("ConfigureAIRunPanel — model selector", () => {
   it("renders a row for each model in MODEL_CATALOG", async () => {
     const { container } = await mountAndLoad();
     const rows = container.querySelectorAll<HTMLButtonElement>("#model-list .model-option");
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(2);
     const ids = Array.from(rows).map((r) => r.getAttribute("data-value"));
     expect(ids).toContain("gemini-3.1-flash-lite");
-    expect(ids).toContain("gemini-3.5-flash");
     expect(ids).toContain("gemini-3.1-pro-preview");
   });
 
@@ -582,13 +581,13 @@ describe("ConfigureAIRunPanel — model selector", () => {
   it("updates selected row on click", async () => {
     const { container } = await mountAndLoad();
     const flashRow = container.querySelector<HTMLButtonElement>(
-      '#model-list .model-option[data-value="gemini-3.5-flash"]',
+      '#model-list .model-option[data-value="gemini-3.1-pro-preview"]',
     )!;
     flashRow.click();
     const selected = container.querySelector<HTMLButtonElement>(
       "#model-list .model-option.selected",
     );
-    expect(selected?.getAttribute("data-value")).toBe("gemini-3.5-flash");
+    expect(selected?.getAttribute("data-value")).toBe("gemini-3.1-pro-preview");
   });
 
   it("updates model summary on selection change", async () => {
@@ -609,12 +608,14 @@ describe("ConfigureAIRunPanel — model selector", () => {
       outputCol: "ai_inference",
     });
     container
-      .querySelector<HTMLButtonElement>('#model-list .model-option[data-value="gemini-3.5-flash"]')!
+      .querySelector<HTMLButtonElement>(
+        '#model-list .model-option[data-value="gemini-3.1-pro-preview"]',
+      )!
       .click();
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     await Promise.resolve(); // flush getActiveRangeInfo promise
     expect(services.runBatchAI).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "gemini-3.5-flash" }),
+      expect.objectContaining({ model: "gemini-3.1-pro-preview" }),
       expect.any(String),
     );
   });
@@ -628,11 +629,11 @@ describe("ConfigureAIRunPanel — model selector", () => {
   });
 
   it("restores model from params when no savedState", async () => {
-    const { container } = await mountAndLoad({ model: "gemini-3.5-flash" });
+    const { container } = await mountAndLoad({ model: "gemini-3.1-pro-preview" });
     const selected = container.querySelector<HTMLButtonElement>(
       "#model-list .model-option.selected",
     );
-    expect(selected?.getAttribute("data-value")).toBe("gemini-3.5-flash");
+    expect(selected?.getAttribute("data-value")).toBe("gemini-3.1-pro-preview");
   });
 
   it("unmount saves model and modelExpanded to SavedState", async () => {
@@ -641,11 +642,13 @@ describe("ConfigureAIRunPanel — model selector", () => {
       outputCol: "ai_inference",
     });
     container
-      .querySelector<HTMLButtonElement>('#model-list .model-option[data-value="gemini-3.5-flash"]')!
+      .querySelector<HTMLButtonElement>(
+        '#model-list .model-option[data-value="gemini-3.1-pro-preview"]',
+      )!
       .click();
     container.querySelector<HTMLButtonElement>("#model-toggle")!.click();
     const state = panel.unmount();
-    expect(state?.model).toBe("gemini-3.5-flash");
+    expect(state?.model).toBe("gemini-3.1-pro-preview");
     expect(state?.modelExpanded).toBe(true);
   });
 });

@@ -287,7 +287,7 @@
         .model-option.selected .model-option-name { color: var(--primary-blue); }
 
         .model-option-desc {
-            font-size: var(--font-size-200);
+            font-size: var(--font-size-100);
             color: var(--text-secondary);
             margin-top: 2px;
             line-height: 1.4;

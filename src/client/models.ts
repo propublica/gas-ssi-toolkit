@@ -27,18 +27,12 @@ export const MODEL_CATALOG: ModelCatalogEntry[] = [
     id: "gemini-3.1-flash-lite",
     name: "Gemini 3.1 Flash Lite",
     description:
-      "Best for translation, transcription, lightweight data extraction, and document processing at scale. Use when cost and speed matter most.",
-  },
-  {
-    id: "gemini-3.5-flash",
-    name: "Gemini 3.5 Flash",
-    description:
-      "Best for rapid agentic loops, complex coding cycles, and iterative multi-step tasks. A great all-rounder for most AI runs.",
+      "Good for almost all tasks — summarizing documents, pulling out key facts, translation, and categorizing records in bulk.",
   },
   {
     id: "gemini-3.1-pro-preview",
     name: "Gemini 3.1 Pro Preview",
     description:
-      "Best for precise tool usage and reliable multi-step execution where accuracy and reasoning depth matter most.",
+      "Best for tasks that require real reasoning — weighing competing claims, navigating ambiguous sources, or thinking through complex documents rather than just extracting from them.",
   },
 ];

@@ -21,7 +21,7 @@ export type ToolId = "google_search" | "url_context" | "code_execution";
  * All model IDs supported by the toolkit.
  * Extend this union when adding a new model option.
  */
-export type ModelId = "gemini-3.1-flash-lite" | "gemini-3.5-flash" | "gemini-3.1-pro-preview";
+export type ModelId = "gemini-3.1-flash-lite" | "gemini-3.1-pro-preview";
 
 // ── Prompt column spec ──────────────────────────────────────────
 
