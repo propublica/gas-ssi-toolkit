@@ -36,6 +36,7 @@
 | BO01 | Poor problem decomposition | OW JH | Educate, Reduce | The reporter cannot translate their reporting question into discrete computational steps. They ask the AI to do too much in one pass, struggle to identify which steps are inference-appropriate vs. spreadsheet-appropriate, and end up with outputs too poorly formatted to act on. |
 | BO02 | Wrong tool for the job | OW | Educate | The reporter reaches for SSI on a task better suited to NotebookLM, Gemini chat, a database query, or a simple regex. They get mediocre results from a tool optimized for something else. |
 | BO03 | AI over-reliance (manual or expert would be better) | OW JH | Educate | The reporter uses AI where manual review or a subject-matter expert would be faster, cheaper, and more reliable. They trust the tool's authority over their own or a colleague's judgment. |
+| BO04 | Data sensitivity not assessed before tool selection | CR | Educate, Reduce | The reporter holds confidential documents, source-identifying materials, embargoed information, or data subject to organizational or legal restrictions on where it may be processed. They decide to use SSI Toolkit without considering that the tool routes content to Google's Gemini servers — outside their organization's controlled infrastructure. The evaluation of whether to use the tool happens without accounting for the external data-handling path. Materials that should never leave a restricted environment are sent to an external AI service before the reporter recognizes this as a problem. |
 
 ---
 
@@ -44,7 +45,6 @@
 
 | ID | Bad Outcome | Tags | Mitigation | Description |
 | --- | --- | --- | --- | --- |
-| BO04 | Sensitive data exposure | CR | Prevent | The reporter uploads confidential documents, PII, source-identifying material, or embargoed information to Gemini servers without understanding the data-handling implications. |
 | BO05 | Unrepresentative or dirty input data | JH | Accept | The reporter runs inference on data that hasn't been inspected or cleaned. AI produces confident-looking output on bad input — missing values, duplicates, encoding errors, or a dataset that doesn't actually represent the population they're reporting on. |
 | BO06 | Unauthorized data use | CR | Accept | The reporter processes data they lack legal or ethical permission to use (scraped content under restrictive ToS, licensed datasets, third-party records with privacy constraints). |
 
