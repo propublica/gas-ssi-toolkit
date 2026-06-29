@@ -14,11 +14,11 @@ The feature is intentionally narrow: no per-model configuration knobs, no user-e
 
 | ID | Display name | Best for |
 |----|-------------|----------|
-| `gemini-3.1-flash-lite` | Flash Lite | Translation, transcription, lightweight data extraction, document processing at scale. Use when cost and speed matter most. |
-| `gemini-3.5-flash` | Flash | Rapid agentic loops, complex coding cycles, and iterative multi-step tasks. A great all-rounder. |
-| `gemini-3.1-pro-preview` | Pro Preview | Precise tool usage and reliable multi-step execution where accuracy and reasoning depth matter most. |
+| `gemini-3.1-flash-lite` | Gemini 3.1 Flash Lite | Translation, transcription, lightweight data extraction, document processing at scale. Use when cost and speed matter most. |
+| `gemini-3.5-flash` | Gemini 3.5 Flash | Rapid agentic loops, complex coding cycles, and iterative multi-step tasks. A great all-rounder. |
+| `gemini-3.1-pro-preview` | Gemini 3.1 Pro Preview | Precise tool usage and reliable multi-step execution where accuracy and reasoning depth matter most. |
 
-`gemini-3.1-flash-lite` is the default (matches current `CONFIG.MODEL_NAME`). When `RunConfig.model` is absent, `callGeminiAPI` already falls back to `CONFIG.MODEL_NAME` — no change needed there.
+`gemini-3.1-flash-lite` is the default (matches current `CONFIG.MODEL_NAME`, which is renamed to `CONFIG.DEFAULT_MODEL` to reflect its new role as a fallback). When `RunConfig.model` is absent, `callGeminiAPI` falls back to `CONFIG.DEFAULT_MODEL`.
 
 ## Architecture
 
@@ -44,9 +44,9 @@ export interface ModelCatalogEntry {
 }
 
 export const MODEL_CATALOG: ModelCatalogEntry[] = [
-  { id: "gemini-3.1-flash-lite", name: "Flash Lite", description: "..." },
-  { id: "gemini-3.5-flash",      name: "Flash",      description: "..." },
-  { id: "gemini-3.1-pro-preview", name: "Pro Preview", description: "..." },
+  { id: "gemini-3.1-flash-lite",  name: "Gemini 3.1 Flash Lite",  description: "..." },
+  { id: "gemini-3.5-flash",       name: "Gemini 3.5 Flash",       description: "..." },
+  { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", description: "..." },
 ];
 ```
 
@@ -68,9 +68,9 @@ requests.push({ ...req, apiKey, modelName: config.model });
 
 ### UI (`src/client/panels/configure-ai-run.ts`)
 
-A new non-collapsible "Model" field group is added above the Tools section. It uses `SingleTagList` for exclusive chip selection across the three models, with a `field-helper` paragraph below that updates to show the selected model's description when the selection changes.
+A new collapsible "Model" field group is added above the Tools section, following the same pattern as the Tools collapsible. When collapsed, a summary line shows the currently selected model name (e.g. "Gemini 3.1 Flash Lite"). When expanded, a `SingleTagList` renders the three model chips for exclusive selection, with a `field-helper` paragraph below that updates to show the selected model's description when the selection changes.
 
-`SavedState` gains a `model?: ModelId` field. On mount, the preset is restored from `savedState?.model ?? params?.model`, defaulting to `gemini-3.1-flash-lite` if neither is set. `assembleRunConfig` reads the selected model and includes it in the returned `RunConfig`.
+`SavedState` gains `model?: ModelId` and `modelExpanded?: boolean` fields. On mount, the preset is restored from `savedState?.model ?? params?.model`, defaulting to `gemini-3.1-flash-lite` if neither is set. `assembleRunConfig` reads the selected model and includes it in the returned `RunConfig`.
 
 ### Recipes
 
@@ -81,8 +81,11 @@ Since `RecipeSettings` is `Pick<RunConfig, "tools" | "applyMarkdown" | "includeG
 | File | Change |
 |------|--------|
 | `src/shared/types.ts` | Add `ModelId`; add `model?: ModelId` to `RunConfig`; add `"model"` to `RecipeSettings` Pick |
+| `src/server/types.ts` | Rename `AppConfig.MODEL_NAME` → `AppConfig.DEFAULT_MODEL` |
+| `src/server/config.ts` | Rename `MODEL_NAME` → `DEFAULT_MODEL` in the `CONFIG` object |
+| `src/server/api.ts` | Update `CONFIG.MODEL_NAME` reference → `CONFIG.DEFAULT_MODEL` |
 | `src/client/models.ts` | New file — `ModelCatalogEntry` interface + `MODEL_CATALOG` array |
-| `src/client/panels/configure-ai-run.ts` | Model selector UI; `SavedState` update; preset restore; `assembleRunConfig` update |
+| `src/client/panels/configure-ai-run.ts` | Collapsible model selector UI; `SavedState` update; preset restore; `assembleRunConfig` update |
 | `src/server/index.ts` | Spread `modelName: config.model` onto `GeminiRequest` at request assembly site |
 
 ## Testing
