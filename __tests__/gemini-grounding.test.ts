@@ -202,6 +202,40 @@ describe("injectCitations", () => {
       "* [Candidates are being evaluated.](https://example.com)\nMore details follow.",
     );
   });
+
+  it("snaps startIndex backward to word boundary when citation begins mid-word", () => {
+    const response = makeResponse({
+      text: "Injury: Marcus Semien is out.",
+      groundingMetadata: {
+        groundingChunks: [{ web: { uri: "https://example.com", title: "Source" } }],
+        groundingSupports: [
+          {
+            segment: { startIndex: 10, endIndex: 29, text: "rcus Semien is out." },
+            groundingChunkIndices: [0],
+          },
+        ],
+      },
+    });
+    expect(injectCitations(response)).toBe("Injury: [Marcus Semien is out.](https://example.com)");
+  });
+
+  it("snaps endIndex forward to word boundary when citation ends mid-word", () => {
+    const response = makeResponse({
+      text: "Starting pitcher Clay Holmes. While he pitched well.",
+      groundingMetadata: {
+        groundingChunks: [{ web: { uri: "https://example.com", title: "Source" } }],
+        groundingSupports: [
+          {
+            segment: { startIndex: 0, endIndex: 33, text: "Starting pitcher Clay Holmes. Whi" },
+            groundingChunkIndices: [0],
+          },
+        ],
+      },
+    });
+    expect(injectCitations(response)).toBe(
+      "[Starting pitcher Clay Holmes. While](https://example.com) he pitched well.",
+    );
+  });
 });
 
 // ---- groundingToMarkdown ----

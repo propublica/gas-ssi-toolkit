@@ -59,6 +59,22 @@ function truncateToFirstBlock(text: string): string {
   return text;
 }
 
+function snapToWordBoundaries(
+  text: string,
+  start: number,
+  end: number,
+): { start: number; end: number } {
+  let snappedStart = start;
+  while (snappedStart > 0 && /\w/.test(text[snappedStart - 1])) {
+    snappedStart--;
+  }
+  let snappedEnd = end;
+  while (snappedEnd < text.length && /\w/.test(text[snappedEnd])) {
+    snappedEnd++;
+  }
+  return { start: snappedStart, end: snappedEnd };
+}
+
 function findExistingLinkSpans(text: string): Array<{ start: number; end: number }> {
   const spans: Array<{ start: number; end: number }> = [];
   const linkRegex = /\[([^\]]*)\]\(([^)]*)\)/g;
@@ -100,13 +116,20 @@ export function injectCitations(
     const rawSpan = truncateToFirstBlock(result.slice(startIndex, endIndex));
     const prefixMatch = rawSpan.match(/^(#{1,6} |\* |- )/);
     const prefixLength = prefixMatch ? prefixMatch[1].length : 0;
-    const spanText = rawSpan.slice(prefixLength);
+    // Snap word boundaries on the content portion only (after block prefix).
+    // snappedStart cannot reach past the prefix's trailing space since \w excludes it.
+    const contentStart = startIndex + prefixLength;
+    const rawContentEnd = startIndex + rawSpan.length;
+    const { start: snappedStart, end: snappedEnd } = snapToWordBoundaries(
+      result,
+      contentStart,
+      rawContentEnd,
+    );
+    const spanText = result.slice(snappedStart, snappedEnd);
     if (!spanText) continue;
-    result =
-      result.slice(0, startIndex) +
-      rawSpan.slice(0, prefixLength) +
-      `[${spanText}](${url})` +
-      result.slice(startIndex + rawSpan.length);
+    // result.slice(0, snappedStart) naturally preserves prefix chars when
+    // snappedStart === contentStart (the common case with a block prefix).
+    result = result.slice(0, snappedStart) + `[${spanText}](${url})` + result.slice(snappedEnd);
   }
   return result;
 }
