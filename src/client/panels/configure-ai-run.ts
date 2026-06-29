@@ -219,7 +219,6 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       includeGrounding: this.includeGroundingCb?.checked ?? false,
       applyMarkdown: this.applyMarkdownCb?.checked ?? false,
       prefixWithColName: this.prefixWithColNameCb?.checked ?? false,
-      model: undefined,
       toolsExpanded: this.toolsExpanded,
     };
   }
