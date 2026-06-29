@@ -17,6 +17,12 @@
  */
 export type ToolId = "google_search" | "url_context" | "code_execution";
 
+/**
+ * All model IDs supported by the toolkit.
+ * Extend this union when adding a new model option.
+ */
+export type ModelId = "gemini-3.1-flash-lite" | "gemini-3.5-flash" | "gemini-3.1-pro-preview";
+
 // ── Prompt column spec ──────────────────────────────────────────
 
 /**
@@ -50,6 +56,8 @@ export interface RunConfig {
   applyMarkdown?: boolean;
   /** When true, each text prompt part is prefixed with its source column name as "<col>: <value>". */
   prefixWithColName?: boolean;
+  /** Model ID to use for this run. When omitted, defaults to CONFIG.DEFAULT_MODEL. */
+  model?: ModelId;
 }
 
 // ── Recipes ─────────────────────────────────────────────────────

@@ -53,7 +53,7 @@ export function buildGeminiPayload(req: GeminiRequest): Record<string, unknown> 
  * Call the Gemini generateContent endpoint and return the response as GeminiResponse.
  */
 export function callGeminiAPI(req: GeminiRequest): GeminiResponse {
-  const modelName = req.modelName ?? CONFIG.MODEL_NAME;
+  const modelName = req.modelName ?? CONFIG.DEFAULT_MODEL;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${req.apiKey}`;
 
   const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
@@ -112,7 +112,7 @@ export function callGeminiAPIBatch(reqs: GeminiRequest[]): GeminiResponse[] {
   if (reqs.length === 0) return [];
 
   const requests = reqs.map((req) => {
-    const modelName = req.modelName ?? CONFIG.MODEL_NAME;
+    const modelName = req.modelName ?? CONFIG.DEFAULT_MODEL;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${req.apiKey}`;
     return {
       url,
