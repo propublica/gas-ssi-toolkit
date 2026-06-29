@@ -514,7 +514,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
       hasFileInputs ? fileUriMap : undefined,
     );
     if (req !== null) {
-      requests.push({ ...req, apiKey });
+      requests.push({ ...req, apiKey, modelName: config.model });
       rowIndices.push(i);
     }
   }
