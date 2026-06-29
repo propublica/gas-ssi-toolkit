@@ -68,7 +68,7 @@ requests.push({ ...req, apiKey, modelName: config.model });
 
 ### UI (`src/client/panels/configure-ai-run.ts`)
 
-A new collapsible "Model" field group is added above the Tools section, following the same pattern as the Tools collapsible. When collapsed, a summary line shows the currently selected model name (e.g. "Gemini 3.1 Flash Lite"). When expanded, a `SingleTagList` renders the three model chips for exclusive selection, with a `field-helper` paragraph below that updates to show the selected model's description when the selection changes.
+A new collapsible "Model" field group is added above the Tools section, following the same pattern as the Tools collapsible. When collapsed, a summary line shows the currently selected model name (e.g. "Gemini 3.1 Flash Lite"). When expanded, three chips are rendered directly from `MODEL_CATALOG.map()` (not via `SingleTagList` — `SingleTagList` only supports strings as both display text and data-value, but model chips need separate IDs and display names). Click handlers enforce exclusive selection by toggling the `.selected` class, with a `field-helper` paragraph below that updates to show the selected model's description when the selection changes.
 
 `SavedState` gains `model?: ModelId` and `modelExpanded?: boolean` fields. On mount, the preset is restored from `savedState?.model ?? params?.model`, defaulting to `gemini-3.1-flash-lite` if neither is set. `assembleRunConfig` reads the selected model and includes it in the returned `RunConfig`.
 
