@@ -140,18 +140,12 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     // Model selection
     const initialModel: ModelId = preset.model ?? "gemini-3.1-flash-lite";
     this.modelListEl = container.querySelector<HTMLElement>("#model-list");
-    const modelButtons = this.modelListEl?.querySelectorAll<HTMLButtonElement>(".tag");
+    const modelButtons = this.modelListEl?.querySelectorAll<HTMLButtonElement>(".model-option");
 
     const updateModelSummary = (): void => {
       const entry = MODEL_CATALOG.find((m) => m.id === this.getSelectedModel());
       const summary = container.querySelector<HTMLElement>("#model-summary");
       if (summary) summary.textContent = entry?.name ?? "";
-    };
-
-    const updateModelDescription = (): void => {
-      const entry = MODEL_CATALOG.find((m) => m.id === this.getSelectedModel());
-      const desc = container.querySelector<HTMLElement>("#model-description");
-      if (desc) desc.textContent = entry?.description ?? "";
     };
 
     modelButtons?.forEach((btn) => {
@@ -160,12 +154,10 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         modelButtons.forEach((b) => b.classList.remove("selected"));
         btn.classList.add("selected");
         updateModelSummary();
-        updateModelDescription();
       });
     });
 
     updateModelSummary();
-    updateModelDescription();
 
     this.modelExpanded = savedState?.modelExpanded ?? false;
     this.applyModelExpandState(container);
@@ -282,7 +274,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   }
 
   private getSelectedModel(): ModelId {
-    const selected = this.modelListEl?.querySelector<HTMLButtonElement>(".tag.selected");
+    const selected = this.modelListEl?.querySelector<HTMLButtonElement>(".model-option.selected");
     return (selected?.getAttribute("data-value") as ModelId) ?? "gemini-3.1-flash-lite";
   }
 
@@ -461,11 +453,9 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           <span class="collapsible-chevron">▶</span>
         </button>
         <div id="model-content" class="collapsible-content" hidden>
-          <p class="field-helper">Choose the Gemini model for this run. Each model has different strengths.</p>
-          <div id="model-list" class="tag-list">
-            ${MODEL_CATALOG.map((m) => `<button type="button" class="tag" data-value="${m.id}">${m.name}</button>`).join("")}
+          <div id="model-list" class="model-option-list">
+            ${MODEL_CATALOG.map((m) => `<button type="button" class="model-option" data-value="${m.id}"><span class="model-option-name">${m.name}</span><span class="model-option-desc">${m.description}</span></button>`).join("")}
           </div>
-          <p class="field-helper" id="model-description"></p>
         </div>
       </div>
       <div class="field-group">

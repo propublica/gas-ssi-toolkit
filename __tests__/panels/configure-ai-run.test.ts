@@ -554,48 +554,52 @@ describe("prefixWithColName checkbox", () => {
 });
 
 describe("ConfigureAIRunPanel — model selector", () => {
-  it("renders a chip for each model in MODEL_CATALOG", async () => {
+  it("renders a row for each model in MODEL_CATALOG", async () => {
     const { container } = await mountAndLoad();
-    const chips = container.querySelectorAll<HTMLButtonElement>("#model-list .tag");
-    expect(chips).toHaveLength(3);
-    const ids = Array.from(chips).map((c) => c.getAttribute("data-value"));
+    const rows = container.querySelectorAll<HTMLButtonElement>("#model-list .model-option");
+    expect(rows).toHaveLength(3);
+    const ids = Array.from(rows).map((r) => r.getAttribute("data-value"));
     expect(ids).toContain("gemini-3.1-flash-lite");
     expect(ids).toContain("gemini-3.5-flash");
     expect(ids).toContain("gemini-3.1-pro-preview");
   });
 
+  it("each row shows name and description inline", async () => {
+    const { container } = await mountAndLoad();
+    const firstRow = container.querySelector<HTMLButtonElement>("#model-list .model-option")!;
+    expect(firstRow.querySelector(".model-option-name")?.textContent).toBe("Gemini 3.1 Flash Lite");
+    expect(firstRow.querySelector(".model-option-desc")?.textContent?.length).toBeGreaterThan(0);
+  });
+
   it("selects gemini-3.1-flash-lite by default", async () => {
     const { container } = await mountAndLoad();
-    const selected = container.querySelector<HTMLButtonElement>("#model-list .tag.selected");
+    const selected = container.querySelector<HTMLButtonElement>(
+      "#model-list .model-option.selected",
+    );
     expect(selected?.getAttribute("data-value")).toBe("gemini-3.1-flash-lite");
   });
 
-  it("updates selected chip on click", async () => {
+  it("updates selected row on click", async () => {
     const { container } = await mountAndLoad();
-    const flashChip = container.querySelector<HTMLButtonElement>(
-      '#model-list .tag[data-value="gemini-3.5-flash"]',
+    const flashRow = container.querySelector<HTMLButtonElement>(
+      '#model-list .model-option[data-value="gemini-3.5-flash"]',
     )!;
-    flashChip.click();
-    const selected = container.querySelector<HTMLButtonElement>("#model-list .tag.selected");
+    flashRow.click();
+    const selected = container.querySelector<HTMLButtonElement>(
+      "#model-list .model-option.selected",
+    );
     expect(selected?.getAttribute("data-value")).toBe("gemini-3.5-flash");
   });
 
   it("updates model summary on selection change", async () => {
     const { container } = await mountAndLoad();
     container
-      .querySelector<HTMLButtonElement>('#model-list .tag[data-value="gemini-3.1-pro-preview"]')!
+      .querySelector<HTMLButtonElement>(
+        '#model-list .model-option[data-value="gemini-3.1-pro-preview"]',
+      )!
       .click();
     const summary = container.querySelector<HTMLElement>("#model-summary");
     expect(summary?.textContent).toBe("Gemini 3.1 Pro Preview");
-  });
-
-  it("updates model description on selection change", async () => {
-    const { container } = await mountAndLoad();
-    container
-      .querySelector<HTMLButtonElement>('#model-list .tag[data-value="gemini-3.5-flash"]')!
-      .click();
-    const desc = container.querySelector<HTMLElement>("#model-description");
-    expect(desc?.textContent).toContain("agentic");
   });
 
   it("includes selected model in assembleRunConfig output", async () => {
@@ -605,7 +609,7 @@ describe("ConfigureAIRunPanel — model selector", () => {
       outputCol: "ai_inference",
     });
     container
-      .querySelector<HTMLButtonElement>('#model-list .tag[data-value="gemini-3.5-flash"]')!
+      .querySelector<HTMLButtonElement>('#model-list .model-option[data-value="gemini-3.5-flash"]')!
       .click();
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     await Promise.resolve(); // flush getActiveRangeInfo promise
@@ -617,13 +621,17 @@ describe("ConfigureAIRunPanel — model selector", () => {
 
   it("restores model from savedState", async () => {
     const { container } = await mountAndLoad({}, { model: "gemini-3.1-pro-preview" } as any);
-    const selected = container.querySelector<HTMLButtonElement>("#model-list .tag.selected");
+    const selected = container.querySelector<HTMLButtonElement>(
+      "#model-list .model-option.selected",
+    );
     expect(selected?.getAttribute("data-value")).toBe("gemini-3.1-pro-preview");
   });
 
   it("restores model from params when no savedState", async () => {
     const { container } = await mountAndLoad({ model: "gemini-3.5-flash" });
-    const selected = container.querySelector<HTMLButtonElement>("#model-list .tag.selected");
+    const selected = container.querySelector<HTMLButtonElement>(
+      "#model-list .model-option.selected",
+    );
     expect(selected?.getAttribute("data-value")).toBe("gemini-3.5-flash");
   });
 
@@ -633,7 +641,7 @@ describe("ConfigureAIRunPanel — model selector", () => {
       outputCol: "ai_inference",
     });
     container
-      .querySelector<HTMLButtonElement>('#model-list .tag[data-value="gemini-3.5-flash"]')!
+      .querySelector<HTMLButtonElement>('#model-list .model-option[data-value="gemini-3.5-flash"]')!
       .click();
     container.querySelector<HTMLButtonElement>("#model-toggle")!.click();
     const state = panel.unmount();
