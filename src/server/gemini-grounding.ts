@@ -47,6 +47,10 @@ function mergeCitations(
 // block boundaries — groupBlocks() splits on these lines before inline parsing runs.
 function truncateToFirstBlock(text: string): string {
   const lines = text.split("\n");
+  // If the span starts on a heading or bullet line it must not cross into the next line.
+  if (/^(#{1,6} |\* |- )/.test(lines[0])) {
+    return lines[0];
+  }
   for (let i = 1; i < lines.length; i++) {
     if (/^(\* |- |#{1,6} |$)/.test(lines[i])) {
       return lines.slice(0, i).join("\n");
@@ -93,11 +97,16 @@ export function injectCitations(
       (span) => startIndex < span.end && endIndex > span.start,
     );
     if (overlaps) continue;
-    const spanText = truncateToFirstBlock(result.slice(startIndex, endIndex));
+    const rawSpan = truncateToFirstBlock(result.slice(startIndex, endIndex));
+    const prefixMatch = rawSpan.match(/^(#{1,6} |\* |- )/);
+    const prefixLength = prefixMatch ? prefixMatch[1].length : 0;
+    const spanText = rawSpan.slice(prefixLength);
+    if (!spanText) continue;
     result =
       result.slice(0, startIndex) +
+      rawSpan.slice(0, prefixLength) +
       `[${spanText}](${url})` +
-      result.slice(startIndex + spanText.length);
+      result.slice(startIndex + rawSpan.length);
   }
   return result;
 }

@@ -158,6 +158,50 @@ describe("injectCitations", () => {
       `[Paris is the capital of France.](${redirectUri})`,
     );
   });
+
+  it("preserves heading prefix outside link and truncates before following paragraph", () => {
+    const response = makeResponse({
+      text: "### Trade Deadline Looming\nBecause the team is struggling heavily.",
+      groundingMetadata: {
+        groundingChunks: [{ web: { uri: "https://example.com", title: "Source" } }],
+        groundingSupports: [
+          {
+            segment: {
+              startIndex: 0,
+              endIndex: 50,
+              text: "### Trade Deadline Looming\nBecause the team is st",
+            },
+            groundingChunkIndices: [0],
+          },
+        ],
+      },
+    });
+    expect(injectCitations(response)).toBe(
+      "### [Trade Deadline Looming](https://example.com)\nBecause the team is struggling heavily.",
+    );
+  });
+
+  it("preserves bullet prefix outside link and truncates before following paragraph", () => {
+    const response = makeResponse({
+      text: "* Candidates are being evaluated.\nMore details follow.",
+      groundingMetadata: {
+        groundingChunks: [{ web: { uri: "https://example.com", title: "Source" } }],
+        groundingSupports: [
+          {
+            segment: {
+              startIndex: 0,
+              endIndex: 48,
+              text: "* Candidates are being evaluated.\nMore details f",
+            },
+            groundingChunkIndices: [0],
+          },
+        ],
+      },
+    });
+    expect(injectCitations(response)).toBe(
+      "* [Candidates are being evaluated.](https://example.com)\nMore details follow.",
+    );
+  });
 });
 
 // ---- groundingToMarkdown ----
