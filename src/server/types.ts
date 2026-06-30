@@ -12,7 +12,7 @@ import type { PromptColumnSpec, ToolId } from "../shared/types";
 
 export interface AppConfig {
   API_KEY_PROPERTY: string;
-  MODEL_NAME: string;
+  DEFAULT_MODEL: string;
   /**
    * Inline data size limits for the Gemini REST API.
    * Source: https://ai.google.dev/gemini-api/docs/file-input-methods#method-comparison
@@ -143,7 +143,7 @@ export interface DriveFileInfo {
 
 export interface GeminiRequest {
   apiKey: string;
-  modelName?: string; // defaults to CONFIG.MODEL_NAME if omitted
+  modelName?: string; // defaults to CONFIG.DEFAULT_MODEL if omitted
   systemPrompt?: string;
   /** Ordered user-turn parts assembled by the caller. Maps 1:1 to contents[0].parts in the REST payload. */
   userParts: GeminiUserPart[];

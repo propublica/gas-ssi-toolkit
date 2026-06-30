@@ -1,5 +1,5 @@
 import type { NavigationContext, Panel } from "../types";
-import { runTool } from "../services";
+import { runTool, formatMarkdownSelection } from "../services";
 import { jobStore } from "../job-store";
 
 export class ToolListPanel implements Panel {
@@ -27,6 +27,18 @@ export class ToolListPanel implements Panel {
     });
     container.querySelector("#btn-extract-text")?.addEventListener("click", () => {
       nav.navigate("extract-text");
+    });
+    container.querySelector("#btn-format-markdown")?.addEventListener("click", () => {
+      const btn = container.querySelector<HTMLButtonElement>("#btn-format-markdown")!;
+      const originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="icon">📝</span> Formatting...';
+      formatMarkdownSelection()
+        .catch((err: Error) => globalThis.alert("Error: " + err.message))
+        .finally(() => {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        });
     });
   }
 
@@ -61,10 +73,13 @@ export class ToolListPanel implements Panel {
         <button id="btn-extract-text" class="tool-btn">
           <span class="icon">📜</span> Extract Text
         </button>
+        <button id="btn-format-markdown" class="tool-btn">
+          <span class="icon">📝</span> Format Markdown
+        </button>
       </div>
       <div class="status-footer">
         <strong>SSI Tools v2.1</strong><br>
-        Powered by Gemini 3.1 Flash Lite Preview<br>
+        Powered by Gemini 3.1 Flash Lite<br>
         Evaluation Unrestricted Mode
       </div>
     `;

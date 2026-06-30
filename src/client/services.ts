@@ -83,3 +83,12 @@ export function getJobProgress(
       .getJobProgress(jobId);
   });
 }
+
+export function formatMarkdownSelection(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler(() => resolve())
+      .withFailureHandler((err: Error) => reject(err))
+      .formatMarkdownSelection();
+  });
+}

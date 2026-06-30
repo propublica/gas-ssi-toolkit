@@ -1,5 +1,5 @@
 import type { NavigationContext, Panel } from "../types";
-import type { RunConfig, ToolId } from "../../shared/types";
+import type { RunConfig, ToolId, ModelId } from "../../shared/types";
 import { TagList } from "../components/tag-list";
 import { TokenInput } from "../components/token-input";
 import { PromptColList } from "../components/prompt-col-list";
@@ -8,6 +8,7 @@ import { PanelLoader } from "../components/panel-loader";
 import { getSheetHeaders, runBatchAI, getActiveRangeInfo } from "../services";
 import { jobStore } from "../job-store";
 import { TOOL_CATALOG } from "../tools";
+import { MODEL_CATALOG } from "../models";
 
 export const CHUNK_SIZE = 40;
 // Warn before dispatch when the batch exceeds this many rows, regardless of chunk count.
@@ -26,13 +27,17 @@ export function computeChunks(
 }
 
 export type SavedState = Required<
-  Omit<RunConfig, "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "prefixWithColName">
+  Omit<
+    RunConfig,
+    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "prefixWithColName" | "model"
+  >
 > &
   Pick<
     RunConfig,
-    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "prefixWithColName"
+    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "prefixWithColName" | "model"
   > & {
     toolsExpanded?: boolean;
+    modelExpanded?: boolean;
   };
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
@@ -48,6 +53,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private nav: NavigationContext | null = null;
   private headersLoaded = false;
   private toolsExpanded = false;
+  private modelListEl: HTMLElement | null = null;
+  private modelExpanded = false;
 
   mount(
     container: HTMLElement,
@@ -71,6 +78,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           includeGrounding: savedState.includeGrounding,
           applyMarkdown: savedState.applyMarkdown,
           prefixWithColName: savedState.prefixWithColName,
+          model: savedState.model,
         }
       : (params ?? {});
 
@@ -128,6 +136,35 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     };
     updateToolsSummary();
     container.querySelector("#tools-list")?.addEventListener("click", updateToolsSummary);
+
+    // Model selection
+    const initialModel: ModelId = preset.model ?? "gemini-3.1-flash-lite";
+    this.modelListEl = container.querySelector<HTMLElement>("#model-list");
+    const modelButtons = this.modelListEl?.querySelectorAll<HTMLButtonElement>(".model-option");
+
+    const updateModelSummary = (): void => {
+      const entry = MODEL_CATALOG.find((m) => m.id === this.getSelectedModel());
+      const summary = container.querySelector<HTMLElement>("#model-summary");
+      if (summary) summary.textContent = entry?.name ?? "";
+    };
+
+    modelButtons?.forEach((btn) => {
+      if (btn.getAttribute("data-value") === initialModel) btn.classList.add("selected");
+      btn.addEventListener("click", () => {
+        modelButtons.forEach((b) => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        updateModelSummary();
+      });
+    });
+
+    updateModelSummary();
+
+    this.modelExpanded = savedState?.modelExpanded ?? false;
+    this.applyModelExpandState(container);
+    container.querySelector("#model-toggle")?.addEventListener("click", () => {
+      this.modelExpanded = !this.modelExpanded;
+      this.applyModelExpandState(container);
+    });
 
     const loader = new PanelLoader(container);
     loader.setState({ status: "loading", message: "Loading columns..." });
@@ -217,6 +254,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       applyMarkdown: this.applyMarkdownCb?.checked ?? false,
       prefixWithColName: this.prefixWithColNameCb?.checked ?? false,
       toolsExpanded: this.toolsExpanded,
+      model: this.getSelectedModel(),
+      modelExpanded: this.modelExpanded,
     };
   }
 
@@ -225,6 +264,18 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     const toggle = container.querySelector<HTMLButtonElement>("#tools-toggle");
     if (content) content.hidden = !this.toolsExpanded;
     if (toggle) toggle.setAttribute("aria-expanded", String(this.toolsExpanded));
+  }
+
+  private applyModelExpandState(container: HTMLElement): void {
+    const content = container.querySelector<HTMLElement>("#model-content");
+    const toggle = container.querySelector<HTMLButtonElement>("#model-toggle");
+    if (content) content.hidden = !this.modelExpanded;
+    if (toggle) toggle.setAttribute("aria-expanded", String(this.modelExpanded));
+  }
+
+  private getSelectedModel(): ModelId {
+    const selected = this.modelListEl?.querySelector<HTMLButtonElement>(".model-option.selected");
+    return (selected?.getAttribute("data-value") as ModelId) ?? "gemini-3.1-flash-lite";
   }
 
   private wireNavButtons(container: HTMLElement): void {
@@ -254,6 +305,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       includeGrounding: this.includeGroundingCb?.checked,
       applyMarkdown: this.applyMarkdownCb?.checked,
       prefixWithColName: this.prefixWithColNameCb?.checked,
+      model: this.getSelectedModel(),
     };
   }
 
@@ -339,6 +391,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     const includeGrounding = this.includeGroundingCb?.checked ?? false;
     const applyMarkdown = this.applyMarkdownCb?.checked ?? false;
     const prefixWithColName = this.prefixWithColNameCb?.checked ?? false;
+    const model = this.getSelectedModel();
     return {
       promptCols,
       systemPromptCol,
@@ -348,6 +401,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       includeGrounding: includeGrounding || undefined,
       applyMarkdown: applyMarkdown || undefined,
       prefixWithColName: prefixWithColName || undefined,
+      model,
     };
   }
 
@@ -391,6 +445,18 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           <input type="checkbox" id="apply-markdown-cb" />
           <span>Apply markdown formatting</span>
         </label>
+      </div>
+      <div class="field-group">
+        <button type="button" id="model-toggle" class="collapsible-header">
+          <span class="collapsible-label">MODEL</span>
+          <span id="model-summary" class="collapsible-summary"></span>
+          <span class="collapsible-chevron">▶</span>
+        </button>
+        <div id="model-content" class="collapsible-content" hidden>
+          <div id="model-list" class="model-option-list">
+            ${MODEL_CATALOG.map((m) => `<button type="button" class="model-option" data-value="${m.id}"><span class="model-option-name">${m.name}</span><span class="model-option-desc">${m.description}</span></button>`).join("")}
+          </div>
+        </div>
       </div>
       <div class="field-group">
         <button type="button" id="tools-toggle" class="collapsible-header">

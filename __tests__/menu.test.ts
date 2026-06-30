@@ -77,15 +77,15 @@ describe("onOpen", () => {
     jest.clearAllMocks();
   });
 
-  it("creates a menu named '⚡ SSI Toolkit'", () => {
+  it("creates a menu named '📐 SSI Toolkit'", () => {
     onOpen();
-    expect(mockCreateMenu).toHaveBeenCalledWith("⚡ SSI Toolkit");
+    expect(mockCreateMenu).toHaveBeenCalledWith("📐 SSI Toolkit");
   });
 
   it("adds a single item that opens the sidebar", () => {
     onOpen();
     expect(mockAddItem).toHaveBeenCalledTimes(1);
-    expect(mockAddItem).toHaveBeenCalledWith("🚀 Open SSI Toolkit", "showSidebar");
+    expect(mockAddItem).toHaveBeenCalledWith("📐 Open SSI Toolkit", "showSidebar");
   });
 
   it("adds the menu to the UI", () => {

@@ -250,29 +250,137 @@ The Gemini API key must be set as a Script Property (`GEMINI_API_KEY`) in Apps S
 - `appsscript.json` must be in `dist/` for clasp push (the build script copies it)
 - Drive Advanced Service must be enabled in the Apps Script editor AND declared in `appsscript.json`
 - `PropertiesService.getScriptProperties()` is available in custom functions once the add-on has been authorized by the user (opening the menu triggers authorization)
-- `.clasp.json` is committed to the repo and points to the single add-on script project
+- `.clasp.json` is gitignored and must be present locally for clasp commands to work — it is not committed to the repo
+
+## Security
+
+The threat model lives at `docs/threat_models/ssi-toolkit-threat-model.md`. Before opening a PR targeting `develop` or `main`, check whether the changes affect any documented threat or introduce a new one — and update the threat model in the same PR if so.
+
+Changes that always warrant a threat model review before submitting a PR:
+
+- **New data flows** — a new external API call, a new Drive/Sheets/Docs operation, or a new `google.script.run` RPC endpoint
+- **AI output written to the sheet** — any change to how Gemini responses are written back must go through `sanitizeForCell()` (`src/server/utils.ts`) before calling `setValue()`. It rejects values containing web-fetch functions (IMAGE, IMPORTDATA, IMPORTXML, IMPORTHTML, IMPORTRANGE, IMPORTFEED) anywhere in the formula body with an explicit error string, and prefixes other formula-triggered values (`=`, `+`, `-`) with `'` so Sheets renders them as literals (T6)
+- **`appsscript.json` OAuth scope changes** — expanding scopes affects T4 (scope expansion variant) and T5; note the change and the justification in the threat model
+- **New npm dependencies** — affects T10 (build dependency compromise); flag in the PR security checklist
+- **New or changed GCP integrations** — any new Google Cloud service, new Gemini endpoint, new data types sent, or changes to the Files API upload path; review T2, T3, T11, and T14 as a starting point
+
+## Git Worktrees
+
+Worktrees live in `.claude/worktrees/` (already gitignored). The `EnterWorktree` native tool handles creation. Each worktree must be on a **unique branch** — git enforces this; two worktrees cannot share the same branch simultaneously.
+
+### Setting up a new worktree
+
+After creating the worktree, run these steps before starting work:
+
+1. **Install dependencies** — `node_modules/` is gitignored and absent in fresh worktrees:
+   ```bash
+   npm install
+   ```
+
+2. **Symlink `.clasp.json`** — only needed if you plan to deploy and test against the dev sheet. `.clasp.json` is gitignored so it won't be present. Symlink from the main workspace so all worktrees share the same target script project:
+   ```bash
+   ln -s /path/to/gas-ssi-toolkit/.clasp.json .clasp.json
+   ```
+   Skip this step for work that doesn't require a live deployment test (e.g. pure logic changes covered by tests).
+
+3. **Deploy from only one worktree at a time** — all worktrees share the same Apps Script project. Running `deploy:watch` from two worktrees simultaneously produces a mixed build. Consciously choose which worktree is "active" for live testing.
+
+### Finishing a worktree
+
+When the feature is ready, open a PR against `develop` (see [Branch Naming](#branch-naming) and [Creating PRs](#creating-prs) below). Once the PR is merged, delete the worktree:
+
+```bash
+git worktree remove .claude/worktrees/AI-{n}-feature-name
+```
 
 ## GitHub
 
-### Creating PRs
+### Docker Sandbox authentication
 
-The `gh` CLI may fail with a TLS certificate error (`OSStatus -26276`) on this machine. Use the GitHub API directly via curl instead:
+> Non-sandbox setups (local dev, direct `gh` auth) can use `gh pr create`, `gh` CLI, or any standard approach and can skip this section.
+
+The sandbox proxy intercepts outbound requests to `api.github.com` and `github.com` and injects the real GitHub token at the network level — the actual credential never enters the sandbox. `GH_TOKEN` inside the sandbox holds a sentinel placeholder (`gho_sbxproxymanaged...`), not the real token, which is why `gh auth status` reports "The token in GH_TOKEN is invalid." That's expected and doesn't affect git or curl operations.
+
+The proxy MITM-inspects TLS using a trusted CA (`Docker Sandboxes Proxy CA` is in the system cert store), so no `-k` flag is needed for curl calls to GitHub.
+
+**Why `gh` CLI doesn't work here (even though it uses the REST API):** `gh` fails at the network layer, not the auth layer. The sandbox routes all traffic through an HTTP proxy at `localhost:3128`. curl (libcurl) successfully tunnels through it; `gh`'s Go `net/http` client fails to establish the CONNECT tunnel and reports "error connecting to localhost." The proxy's credential injection only fires once the tunnel is up — `gh` never gets that far. (`gh auth status` has a separate, earlier failure: it validates `GH_TOKEN` locally and rejects the sentinel before making any network call.)
+
+**Why `git push`/`git pull` work fine (HTTPS remotes only):** Git uses libcurl for HTTPS transport — the same library curl uses — so it tunnels through the proxy correctly and gets credentials injected transparently. No `git config credential.*` setup is needed. Make sure your remote uses HTTPS, not SSH:
 
 ```bash
-TOKEN=$(gh auth token)
-curl -s -k -X POST \
-  -H "Authorization: token $TOKEN" \
-  -H "Accept: application/vnd.github.v3+json" \
-  https://api.github.com/repos/propublica/gas-ssi-toolkit/pulls \
-  -d "{
-    \"title\": \"your PR title\",
-    \"head\": \"your-branch-name\",
-    \"base\": \"develop\",
-    \"body\": \"your PR body\"
-  }" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('html_url') or d)"
+git remote set-url origin https://github.com/propublica/gas-ssi-toolkit.git
 ```
 
-PRs target `develop` by default; use `"base": "main"` for hotfixes. The `-k` flag skips TLS verification (safe for GitHub's well-known API).
+SSH remotes (`git@github.com:...`) require additional host-side setup (SSH agent forwarding + network policy changes) and don't work out of the box — see the [Docker Sandbox credentials docs](https://docs.docker.com/ai/sandboxes/security/credentials/#ssh-agent).
+
+If `git push` does fail with `fatal: could not read Username`, it means the sandbox secret hasn't been set on the host yet. Fix by running on the host:
+
+```bash
+sbx secret set <sandbox-name> github -t "$(gh auth token)"
+```
+
+where `<sandbox-name>` is the value of `$SANDBOX_VM_ID` inside the sandbox.
+
+### Session Start
+
+At the start of any session where implementation work is about to begin, run `git branch --show-current`. If the current branch is `develop` or `main`, **do not write any code yet** — ask for a Linear issue ID and create a new feature branch first (following [Branch Naming](#branch-naming) below). Only develop directly on `develop` if the user explicitly says to.
+
+### Branch Naming
+
+All feature and fix branches must follow this format:
+
+```
+AI-{issue-number}-short-description
+```
+
+Examples: `AI-42-add-token-input`, `AI-107-fix-recipe-prep-crash`
+
+Linear's GitHub integration auto-detects branches with the issue ID pattern and links them to the issue on the Linear side. This is a public repo — no Linear URLs go in PR bodies. The branch name alone is sufficient to trigger the integration; no additional issue reference is needed in the PR body.
+
+**When creating a new branch:** Ask for the Linear issue ID if none is evident from context. Suggest the `AI-{n}-description` name before running `git checkout -b`.
+
+**When creating a PR:** Check the branch name against `AI-\d+`. If absent, pause and say:
+
+> "This branch name doesn't contain a Linear issue ID (`AI-123-...`). Is there an associated Linear issue? If not, say 'no issue' to proceed."
+
+Wait for confirmation before creating the PR.
+
+### Creating PRs
+
+> Non-sandbox setups (local dev, direct `gh` auth) can use `gh pr create` and skip this section.
+
+**Step 1 — Branch name check**
+
+Run `git branch --show-current`. If the output does not match `AI-\d+` (e.g. `AI-42-my-feature`), warn and wait for confirmation. See [Branch Naming](#branch-naming).
+
+**Step 2 — Build the PR body**
+
+Read `.github/PULL_REQUEST_TEMPLATE.md` to get the section structure. Assemble the body:
+
+- **Summary:** 2–4 bullets from `git log <base>..HEAD --oneline` and `git diff <base>..HEAD`. Focus on motivation and impact — not just a restatement of commit titles. Use `develop` as `<base>` for PRs targeting develop, `main` for PRs targeting main.
+
+- **Manual QA — two parts in this order:**
+  1. *Feature-specific steps* — add numbered steps above the regression checklist items (not under a separate heading) that a human can follow to manually verify this PR's specific changes. Write from the diff. Be concrete (name the menu item, the sidebar panel, the column, etc.).
+  2. *Regression checklist* — paste the regression checklist from the template verbatim (the template already includes a note about N/A for `develop`-targeting PRs; do not add a second one).
+
+- **Notes:** Fill in only if a reviewer needs specific information (migration steps, known limitations, deploy dependencies). Otherwise leave the HTML comment placeholder from the template unchanged.
+
+**Step 3 — Create the PR**
+
+Use curl — the sandbox proxy injects credentials automatically. Use Python to assemble the JSON payload so the body is correctly escaped:
+
+```bash
+curl -s -X POST \
+  -H "Accept: application/vnd.github.v3+json" \
+  https://api.github.com/repos/propublica/gas-ssi-toolkit/pulls \
+  -d "$(python3 -c "
+import json
+body = '''<assembled body — paste the populated template here as a Python triple-quoted string>'''
+print(json.dumps({'title': '<PR title>', 'head': '<branch-name>', 'base': 'develop', 'body': body}))
+")" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('html_url') or d)"
+```
+
+PRs target `develop` by default; use `"base": "main"` for hotfixes.
 
 ## Code Style
 

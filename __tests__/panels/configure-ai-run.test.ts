@@ -552,3 +552,103 @@ describe("prefixWithColName checkbox", () => {
     expect(container.querySelector<HTMLInputElement>("#prefix-col-name-cb")!.checked).toBe(true);
   });
 });
+
+describe("ConfigureAIRunPanel — model selector", () => {
+  it("renders a row for each model in MODEL_CATALOG", async () => {
+    const { container } = await mountAndLoad();
+    const rows = container.querySelectorAll<HTMLButtonElement>("#model-list .model-option");
+    expect(rows).toHaveLength(2);
+    const ids = Array.from(rows).map((r) => r.getAttribute("data-value"));
+    expect(ids).toContain("gemini-3.1-flash-lite");
+    expect(ids).toContain("gemini-3.1-pro-preview");
+  });
+
+  it("each row shows name and description inline", async () => {
+    const { container } = await mountAndLoad();
+    const firstRow = container.querySelector<HTMLButtonElement>("#model-list .model-option")!;
+    expect(firstRow.querySelector(".model-option-name")?.textContent).toBe("Gemini 3.1 Flash Lite");
+    expect(firstRow.querySelector(".model-option-desc")?.textContent?.length).toBeGreaterThan(0);
+  });
+
+  it("selects gemini-3.1-flash-lite by default", async () => {
+    const { container } = await mountAndLoad();
+    const selected = container.querySelector<HTMLButtonElement>(
+      "#model-list .model-option.selected",
+    );
+    expect(selected?.getAttribute("data-value")).toBe("gemini-3.1-flash-lite");
+  });
+
+  it("updates selected row on click", async () => {
+    const { container } = await mountAndLoad();
+    const flashRow = container.querySelector<HTMLButtonElement>(
+      '#model-list .model-option[data-value="gemini-3.1-pro-preview"]',
+    )!;
+    flashRow.click();
+    const selected = container.querySelector<HTMLButtonElement>(
+      "#model-list .model-option.selected",
+    );
+    expect(selected?.getAttribute("data-value")).toBe("gemini-3.1-pro-preview");
+  });
+
+  it("updates model summary on selection change", async () => {
+    const { container } = await mountAndLoad();
+    container
+      .querySelector<HTMLButtonElement>(
+        '#model-list .model-option[data-value="gemini-3.1-pro-preview"]',
+      )!
+      .click();
+    const summary = container.querySelector<HTMLElement>("#model-summary");
+    expect(summary?.textContent).toBe("Gemini 3.1 Pro Preview");
+  });
+
+  it("includes selected model in assembleRunConfig output", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+    });
+    container
+      .querySelector<HTMLButtonElement>(
+        '#model-list .model-option[data-value="gemini-3.1-pro-preview"]',
+      )!
+      .click();
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    await Promise.resolve(); // flush getActiveRangeInfo promise
+    expect(services.runBatchAI).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "gemini-3.1-pro-preview" }),
+      expect.any(String),
+    );
+  });
+
+  it("restores model from savedState", async () => {
+    const { container } = await mountAndLoad({}, { model: "gemini-3.1-pro-preview" } as any);
+    const selected = container.querySelector<HTMLButtonElement>(
+      "#model-list .model-option.selected",
+    );
+    expect(selected?.getAttribute("data-value")).toBe("gemini-3.1-pro-preview");
+  });
+
+  it("restores model from params when no savedState", async () => {
+    const { container } = await mountAndLoad({ model: "gemini-3.1-pro-preview" });
+    const selected = container.querySelector<HTMLButtonElement>(
+      "#model-list .model-option.selected",
+    );
+    expect(selected?.getAttribute("data-value")).toBe("gemini-3.1-pro-preview");
+  });
+
+  it("unmount saves model and modelExpanded to SavedState", async () => {
+    const { container, panel } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+    });
+    container
+      .querySelector<HTMLButtonElement>(
+        '#model-list .model-option[data-value="gemini-3.1-pro-preview"]',
+      )!
+      .click();
+    container.querySelector<HTMLButtonElement>("#model-toggle")!.click();
+    const state = panel.unmount();
+    expect(state?.model).toBe("gemini-3.1-pro-preview");
+    expect(state?.modelExpanded).toBe(true);
+  });
+});

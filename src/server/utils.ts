@@ -6,7 +6,7 @@
  * Functions that operate purely on plain values have no GAS dependency at all.
  */
 
-import type { DriveFileInfo } from "./types";
+import type { DriveFileInfo, GeminiResponse } from "./types";
 
 /**
  * Extract a Google Drive file/folder ID from a URL or raw ID string.
@@ -177,4 +177,87 @@ export function writeColumn(
   if (wrapStrategy !== undefined) {
     range.setWrapStrategy(wrapStrategy);
   }
+}
+
+/**
+ * Idempotent — re-applied on each chunk; header colour and note content never change between calls.
+ */
+export function markAIOutputRange(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  colIdx: number,
+  startRow: number,
+  numRows: number,
+): void {
+  const header = sheet.getRange(1, colIdx);
+  header.setBackground("#F9AB00");
+  header.setNote(
+    "Some cells in this column may be AI-generated — exercise good judgement when using",
+  );
+  sheet.getRange(startRow, colIdx, numRows, 1).setBackground("#FFF8E1");
+}
+
+// Sheets functions that make outbound HTTP requests — the exfiltration vector for formula injection.
+// We scan the whole formula body so nested calls like =IF(1=1,IMAGE("evil"),0) are caught too.
+const WEB_FETCH_PATTERN = /\b(image|importdata|importxml|importhtml|importrange|importfeed)\s*\(/i;
+
+/**
+ * Prevent formula injection when writing AI-generated text to a Sheets cell.
+ *
+ * Sheets evaluates values beginning with =, +, or - as formulas. If the formula
+ * contains a web-fetch function (IMAGE, IMPORTDATA, IMPORTXML, IMPORTHTML, IMPORTRANGE,
+ * IMPORTFEED) — anywhere in the formula, including nested positions — it could make an
+ * outbound HTTP request that exfiltrates adjacent cell data. Those values are rejected
+ * with an explicit error string.
+ *
+ * Other formula-prefixed values (=SUM, -IF, etc.) are safe to prefix with ' so Sheets
+ * treats them as literal text instead of evaluating them.
+ */
+export function sanitizeForCell(value: string): string {
+  if (!value.length || !/^[=+-]/.test(value[0])) return value;
+  if (WEB_FETCH_PATTERN.test(value)) {
+    return "[SSI Error: AI response contained an external request formula — output rejected]";
+  }
+  return `'${value}`;
+}
+
+/**
+ * Resolve Vertex AI Search redirect URIs to their actual destination URLs.
+ * Fires one UrlFetchApp.fetchAll for all unique URIs across all responses,
+ * reading the Location header from each 3xx reply. Non-redirect responses
+ * (e.g. expired URLs) are silently omitted — callers fall back to the
+ * redirect URI via `resolvedUris?.get(uri) ?? uri`.
+ */
+export function resolveGroundingUris(responses: GeminiResponse[]): Map<string, string> {
+  const redirectUris = new Set<string>();
+  for (const response of responses) {
+    for (const chunk of response.groundingMetadata?.groundingChunks ?? []) {
+      const src = chunk.web ?? chunk.retrievedContext;
+      if (src?.uri) redirectUris.add(src.uri);
+    }
+  }
+
+  if (redirectUris.size === 0) return new Map();
+
+  const uriArray = Array.from(redirectUris);
+  const fetchRequests: GoogleAppsScript.URL_Fetch.URLFetchRequest[] = uriArray.map((uri) => ({
+    url: uri,
+    method: "get" as GoogleAppsScript.URL_Fetch.HttpMethod,
+    followRedirects: false,
+    muteHttpExceptions: true,
+  }));
+
+  const fetchResponses = UrlFetchApp.fetchAll(fetchRequests);
+  const resolved = new Map<string, string>();
+
+  for (let i = 0; i < uriArray.length; i++) {
+    const resp = fetchResponses[i];
+    const status = resp.getResponseCode();
+    if (status >= 300 && status < 400) {
+      const headers = resp.getHeaders() as Record<string, string>;
+      const location = headers["Location"] ?? headers["location"];
+      if (location) resolved.set(uriArray[i], location);
+    }
+  }
+
+  return resolved;
 }

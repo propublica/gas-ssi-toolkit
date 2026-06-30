@@ -233,11 +233,11 @@ describe("callGeminiAPI", () => {
     expect(url).toContain("gemini-1.5-pro");
   });
 
-  it("falls back to CONFIG.MODEL_NAME when modelName is omitted", () => {
+  it("falls back to CONFIG.DEFAULT_MODEL when modelName is omitted", () => {
     mockFetchResponse({ candidates: [{ content: { parts: [{ text: "ok" }] } }] });
     callGeminiAPI(baseReq);
     const url = (UrlFetchApp.fetch as jest.Mock).mock.calls[0][0] as string;
-    expect(url).toContain(CONFIG.MODEL_NAME);
+    expect(url).toContain(CONFIG.DEFAULT_MODEL);
   });
 
   it("assembles text from multiple text parts (code execution interleaving)", () => {
@@ -459,11 +459,11 @@ describe("callGeminiAPIBatch", () => {
     expect(calls[0].url).toContain("gemini-1.5-pro");
   });
 
-  it("falls back to CONFIG.MODEL_NAME when modelName is omitted", () => {
+  it("falls back to CONFIG.DEFAULT_MODEL when modelName is omitted", () => {
     mockFetchAllResponses([{ candidates: [{ content: { parts: [{ text: "ok" }] } }] }]);
     callGeminiAPIBatch([{ apiKey: "key", userParts: [{ text: "Q" }] }]);
     const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
-    expect(calls[0].url).toContain(CONFIG.MODEL_NAME);
+    expect(calls[0].url).toContain(CONFIG.DEFAULT_MODEL);
   });
 
   it("returns 'No response.' when candidates are empty", () => {
