@@ -47,12 +47,13 @@ function mergeCitations(
 // block boundaries — groupBlocks() splits on these lines before inline parsing runs.
 function truncateToFirstBlock(text: string): string {
   const lines = text.split("\n");
-  // If the span starts on a heading or bullet line it must not cross into the next line.
-  if (/^(#{1,6} |\* |- )/.test(lines[0])) {
+  // Treat heading, bullet, and standalone bold-heading lines as block boundaries.
+  // A line starting or ending with ** is Gemini's section-heading style (**Title**).
+  if (/^(#{1,6} |\* |- |\*\*)/.test(lines[0]) || lines[0].endsWith("**")) {
     return lines[0];
   }
   for (let i = 1; i < lines.length; i++) {
-    if (/^(\* |- |#{1,6} |$)/.test(lines[i])) {
+    if (/^(\* |- |#{1,6} |$|\*\*)/.test(lines[i]) || lines[i].endsWith("**")) {
       return lines.slice(0, i).join("\n");
     }
   }
@@ -65,7 +66,9 @@ function snapToWordBoundaries(
   end: number,
 ): { start: number; end: number } {
   let snappedStart = start;
-  while (snappedStart > 0 && /\w/.test(text[snappedStart - 1])) {
+  // Also cross * and ~ so a citation starting inside **bold** or ~~strikethrough~~ snaps
+  // back past the opening delimiter rather than leaving it stranded outside the link.
+  while (snappedStart > 0 && /[\w*~]/.test(text[snappedStart - 1])) {
     snappedStart--;
   }
   let snappedEnd = end;
