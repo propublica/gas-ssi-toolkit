@@ -594,9 +594,9 @@ export function runTool(functionName: string, jobId?: string): void {
 // RECIPE PREP
 // ==========================================
 
-export function prepRecipe({ cols, inputValues }: PrepRecipeParams): PrepRecipeResult {
+export function prepRecipe({ cols, inputValues, rowRange }: PrepRecipeParams): PrepRecipeResult {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  let numRows = 1;
+  let numRows = rowRange ? rowRange.end - rowRange.start + 1 : 1;
 
   // Pass 1: scan Drive folders, cache results, determine numRows
   const folderCache = new Map<string, string[]>();

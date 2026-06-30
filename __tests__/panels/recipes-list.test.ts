@@ -21,6 +21,13 @@ jest.mock("../../src/client/recipes", () => ({
       panelId: "recipe",
       params: {},
     },
+    {
+      id: "doc-sum-v1",
+      name: "Document Summarization V1",
+      icon: "📄",
+      description: "V1 variant",
+      variant: "v1",
+    },
   ],
 }));
 
@@ -73,5 +80,14 @@ describe("RecipesListPanel", () => {
   it("unmount returns undefined", () => {
     const { panel } = mount();
     expect(panel.unmount()).toBeUndefined();
+  });
+
+  it("clicking a variant recipe navigates to recipe-v1 when variant is v1", () => {
+    const { container, nav } = mount();
+    container.querySelector<HTMLButtonElement>("#btn-doc-sum-v1")!.click();
+    expect(nav.navigate).toHaveBeenCalledWith(
+      "recipe-v1",
+      expect.objectContaining({ id: "doc-sum-v1", variant: "v1" }),
+    );
   });
 });
