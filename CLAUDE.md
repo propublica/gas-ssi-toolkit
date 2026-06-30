@@ -250,7 +250,7 @@ The Gemini API key must be set as a Script Property (`GEMINI_API_KEY`) in Apps S
 - `appsscript.json` must be in `dist/` for clasp push (the build script copies it)
 - Drive Advanced Service must be enabled in the Apps Script editor AND declared in `appsscript.json`
 - `PropertiesService.getScriptProperties()` is available in custom functions once the add-on has been authorized by the user (opening the menu triggers authorization)
-- `.clasp.json` is committed to the repo and points to the single add-on script project
+- `.clasp.json` is gitignored and must be present locally for clasp commands to work — it is not committed to the repo
 
 ## Security
 
@@ -263,6 +263,35 @@ Changes that always warrant a threat model review before submitting a PR:
 - **`appsscript.json` OAuth scope changes** — expanding scopes affects T4 (scope expansion variant) and T5; note the change and the justification in the threat model
 - **New npm dependencies** — affects T10 (build dependency compromise); flag in the PR security checklist
 - **New or changed GCP integrations** — any new Google Cloud service, new Gemini endpoint, new data types sent, or changes to the Files API upload path; review T2, T3, T11, and T14 as a starting point
+
+## Git Worktrees
+
+Worktrees live in `.claude/worktrees/` (already gitignored). The `EnterWorktree` native tool handles creation. Each worktree must be on a **unique branch** — git enforces this; two worktrees cannot share the same branch simultaneously.
+
+### Setting up a new worktree
+
+After creating the worktree, run these steps before starting work:
+
+1. **Install dependencies** — `node_modules/` is gitignored and absent in fresh worktrees:
+   ```bash
+   npm install
+   ```
+
+2. **Symlink `.clasp.json`** — only needed if you plan to deploy and test against the dev sheet. `.clasp.json` is gitignored so it won't be present. Symlink from the main workspace so all worktrees share the same target script project:
+   ```bash
+   ln -s /path/to/gas-ssi-toolkit/.clasp.json .clasp.json
+   ```
+   Skip this step for work that doesn't require a live deployment test (e.g. pure logic changes covered by tests).
+
+3. **Deploy from only one worktree at a time** — all worktrees share the same Apps Script project. Running `deploy:watch` from two worktrees simultaneously produces a mixed build. Consciously choose which worktree is "active" for live testing.
+
+### Finishing a worktree
+
+When the feature is ready, open a PR against `develop` (see [Branch Naming](#branch-naming) and [Creating PRs](#creating-prs) below). Once the PR is merged, delete the worktree:
+
+```bash
+git worktree remove .claude/worktrees/AI-{n}-feature-name
+```
 
 ## GitHub
 
