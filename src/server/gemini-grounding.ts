@@ -47,12 +47,35 @@ function mergeCitations(
 // block boundaries — groupBlocks() splits on these lines before inline parsing runs.
 function truncateToFirstBlock(text: string): string {
   const lines = text.split("\n");
+  // Treat heading, bullet, and standalone bold-heading lines as block boundaries.
+  // A line starting or ending with ** is Gemini's section-heading style (**Title**).
+  if (/^(#{1,6} |\* |- |\*\*)/.test(lines[0]) || lines[0].endsWith("**")) {
+    return lines[0];
+  }
   for (let i = 1; i < lines.length; i++) {
-    if (/^(\* |- |#{1,6} |$)/.test(lines[i])) {
+    if (/^(\* |- |#{1,6} |$|\*\*)/.test(lines[i]) || lines[i].endsWith("**")) {
       return lines.slice(0, i).join("\n");
     }
   }
   return text;
+}
+
+function snapToWordBoundaries(
+  text: string,
+  start: number,
+  end: number,
+): { start: number; end: number } {
+  let snappedStart = start;
+  // Also cross * and ~ so a citation starting inside **bold** or ~~strikethrough~~ snaps
+  // back past the opening delimiter rather than leaving it stranded outside the link.
+  while (snappedStart > 0 && /[\w*~]/.test(text[snappedStart - 1])) {
+    snappedStart--;
+  }
+  let snappedEnd = end;
+  while (snappedEnd < text.length && /\w/.test(text[snappedEnd])) {
+    snappedEnd++;
+  }
+  return { start: snappedStart, end: snappedEnd };
 }
 
 function findExistingLinkSpans(text: string): Array<{ start: number; end: number }> {
@@ -93,11 +116,23 @@ export function injectCitations(
       (span) => startIndex < span.end && endIndex > span.start,
     );
     if (overlaps) continue;
-    const spanText = truncateToFirstBlock(result.slice(startIndex, endIndex));
-    result =
-      result.slice(0, startIndex) +
-      `[${spanText}](${url})` +
-      result.slice(startIndex + spanText.length);
+    const rawSpan = truncateToFirstBlock(result.slice(startIndex, endIndex));
+    const prefixMatch = rawSpan.match(/^(#{1,6} |\* |- )/);
+    const prefixLength = prefixMatch ? prefixMatch[1].length : 0;
+    // Snap word boundaries on the content portion only (after block prefix).
+    // snappedStart cannot reach past the prefix's trailing space since \w excludes it.
+    const contentStart = startIndex + prefixLength;
+    const rawContentEnd = startIndex + rawSpan.length;
+    const { start: snappedStart, end: snappedEnd } = snapToWordBoundaries(
+      result,
+      contentStart,
+      rawContentEnd,
+    );
+    const spanText = result.slice(snappedStart, snappedEnd);
+    if (!spanText) continue;
+    // result.slice(0, snappedStart) naturally preserves prefix chars when
+    // snappedStart === contentStart (the common case with a block prefix).
+    result = result.slice(0, snappedStart) + `[${spanText}](${url})` + result.slice(snappedEnd);
   }
   return result;
 }
