@@ -229,7 +229,7 @@ flowchart LR
 | T13 | R15 | Accept | GAS execution limits are a platform constraint. Document the limitation in user-facing guidance; consider adding a pre-scan folder size estimate with a warning if the tree exceeds a safe threshold |
 | T14 | R16 | Reduce | Configure GCP budget alerts on the project with email notification thresholds (e.g. 50%, 90%, 100% of monthly budget); enable a hard spend cap if the GCP billing account supports it |
 | T14 | R17 | Reduce | Set per-API-key quotas in Google Cloud Console to cap daily request volume and token usage for `GEMINI_API_KEY`; this limits blast radius for both key abuse and accidental overuse |
-| T14 | R18 | Reduce | Surface the row count to the user before confirming a large batch run and add a configurable warning threshold (e.g. >500 rows); this gives users a chance to scope down before generating a large number of API calls |
+| T14 | R18 | Reduce | Surface the row count to the user before confirming a large batch run and add a configurable warning threshold (e.g. >500 rows); this gives users a chance to scope down before generating a large number of API calls. Superseded by R44 — see AI-88 |
 | T15 | R19 | Reduce | Three-part mitigation: (1) wrap temp doc deletion in a `finally` block so cleanup runs even on exception; (2) if deletion fails, surface an explicit alert to the user in the sidebar identifying the orphaned doc by name so they can delete it from Drive themselves; (3) name all temp docs with a recognizable prefix (e.g. `[SSI-TEMP]`) so orphaned docs are identifiable in Drive even if the alert is missed |
 | T6 | R21 | Reduce | Route Extract Text's extracted-text write through `sanitizeForCell()` before `setValue()` (`index.ts:164`) |
 | T6 | R22 | Reduce | Route the `applyMarkdown` branch's assembled plain text through `sanitizeForCell()` before building the `RichTextValue`, or fall back to the plain `setValue()` path when it flags a dangerous formula (`index.ts:546`) |
@@ -252,6 +252,8 @@ flowchart LR
 | T4 | R39 | Reduce | Add an explicit `permissions: contents: read` block to the CI workflow |
 | T8 | R41 | Reduce | Add server-side input validation to `importDriveLinks` (`folderUrl` format, `mimeTypes` shape) and `extractText` (`rowRange` bounds checked against the sheet's actual row count) |
 | T8 | R42 | Reduce | Wrap `importDriveLinks`, `extractText`, `prepRecipe`, and `sampleRowsToEvaluation` in try/catch and return scrubbed error text instead of letting raw Drive/Sheets exceptions reach the client via the default `google.script.run` failure serialization |
+| T14 | R43 | Reduce | Add a "Test" button to the Run AI Inference panel that runs the configured batch across the first 10 rows and surfaces measured execution time, average token usage, and estimated cost per row and for the full run — giving users an empirical, configuration-specific cost estimate before committing to a full batch (AI-87) |
+| T14 | R44 | Reduce | Replace the static row-count warning in `ConfigureAIRunPanel` with one driven by cached test-run data: prompt the user to run a test first if none exists; once one exists, warn when the estimated cost or time (derived from real measured token usage) crosses a threshold (e.g. $10 or 10 minutes); separately warn when the run exceeds the client-side chunking size so the user knows to keep the sidebar open for the whole run (AI-88; supersedes R18's static threshold) |
 
 ---
 
@@ -299,6 +301,8 @@ First draft — not yet formally reviewed by the security team. A full OWASP/LLM
 | Low | Open | — | — | Fix T4 — CI token scope | Add `permissions: contents: read` to the CI workflow (R39) |
 | Medium | Open | — | — | Fix T8 — validate importDriveLinks/extractText inputs | `folderUrl`/`mimeTypes` (`importDriveLinks`) and `rowRange` (`extractText`) have no server-side validation (R41) |
 | Medium | Open | — | — | Fix T8 — missing error handling on 4 exposed functions | `importDriveLinks`, `extractText`, `prepRecipe`, `sampleRowsToEvaluation` have no try/catch; raw exceptions reach the client unscrubbed (R42) |
+| Medium | Open | [AI-87](https://linear.app/propublica/issue/AI-87/implement-test-button-in-the-run-ai-inference-panel-with-cost) | — | Fix T14 — test-run cost estimation | Add a "Test" button to Run AI that measures actual time/token usage/cost across a 10-row sample (R43) |
+| Medium | Open | [AI-88](https://linear.app/propublica/issue/AI-88/beef-up-run-ai-inference-panels-full-run-warning) | — | Fix T14 — data-driven full-run warning | Replace the static row-count warning with one driven by cached test-run cost/time data (R44) |
 
 ### Planned Threat Models
 
