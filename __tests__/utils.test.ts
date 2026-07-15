@@ -16,7 +16,6 @@ import {
   flattenArg,
   resolveColumns,
   findOrCreateColumn,
-  writeColumn,
   writeJobProgress,
   interpolateTemplate,
   resolveGroundingUris,
@@ -365,8 +364,6 @@ describe("findOrCreateColumn", () => {
   });
 });
 
-// ── writeColumn ─────────────────────────────────────────────────
-
 describe("writeJobProgress", () => {
   it("writes serialized progress to cache with 5-minute TTL", () => {
     const mockPut = jest.fn();
@@ -396,39 +393,6 @@ describe("writeJobProgress", () => {
       JSON.stringify({ message: "Scanning folder..." }),
       300,
     );
-  });
-});
-
-describe("writeColumn", () => {
-  it("writes values starting at row 2 using a single setValues call", () => {
-    const setValuesMock = jest.fn();
-    const sheet = {
-      getRange: jest.fn().mockReturnValue({ setValues: setValuesMock }),
-    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
-    writeColumn(sheet, 3, ["a", "b", "c"]);
-    expect(sheet.getRange).toHaveBeenCalledWith(2, 3, 3, 1);
-    expect(setValuesMock).toHaveBeenCalledWith([["a"], ["b"], ["c"]]);
-  });
-
-  it("does nothing when values array is empty", () => {
-    const sheet = {
-      getRange: jest.fn(),
-    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
-    writeColumn(sheet, 1, []);
-    expect(sheet.getRange).not.toHaveBeenCalled();
-  });
-
-  it("applies wrapStrategy to the written range when provided", () => {
-    const setValuesMock = jest.fn();
-    const setWrapStrategyMock = jest.fn();
-    const sheet = {
-      getRange: jest
-        .fn()
-        .mockReturnValue({ setValues: setValuesMock, setWrapStrategy: setWrapStrategyMock }),
-    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
-    const wrapStrategy = "CLIP" as unknown as GoogleAppsScript.Spreadsheet.WrapStrategy;
-    writeColumn(sheet, 3, ["a", "b"], wrapStrategy);
-    expect(setWrapStrategyMock).toHaveBeenCalledWith(wrapStrategy);
   });
 });
 

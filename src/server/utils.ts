@@ -161,25 +161,6 @@ export function interpolateTemplate(template: string, inputValues: Record<string
 }
 
 /**
- * Write an array of string values to a column starting at row 2.
- * Uses a single setValues() call for efficiency.
- * Pass wrapStrategy to apply a wrap format to the written range.
- */
-export function writeColumn(
-  sheet: GoogleAppsScript.Spreadsheet.Sheet,
-  colIdx: number,
-  values: string[],
-  wrapStrategy?: GoogleAppsScript.Spreadsheet.WrapStrategy,
-): void {
-  if (values.length === 0) return;
-  const range = sheet.getRange(2, colIdx, values.length, 1);
-  range.setValues(values.map((v) => [v]));
-  if (wrapStrategy !== undefined) {
-    range.setWrapStrategy(wrapStrategy);
-  }
-}
-
-/**
  * Idempotent — re-applied on each chunk; header colour and note content never change between calls.
  */
 export function markAIOutputRange(

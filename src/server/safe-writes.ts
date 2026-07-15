@@ -63,3 +63,25 @@ export function writeSafeRichText(range: Range, richTextValue: RichTextValue): v
 export function writeSafeRichTextGrid(range: Range, grid: RichTextValue[][]): void {
   range.setRichTextValues(grid.map((row) => row.map(sanitizeRichTextValue)));
 }
+
+/**
+ * Write an array of string values to a column starting at row 2.
+ * Sanitizes every value before writing. Pass wrapStrategy to apply a wrap
+ * format to the entire written range.
+ */
+export function writeColumn(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  colIdx: number,
+  values: string[],
+  wrapStrategy?: GoogleAppsScript.Spreadsheet.WrapStrategy,
+): void {
+  if (values.length === 0) return;
+  const range = sheet.getRange(2, colIdx, values.length, 1);
+  writeSafeValueGrid(
+    range,
+    values.map((v) => [v]),
+  );
+  if (wrapStrategy !== undefined) {
+    range.setWrapStrategy(wrapStrategy);
+  }
+}
