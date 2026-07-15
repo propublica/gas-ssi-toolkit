@@ -59,3 +59,7 @@ function sanitizeRichTextValue(cell: RichTextValue): RichTextValue {
 export function writeSafeRichText(range: Range, richTextValue: RichTextValue): void {
   range.setRichTextValue(sanitizeRichTextValue(richTextValue));
 }
+
+export function writeSafeRichTextGrid(range: Range, grid: RichTextValue[][]): void {
+  range.setRichTextValues(grid.map((row) => row.map(sanitizeRichTextValue)));
+}

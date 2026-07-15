@@ -24,6 +24,7 @@ import {
   writeSafeValue,
   writeSafeValueGrid,
   writeSafeRichText,
+  writeSafeRichTextGrid,
 } from "../src/server/safe-writes";
 
 describe("sanitizeForCell", () => {
@@ -194,5 +195,24 @@ describe("writeSafeRichText", () => {
     const written = setRichTextValueMock.mock
       .calls[0][0] as GoogleAppsScript.Spreadsheet.RichTextValue;
     expect(written.getText()).toBe("'=SUM(A1:A10)");
+  });
+});
+
+describe("writeSafeRichTextGrid", () => {
+  it("sanitizes every cell in the grid via a single setRichTextValues call", () => {
+    const setRichTextValuesMock = jest.fn();
+    const range = {
+      setRichTextValues: setRichTextValuesMock,
+    } as unknown as GoogleAppsScript.Spreadsheet.Range;
+    const safeCell = makeRichTextValue("safe text");
+    const dangerousCell = makeRichTextValue('=IMAGE("evil.com")');
+    writeSafeRichTextGrid(range, [[safeCell, dangerousCell]]);
+    expect(setRichTextValuesMock).toHaveBeenCalledTimes(1);
+    const [[writtenSafe, writtenDangerous]] = setRichTextValuesMock.mock
+      .calls[0][0] as GoogleAppsScript.Spreadsheet.RichTextValue[][];
+    expect(writtenSafe).toBe(safeCell);
+    expect(writtenDangerous.getText()).toBe(
+      "[SSI Error: AI response contained an external request formula — output rejected]",
+    );
   });
 });
