@@ -39,3 +39,9 @@ type Range = GoogleAppsScript.Spreadsheet.Range;
 export function writeSafeValue(range: Range, value: unknown): void {
   range.setValue(typeof value === "string" ? sanitizeForCell(value) : value);
 }
+
+export function writeSafeValueGrid(range: Range, values: unknown[][]): void {
+  range.setValues(
+    values.map((row) => row.map((v) => (typeof v === "string" ? sanitizeForCell(v) : v))),
+  );
+}

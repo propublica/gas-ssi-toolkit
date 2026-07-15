@@ -3,7 +3,7 @@
  * untrusted-origin content to a Sheets cell. See T6 in the threat model.
  */
 
-import { sanitizeForCell, writeSafeValue } from "../src/server/safe-writes";
+import { sanitizeForCell, writeSafeValue, writeSafeValueGrid } from "../src/server/safe-writes";
 
 describe("sanitizeForCell", () => {
   const REJECTION_MSG =
@@ -106,5 +106,32 @@ describe("writeSafeValue", () => {
     const range = { setValue: setValueMock } as unknown as GoogleAppsScript.Spreadsheet.Range;
     writeSafeValue(range, 42);
     expect(setValueMock).toHaveBeenCalledWith(42);
+  });
+});
+
+describe("writeSafeValueGrid", () => {
+  it("sanitizes every string cell and writes the whole grid in one setValues call", () => {
+    const setValuesMock = jest.fn();
+    const range = { setValues: setValuesMock } as unknown as GoogleAppsScript.Spreadsheet.Range;
+    writeSafeValueGrid(range, [
+      ["safe text", '=IMAGE("evil.com")'],
+      ["=SUM(A1:A10)", "more text"],
+    ]);
+    expect(setValuesMock).toHaveBeenCalledTimes(1);
+    expect(setValuesMock).toHaveBeenCalledWith([
+      [
+        "safe text",
+        "[SSI Error: AI response contained an external request formula — output rejected]",
+      ],
+      ["'=SUM(A1:A10)", "more text"],
+    ]);
+  });
+
+  it("passes non-string cells (numbers, booleans, dates) through unchanged", () => {
+    const setValuesMock = jest.fn();
+    const range = { setValues: setValuesMock } as unknown as GoogleAppsScript.Spreadsheet.Range;
+    const date = new Date(2026, 0, 1);
+    writeSafeValueGrid(range, [[42, true, date]]);
+    expect(setValuesMock).toHaveBeenCalledWith([[42, true, date]]);
   });
 });
