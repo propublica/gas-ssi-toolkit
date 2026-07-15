@@ -107,30 +107,6 @@ export function resolveColumns(headers: string[], names: string[]): number[] {
 }
 
 /**
- * Find a column by header title in row 1, or append a new one.
- * Returns the 1-based column index.
- * Pass wrapStrategy to apply a wrap format to the entire new column on creation.
- */
-export function findOrCreateColumn(
-  sheet: GoogleAppsScript.Spreadsheet.Sheet,
-  title: string,
-  wrapStrategy?: GoogleAppsScript.Spreadsheet.WrapStrategy,
-): number {
-  const lastCol = sheet.getLastColumn();
-  if (lastCol > 0) {
-    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
-    const idx = headers.indexOf(title);
-    if (idx !== -1) return idx + 1;
-  }
-  const newCol = lastCol + 1;
-  sheet.getRange(1, newCol).setValue(title);
-  if (wrapStrategy !== undefined) {
-    sheet.getRange(1, newCol, sheet.getMaxRows(), 1).setWrapStrategy(wrapStrategy);
-  }
-  return newCol;
-}
-
-/**
  * Writes job progress to CacheService so the sidebar can poll it.
  * TTL is 300s (5 minutes) — long enough for any single operation.
  */
@@ -161,25 +137,6 @@ export function interpolateTemplate(template: string, inputValues: Record<string
 }
 
 /**
- * Write an array of string values to a column starting at row 2.
- * Uses a single setValues() call for efficiency.
- * Pass wrapStrategy to apply a wrap format to the written range.
- */
-export function writeColumn(
-  sheet: GoogleAppsScript.Spreadsheet.Sheet,
-  colIdx: number,
-  values: string[],
-  wrapStrategy?: GoogleAppsScript.Spreadsheet.WrapStrategy,
-): void {
-  if (values.length === 0) return;
-  const range = sheet.getRange(2, colIdx, values.length, 1);
-  range.setValues(values.map((v) => [v]));
-  if (wrapStrategy !== undefined) {
-    range.setWrapStrategy(wrapStrategy);
-  }
-}
-
-/**
  * Idempotent — re-applied on each chunk; header colour and note content never change between calls.
  */
 export function markAIOutputRange(
@@ -194,30 +151,6 @@ export function markAIOutputRange(
     "Some cells in this column may be AI-generated — exercise good judgement when using",
   );
   sheet.getRange(startRow, colIdx, numRows, 1).setBackground("#FFF8E1");
-}
-
-// Sheets functions that make outbound HTTP requests — the exfiltration vector for formula injection.
-// We scan the whole formula body so nested calls like =IF(1=1,IMAGE("evil"),0) are caught too.
-const WEB_FETCH_PATTERN = /\b(image|importdata|importxml|importhtml|importrange|importfeed)\s*\(/i;
-
-/**
- * Prevent formula injection when writing AI-generated text to a Sheets cell.
- *
- * Sheets evaluates values beginning with =, +, or - as formulas. If the formula
- * contains a web-fetch function (IMAGE, IMPORTDATA, IMPORTXML, IMPORTHTML, IMPORTRANGE,
- * IMPORTFEED) — anywhere in the formula, including nested positions — it could make an
- * outbound HTTP request that exfiltrates adjacent cell data. Those values are rejected
- * with an explicit error string.
- *
- * Other formula-prefixed values (=SUM, -IF, etc.) are safe to prefix with ' so Sheets
- * treats them as literal text instead of evaluating them.
- */
-export function sanitizeForCell(value: string): string {
-  if (!value.length || !/^[=+-]/.test(value[0])) return value;
-  if (WEB_FETCH_PATTERN.test(value)) {
-    return "[SSI Error: AI response contained an external request formula — output rejected]";
-  }
-  return `'${value}`;
 }
 
 /**
