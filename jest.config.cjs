@@ -47,9 +47,14 @@ module.exports = {
       functions: 100,
     },
     "./src/server/utils.ts": {
-      statements: 83,
-      branches: 93,
-      functions: 100,
+      statements: 95,
+      branches: 91,
+      functions: 95,
+    },
+    "./src/server/safe-writes.ts": {
+      statements: 95,
+      branches: 95,
+      functions: 95,
     },
     "./src/server/drive.ts": {
       statements: 95,

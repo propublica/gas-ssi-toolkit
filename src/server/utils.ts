@@ -107,30 +107,6 @@ export function resolveColumns(headers: string[], names: string[]): number[] {
 }
 
 /**
- * Find a column by header title in row 1, or append a new one.
- * Returns the 1-based column index.
- * Pass wrapStrategy to apply a wrap format to the entire new column on creation.
- */
-export function findOrCreateColumn(
-  sheet: GoogleAppsScript.Spreadsheet.Sheet,
-  title: string,
-  wrapStrategy?: GoogleAppsScript.Spreadsheet.WrapStrategy,
-): number {
-  const lastCol = sheet.getLastColumn();
-  if (lastCol > 0) {
-    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
-    const idx = headers.indexOf(title);
-    if (idx !== -1) return idx + 1;
-  }
-  const newCol = lastCol + 1;
-  sheet.getRange(1, newCol).setValue(title);
-  if (wrapStrategy !== undefined) {
-    sheet.getRange(1, newCol, sheet.getMaxRows(), 1).setWrapStrategy(wrapStrategy);
-  }
-  return newCol;
-}
-
-/**
  * Writes job progress to CacheService so the sidebar can poll it.
  * TTL is 300s (5 minutes) — long enough for any single operation.
  */

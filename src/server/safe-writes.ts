@@ -85,3 +85,28 @@ export function writeColumn(
     range.setWrapStrategy(wrapStrategy);
   }
 }
+
+/**
+ * Find a column by header title in row 1, or append a new one.
+ * Returns the 1-based column index. The new column's title is sanitized
+ * before writing. Pass wrapStrategy to apply a wrap format to the entire
+ * new column on creation.
+ */
+export function findOrCreateColumn(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  title: string,
+  wrapStrategy?: GoogleAppsScript.Spreadsheet.WrapStrategy,
+): number {
+  const lastCol = sheet.getLastColumn();
+  if (lastCol > 0) {
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
+    const idx = headers.indexOf(title);
+    if (idx !== -1) return idx + 1;
+  }
+  const newCol = lastCol + 1;
+  writeSafeValue(sheet.getRange(1, newCol), title);
+  if (wrapStrategy !== undefined) {
+    sheet.getRange(1, newCol, sheet.getMaxRows(), 1).setWrapStrategy(wrapStrategy);
+  }
+  return newCol;
+}

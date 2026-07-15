@@ -27,14 +27,13 @@ import {
   sampleRows,
   truncateText,
   resolveColumns,
-  findOrCreateColumn,
   writeJobProgress,
   interpolateTemplate,
   flattenArg,
   markAIOutputRange,
   resolveGroundingUris,
 } from "./utils";
-import { sanitizeForCell, writeColumn } from "./safe-writes";
+import { findOrCreateColumn, writeColumn, sanitizeForCell } from "./safe-writes";
 import { CONFIG } from "./config";
 import type {
   RunConfig,
