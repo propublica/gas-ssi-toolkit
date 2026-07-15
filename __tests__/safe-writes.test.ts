@@ -3,7 +3,7 @@
  * untrusted-origin content to a Sheets cell. See T6 in the threat model.
  */
 
-import { sanitizeForCell } from "../src/server/safe-writes";
+import { sanitizeForCell, writeSafeValue } from "../src/server/safe-writes";
 
 describe("sanitizeForCell", () => {
   const REJECTION_MSG =
@@ -74,5 +74,37 @@ describe("sanitizeForCell", () => {
   it("preserves the full response when prepending apostrophe to a safe multiline formula", () => {
     const input = "=SUM(A1:A10)\nNote: this formula sums the range";
     expect(sanitizeForCell(input)).toBe(`'${input}`);
+  });
+});
+
+describe("writeSafeValue", () => {
+  it("writes a safe string value to the range unchanged", () => {
+    const setValueMock = jest.fn();
+    const range = { setValue: setValueMock } as unknown as GoogleAppsScript.Spreadsheet.Range;
+    writeSafeValue(range, "hello");
+    expect(setValueMock).toHaveBeenCalledWith("hello");
+  });
+
+  it("rejects a web-fetch formula", () => {
+    const setValueMock = jest.fn();
+    const range = { setValue: setValueMock } as unknown as GoogleAppsScript.Spreadsheet.Range;
+    writeSafeValue(range, '=IMAGE("evil.com")');
+    expect(setValueMock).toHaveBeenCalledWith(
+      "[SSI Error: AI response contained an external request formula — output rejected]",
+    );
+  });
+
+  it("literal-izes a non-web-fetch formula", () => {
+    const setValueMock = jest.fn();
+    const range = { setValue: setValueMock } as unknown as GoogleAppsScript.Spreadsheet.Range;
+    writeSafeValue(range, "=SUM(A1:A10)");
+    expect(setValueMock).toHaveBeenCalledWith("'=SUM(A1:A10)");
+  });
+
+  it("passes non-string values through unchanged (numbers can never be a sheet function)", () => {
+    const setValueMock = jest.fn();
+    const range = { setValue: setValueMock } as unknown as GoogleAppsScript.Spreadsheet.Range;
+    writeSafeValue(range, 42);
+    expect(setValueMock).toHaveBeenCalledWith(42);
   });
 });

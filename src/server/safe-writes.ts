@@ -33,3 +33,9 @@ export function sanitizeForCell(value: string): string {
   }
   return `'${value}`;
 }
+
+type Range = GoogleAppsScript.Spreadsheet.Range;
+
+export function writeSafeValue(range: Range, value: unknown): void {
+  range.setValue(typeof value === "string" ? sanitizeForCell(value) : value);
+}
