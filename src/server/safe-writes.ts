@@ -45,3 +45,17 @@ export function writeSafeValueGrid(range: Range, values: unknown[][]): void {
     values.map((row) => row.map((v) => (typeof v === "string" ? sanitizeForCell(v) : v))),
   );
 }
+
+type RichTextValue = GoogleAppsScript.Spreadsheet.RichTextValue;
+
+/** Rich-text counterpart: safe if sanitizeForCell leaves the flattened text untouched;
+ *  otherwise formatting is dropped and the sanitized text becomes plain content. */
+function sanitizeRichTextValue(cell: RichTextValue): RichTextValue {
+  const text = cell.getText();
+  const sanitized = sanitizeForCell(text);
+  return sanitized === text ? cell : SpreadsheetApp.newRichTextValue().setText(sanitized).build();
+}
+
+export function writeSafeRichText(range: Range, richTextValue: RichTextValue): void {
+  range.setRichTextValue(sanitizeRichTextValue(richTextValue));
+}
