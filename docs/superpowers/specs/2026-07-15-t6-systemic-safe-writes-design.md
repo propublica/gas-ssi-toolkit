@@ -13,7 +13,7 @@ T6 (formula injection via untrusted cell writes) has been fixed as point-fixes t
 **New framing:** T6 applies to any Apps Script function whose contract writes content to a cell that the acting user did not directly and knowingly type into that specific cell. Six functions currently do this:
 
 | Function | What it writes | Why it's in scope |
-|---|---|---|
+| --- | --- | --- |
 | `runBatchAI` | AI-generated text (plain, markdown, grounding markdown) | Model output, not user-composed |
 | `extractText` | Drive document/OCR text | Untrusted document content |
 | `formatMarkdownSelection` | Re-parses and rewrites the *existing* content of a selected range | Operates on whatever's already in the cell, including prior AI/Extract-Text output |
@@ -22,7 +22,7 @@ T6 (formula injection via untrusted cell writes) has been fixed as point-fixes t
 
 This is not about whether today's callers happen to pass provably-untrusted content — it's about which functions' write path *could* be hijacked, now or by a future caller, without a human ever getting the chance to consciously accept the risk the way they would typing a formula directly into a cell.
 
-**Considered and found not applicable:** the Gemini grounding-markdown write (`groundingToMarkdown`, used in `runBatchAI`'s grounding-column branch). Every branch of `groundingToMarkdown` wraps variable/attacker-influenceable content (citation titles, URLs, search queries) behind a fixed literal prefix — `"Sources (N):\n..."`, `"Search queries: ..."`, `"Code (lang):\n..."`. Because `sanitizeForCell()`'s check only inspects the *first character* of the assembled string, and that first character is always one of these fixed prefixes, this call site can never produce a formula-triggering leading character regardless of grounding-source content. It's still routed through the same safe-write primitive as everything else (see Architecture — no exceptions), but it is not itself a live T6 gap. (It remains a live T18 concern — hyperlink scheme allow-listing and citation-title escaping — unaffected by this analysis.)
+**Included, per "sanitize every write, no exceptions" (see Architecture below): the Gemini grounding-markdown write** (`groundingToMarkdown`, used in `runBatchAI`'s grounding-column branch). Worth noting for context: every branch of `groundingToMarkdown` wraps variable/attacker-influenceable content (citation titles, URLs, search queries) behind a fixed literal prefix — `"Sources (N):\n..."`, `"Search queries: ..."`, `"Code (lang):\n..."`. Because `sanitizeForCell()`'s check only inspects the *first character* of the assembled string, and that first character is always one of these fixed prefixes, this specific call site could never produce a formula-triggering leading character regardless of grounding-source content — so on its own it wouldn't need a guard. But per the blanket-sanitization decision, it is routed through `writeSafeRichText` like every other write anyway, rather than carved out as a proven-safe exception. (It remains a live T18 concern — hyperlink scheme allow-listing and citation-title escaping — unaffected by this analysis.)
 
 **Accepted residual risk (documented, not mitigated in-app):** a human user manually copy-pasting (Ctrl+C/Ctrl+V, paste-special-values, drag-fill) an already-neutralized cell's content into a new cell via the Sheets UI. No Apps Script code or trigger runs before or during a native clipboard paste — there's nothing in this add-on's control to intercept. This is consistent with the existing T6 note that user-authored formulas are out of scope; the difference here is the user may not realize a literal-looking string in an AI-output column is a neutralized formula. No in-app UI warning is added for this iteration — documented as an accepted risk only.
 
@@ -68,13 +68,6 @@ export function sanitizeForCell(value: string): string {
   return `'${value}`;
 }
 
-/** Non-string cell values (numbers, booleans, dates) can never start with =/+/- —
- *  pass through unchanged. Needed because sampleRowsToEvaluation copies raw,
- *  mixed-type getValues() output, not just AI/extraction strings. */
-function sanitizeCellValue(value: unknown): unknown {
-  return typeof value === "string" ? sanitizeForCell(value) : value;
-}
-
 /** Rich-text counterpart: safe if sanitizeForCell leaves the flattened text untouched;
  *  otherwise formatting is dropped and the sanitized text becomes plain content. */
 function sanitizeRichTextValue(cell: RichTextValue): RichTextValue {
@@ -83,12 +76,20 @@ function sanitizeRichTextValue(cell: RichTextValue): RichTextValue {
   return sanitized === text ? cell : SpreadsheetApp.newRichTextValue().setText(sanitized).build();
 }
 
-export function writeSafeValue(range: Range, text: string): void {
-  range.setValue(sanitizeForCell(text));
+// Plain cell values can be any GAS type (string, number, boolean, Date) — a
+// non-string can never be a sheet function, so it passes through untouched.
+// Needed because sampleRowsToEvaluation copies raw, mixed-type getValues()
+// output, not just AI/extraction strings. RichTextValue has no equivalent
+// gate because it is always text by construction (see sanitizeRichTextValue).
+
+export function writeSafeValue(range: Range, value: unknown): void {
+  range.setValue(typeof value === "string" ? sanitizeForCell(value) : value);
 }
 
 export function writeSafeValueGrid(range: Range, values: unknown[][]): void {
-  range.setValues(values.map((row) => row.map(sanitizeCellValue)));
+  range.setValues(
+    values.map((row) => row.map((v) => (typeof v === "string" ? sanitizeForCell(v) : v))),
+  );
 }
 
 export function writeSafeRichText(range: Range, richTextValue: RichTextValue): void {
@@ -117,7 +118,7 @@ A build-time check fails if a raw `.setValue(`, `.setValues(`, `.setRichTextValu
 ## Full Call-Site Inventory
 
 | Site | Today's content source | Primitive |
-|---|---|---|
+| --- | --- | --- |
 | `extractText` (`index.ts:164`) | OCR/Doc text | `writeSafeValue` |
 | `runBatchAI` plain-text branch (`index.ts:551`) | AI response | `writeSafeValue` |
 | `runBatchAI` `applyMarkdown` branch (`index.ts:546`, catch-fallback `548`) | AI response, rich text | `writeSafeRichText` (try/catch around markdown *parsing* exceptions is preserved — unrelated to sanitization) |
