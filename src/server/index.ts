@@ -37,6 +37,7 @@ import {
   findOrCreateColumn,
   writeColumn,
   writeSafeValue,
+  writeSafeValueGrid,
   writeSafeRichText,
   writeSafeRichTextGrid,
 } from "./safe-writes";
@@ -222,16 +223,17 @@ export function sampleRowsToEvaluation(_jobId?: string): void {
   if (!targetSheet) {
     targetSheet = ss.insertSheet(targetName);
     const headers = sourceSheet.getRange(1, 1, 1, sourceSheet.getLastColumn()).getValues();
-    targetSheet.getRange(1, 1, 1, headers[0].length).setValues(headers);
+    writeSafeValueGrid(targetSheet.getRange(1, 1, 1, headers[0].length), headers);
   }
 
   const selectedRows = sampleRows(allData, sampleSize, seed);
 
   // Write to target
   const targetRow = targetSheet.getLastRow() + 1;
-  targetSheet
-    .getRange(targetRow, 1, selectedRows.length, selectedRows[0].length)
-    .setValues(selectedRows);
+  writeSafeValueGrid(
+    targetSheet.getRange(targetRow, 1, selectedRows.length, selectedRows[0].length),
+    selectedRows,
+  );
 
   ss.setActiveSheet(targetSheet);
   ui.alert(
