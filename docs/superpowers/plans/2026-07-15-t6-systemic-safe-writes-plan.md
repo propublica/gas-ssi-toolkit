@@ -1051,6 +1051,74 @@ git commit -m "fix(security): route sampleRowsToEvaluation's copy through safe-w
 
 ---
 
+### Task 5b: Fix newly-discovered gap — runBatchAI's column-header creation
+
+**Found during Task 6:** attempting to add the ESLint enforcement rule immediately failed `npm run lint` against pre-existing code — two raw `.setValue()` calls in `runBatchAI` that create the output/grounding column headers were missed by the original design's call-site audit and by Tasks 2–5's briefs. `config.outputCol` is a value the user types into the sidebar's "Output column" field (RPC-supplied, never passing through Sheets' own cell-entry escaping) — the same category already established for `prepRecipe`'s `colTitle`, which is why `findOrCreateColumn` already sanitizes its title writes. This code hand-rolls the identical find-or-append-column pattern instead of calling it.
+
+**Files:**
+- Modify: `src/server/index.ts:352-372`
+
+**Interfaces:**
+- Consumes: `findOrCreateColumn(sheet, title: string): number` (already relocated to `./safe-writes` and already imported in `index.ts` from Task 1).
+
+- [ ] **Step 1: Replace the hand-rolled output/grounding column creation with `findOrCreateColumn`**
+
+Change:
+
+```ts
+  // Resolve output column — create if not found
+  let outputIdx = headers.indexOf(config.outputCol);
+  if (outputIdx === -1) {
+    const newColIdx = sheet.getLastColumn() + 1;
+    sheet.getRange(1, newColIdx).setValue(config.outputCol);
+    outputIdx = newColIdx - 1;
+    headers.push(config.outputCol); // keep in sync, matching grounding column pattern
+  }
+
+  // Resolve grounding column — create if not found (only when opted in)
+  let groundingIdx = -1;
+  const groundingColName = config.outputCol + "_grounding";
+  if (config.includeGrounding) {
+    groundingIdx = headers.indexOf(groundingColName);
+    if (groundingIdx === -1) {
+      const newColIdx = sheet.getLastColumn() + 1;
+      sheet.getRange(1, newColIdx).setValue(groundingColName);
+      groundingIdx = newColIdx - 1;
+      headers.push(groundingColName); // keep in sync for subsequent rows
+    }
+  }
+```
+
+to:
+
+```ts
+  // Resolve output column — create if not found
+  const outputIdx = findOrCreateColumn(sheet, config.outputCol) - 1;
+
+  // Resolve grounding column — create if not found (only when opted in)
+  let groundingIdx = -1;
+  const groundingColName = config.outputCol + "_grounding";
+  if (config.includeGrounding) {
+    groundingIdx = findOrCreateColumn(sheet, groundingColName) - 1;
+  }
+```
+
+`findOrCreateColumn` re-fetches headers directly from the sheet and returns a 1-based index whether the column already existed or was just created — subtract 1 to preserve the existing 0-based `outputIdx`/`groundingIdx` used throughout the rest of the function. The `headers.push(...)` lines are dropped: `headers` (the in-memory array from `getSheetHeaders()`, line ~312) is never read again anywhere later in `runBatchAI` — it was only being kept in sync for these two now-removed lookups.
+
+- [ ] **Step 2: Run typecheck, lint, and the full suite**
+
+Run: `npm run typecheck && npm run lint && npm test`
+Expected: All pass. (Do NOT yet add the ESLint enforcement rule from Task 6 in this task — that's the next task, once this gap is closed lint will pass cleanly under it.)
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/server/index.ts
+git commit -m "fix(security): route runBatchAI's column-header creation through findOrCreateColumn"
+```
+
+---
+
 ### Task 6: Add the ESLint enforcement rule
 
 **Files:**
