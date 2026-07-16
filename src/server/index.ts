@@ -350,25 +350,13 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
   }
 
   // Resolve output column — create if not found
-  let outputIdx = headers.indexOf(config.outputCol);
-  if (outputIdx === -1) {
-    const newColIdx = sheet.getLastColumn() + 1;
-    sheet.getRange(1, newColIdx).setValue(config.outputCol);
-    outputIdx = newColIdx - 1;
-    headers.push(config.outputCol); // keep in sync, matching grounding column pattern
-  }
+  const outputIdx = findOrCreateColumn(sheet, config.outputCol) - 1;
 
   // Resolve grounding column — create if not found (only when opted in)
   let groundingIdx = -1;
   const groundingColName = config.outputCol + "_grounding";
   if (config.includeGrounding) {
-    groundingIdx = headers.indexOf(groundingColName);
-    if (groundingIdx === -1) {
-      const newColIdx = sheet.getLastColumn() + 1;
-      sheet.getRange(1, newColIdx).setValue(groundingColName);
-      groundingIdx = newColIdx - 1;
-      headers.push(groundingColName); // keep in sync for subsequent rows
-    }
+    groundingIdx = findOrCreateColumn(sheet, groundingColName) - 1;
   }
 
   // Determine row range
