@@ -33,7 +33,13 @@ import {
   markAIOutputRange,
   resolveGroundingUris,
 } from "./utils";
-import { findOrCreateColumn, writeColumn, writeSafeValue, writeSafeRichText } from "./safe-writes";
+import {
+  findOrCreateColumn,
+  writeColumn,
+  writeSafeValue,
+  writeSafeRichText,
+  writeSafeRichTextGrid,
+} from "./safe-writes";
 import { CONFIG } from "./config";
 import type {
   RunConfig,
@@ -286,7 +292,7 @@ export function formatMarkdownSelection(): void {
       }
     }),
   ) as GoogleAppsScript.Spreadsheet.RichTextValue[][];
-  range.setRichTextValues(grid);
+  writeSafeRichTextGrid(range, grid);
   ui.alert(`Formatted ${count} cell(s).`);
 }
 
