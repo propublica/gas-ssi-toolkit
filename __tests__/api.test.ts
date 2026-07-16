@@ -322,6 +322,38 @@ describe("callGeminiAPI", () => {
     expect(resp.groundingMetadata).toBeUndefined();
     expect(resp.codePairs).toBeUndefined();
   });
+
+  it("populates usageMetadata when present in the response", () => {
+    mockFetchResponse({
+      candidates: [{ content: { parts: [{ text: "ok" }] } }],
+      usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, totalTokenCount: 15 },
+    });
+    const resp = callGeminiAPI(baseReq);
+    expect(resp.usageMetadata).toEqual({
+      promptTokenCount: 10,
+      candidatesTokenCount: 5,
+      totalTokenCount: 15,
+    });
+  });
+
+  it("passes through thoughtsTokenCount when present", () => {
+    mockFetchResponse({
+      candidates: [{ content: { parts: [{ text: "ok" }] } }],
+      usageMetadata: {
+        promptTokenCount: 10,
+        candidatesTokenCount: 5,
+        thoughtsTokenCount: 20,
+        totalTokenCount: 35,
+      },
+    });
+    const resp = callGeminiAPI(baseReq);
+    expect(resp.usageMetadata?.thoughtsTokenCount).toBe(20);
+  });
+
+  it("leaves usageMetadata undefined when not present in the response", () => {
+    mockFetchResponse({ candidates: [{ content: { parts: [{ text: "ok" }] } }] });
+    expect(callGeminiAPI(baseReq).usageMetadata).toBeUndefined();
+  });
 });
 
 // ── invokeGemini tests ─────────────────────────────────────────
@@ -386,6 +418,27 @@ describe("callGeminiAPIBatch", () => {
     expect(results).toHaveLength(2);
     expect(results[0].text).toBe("Result A");
     expect(results[1].text).toBe("Result B");
+  });
+
+  it("populates usageMetadata per response", () => {
+    mockFetchAllResponses([
+      {
+        candidates: [{ content: { parts: [{ text: "A" }] } }],
+        usageMetadata: { promptTokenCount: 8, candidatesTokenCount: 4, totalTokenCount: 12 },
+      },
+      { candidates: [{ content: { parts: [{ text: "B" }] } }] },
+    ]);
+    const reqs: GeminiRequest[] = [
+      { apiKey: "key", userParts: [{ text: "Q1" }] },
+      { apiKey: "key", userParts: [{ text: "Q2" }] },
+    ];
+    const results = callGeminiAPIBatch(reqs);
+    expect(results[0].usageMetadata).toEqual({
+      promptTokenCount: 8,
+      candidatesTokenCount: 4,
+      totalTokenCount: 12,
+    });
+    expect(results[1].usageMetadata).toBeUndefined();
   });
 
   it("returns empty array for empty input", () => {
