@@ -33,15 +33,20 @@ Stats capture becomes part of `runBatchAI`'s normal contract: every invocation m
 
 ### Gemini API response — capturing `usageMetadata`
 
-The REST response for `generateContent` includes a top-level `usageMetadata` object (sibling to `candidates`), which the toolkit currently discards entirely. Relevant fields (of the full set the API returns — `cachedContentTokenCount`, `thoughtsTokenCount`, and the `*TokensDetails` breakdowns are not used by this app and are not captured):
+The REST response for `generateContent` includes a top-level `usageMetadata` object (sibling to `candidates`), which the toolkit currently discards entirely.
+
+Field relationships, per the Gemini API reference and thinking-token docs — this matters for getting cost math right, not just for picking field names:
+- `promptTokenCount` is the **complete** effective prompt size — it already includes `cachedContentTokenCount` and `toolUsePromptTokenCount` as subsets, not additional to it. Neither of those two needs to be captured separately: `cachedContentTokenCount` will always be 0 for this app (nothing here ever sets `cachedContent`), and `toolUsePromptTokenCount` would double-count input cost if added on top of `promptTokenCount`.
+- `thoughtsTokenCount` is genuinely additional — billed at the model's **output** rate ("response pricing is the sum of output tokens and thinking tokens"). This is **not an edge case for this app**: thinking is on by default for both models in `PRICING_CATALOG` (Gemini 3.1 Pro Preview defaults to "high," Gemini 3.1 Flash Lite defaults to "minimal"), so omitting it would systematically undercount cost on every request, not just occasionally.
+- `totalTokenCount` ≈ `promptTokenCount + thoughtsTokenCount + candidatesTokenCount`.
 
 ```typescript
 // src/server/types.ts
 export interface GeminiUsageMetadata {
   promptTokenCount: number;
   candidatesTokenCount: number;
+  thoughtsTokenCount?: number; // billed at the output rate; present whenever thinking is active
   totalTokenCount: number;
-  toolUsePromptTokenCount?: number; // tokens spent constructing tool-use context (e.g. injected search results); present only when tools were used
 }
 ```
 
@@ -95,8 +100,8 @@ Follows the existing `RecipeSettings = Pick<RunConfig, ...>` precedent (`src/cli
 export interface RunStats {
   rowCount: number;              // rows successfully measured (had usageMetadata)
   totalTimeMs: number;           // wall-clock time for the whole invocation
-  totalInputTokens: number;      // sum of (promptTokenCount + toolUsePromptTokenCount)
-  totalOutputTokens: number;     // sum of candidatesTokenCount
+  totalInputTokens: number;      // sum of promptTokenCount (already includes tool-use/cached-content overhead)
+  totalOutputTokens: number;     // sum of (candidatesTokenCount + thoughtsTokenCount) — both billed at the output rate
   totalTokenCost: number;        // USD, token pricing only
   totalGroundingQueries: number; // sum of groundingMetadata.webSearchQueries.length
   totalGroundingCost: number;    // USD, at Standard grounding rate
@@ -111,7 +116,7 @@ Deliberately stores **totals**, not averages — per-row figures are a trivial d
 
 Pure, no GAS globals, fully unit-testable with fixture data:
 
-- `computeRunStats(results: GeminiResponse[], elapsedMs: number): Omit<RunStats, "testedAt" | "config">` — filters to results carrying `usageMetadata` (skips error/no-usage rows); for each measured result, applies the correct pricing tier (Pro Preview's >200k-token check, using billable input tokens as the threshold signal) before summing cost; sums grounding queries from `groundingMetadata.webSearchQueries.length` **unconditionally** — this must not gate on `RunConfig.includeGrounding`, since that flag only controls whether a `_grounding` output column is written, not whether the tool actually ran and incurred cost.
+- `computeRunStats(results: GeminiResponse[], elapsedMs: number): Omit<RunStats, "testedAt" | "config">` — filters to results carrying `usageMetadata` (skips error/no-usage rows). For each measured result: the pricing tier is `promptTokenCount > 200_000 ? "over200k" : "standard"` (Pro Preview only); input cost is `promptTokenCount` at that tier's input rate; output cost is `(candidatesTokenCount + (thoughtsTokenCount ?? 0))` at that tier's output rate — thinking tokens are folded into the same output bucket since they're billed identically, not tracked as a separate field. Sums grounding queries from `groundingMetadata.webSearchQueries.length` **unconditionally** — this must not gate on `RunConfig.includeGrounding`, since that flag only controls whether a `_grounding` output column is written, not whether the tool actually ran and incurred cost.
 
 ### Config snapshot & comparison (`src/shared/run-stats.ts`, new)
 
@@ -212,7 +217,7 @@ Missing this would silently drop the `RunStats` value at the RPC boundary.
 
 ## Testing
 
-- `computeRunStats` (pure, fixture-driven): normal case; mixed success/error rows; Pro Preview tiering on both sides of the 200k threshold; grounding query summing; all-rows-invalid → zero-value result.
+- `computeRunStats` (pure, fixture-driven): normal case; mixed success/error rows; Pro Preview tiering on both sides of the 200k threshold; a response with `thoughtsTokenCount` present, asserting it's billed at the output rate and folded into `totalOutputTokens`; a response with no `thoughtsTokenCount` (thinking disabled/absent); grounding query summing; all-rows-invalid → zero-value result.
 - `buildConfigSnapshot` / `configsMatch` (pure): correct field selection; `tools: undefined` and `tools: []` normalize to equal.
 - `api.ts`: extend existing tests to assert `usageMetadata` passthrough (present and absent cases).
 - `writeRunStats`: mocked `CacheService`, matching the existing `writeJobProgress` test pattern.
