@@ -33,7 +33,7 @@ import {
   markAIOutputRange,
   resolveGroundingUris,
 } from "./utils";
-import { findOrCreateColumn, writeColumn, sanitizeForCell, writeSafeValue } from "./safe-writes";
+import { findOrCreateColumn, writeColumn, writeSafeValue, writeSafeRichText } from "./safe-writes";
 import { CONFIG } from "./config";
 import type {
   RunConfig,
@@ -539,28 +539,30 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
     if (config.applyMarkdown) {
       try {
-        sheet
-          .getRange(realRowIndex, outputIdx + 1)
-          .setRichTextValue(toCellValue(parseMarkdown(injectCitations(result, resolvedUris))));
+        writeSafeRichText(
+          sheet.getRange(realRowIndex, outputIdx + 1),
+          toCellValue(parseMarkdown(injectCitations(result, resolvedUris))),
+        );
       } catch (_e) {
-        sheet.getRange(realRowIndex, outputIdx + 1).setValue(sanitizeForCell(result.text));
+        writeSafeValue(sheet.getRange(realRowIndex, outputIdx + 1), result.text);
       }
     } else {
-      sheet.getRange(realRowIndex, outputIdx + 1).setValue(sanitizeForCell(result.text));
+      writeSafeValue(sheet.getRange(realRowIndex, outputIdx + 1), result.text);
     }
 
     if (config.includeGrounding && groundingIdx >= 0) {
       const groundingMarkdown = groundingToMarkdown(result, resolvedUris);
       if (groundingMarkdown !== null) {
-        sheet
-          .getRange(realRowIndex, groundingIdx + 1)
-          .setRichTextValue(toCellValue(parseMarkdown(groundingMarkdown)));
+        writeSafeRichText(
+          sheet.getRange(realRowIndex, groundingIdx + 1),
+          toCellValue(parseMarkdown(groundingMarkdown)),
+        );
       }
     }
   }
 
   for (const [i, errorText] of directWrites) {
-    sheet.getRange(startRow + i, outputIdx + 1).setValue(errorText);
+    writeSafeValue(sheet.getRange(startRow + i, outputIdx + 1), errorText);
   }
 
   SpreadsheetApp.flush();
