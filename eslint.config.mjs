@@ -39,4 +39,15 @@ export default defineConfig([globalIgnores(["**/dist/", "**/node_modules/", "**/
         "@typescript-eslint/explicit-function-return-type": "warn",
         "@typescript-eslint/no-explicit-any": "warn",
     },
+}, {
+    files: ["src/server/**/*.ts"],
+    ignores: ["src/server/safe-writes.ts"],
+    rules: {
+        "no-restricted-syntax": ["error", {
+            selector:
+                "CallExpression[callee.type='MemberExpression'][callee.property.name=/^(setValue|setValues|setRichTextValue|setRichTextValues)$/]",
+            message:
+                "Raw Sheets write calls are restricted to src/server/safe-writes.ts. Route this write through writeSafeValue/writeSafeValueGrid/writeSafeRichText/writeSafeRichTextGrid. See docs/threat_models/ssi-toolkit-threat-model.md, T6.",
+        }],
+    },
 }]);
