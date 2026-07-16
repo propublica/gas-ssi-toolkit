@@ -33,7 +33,7 @@ import {
   markAIOutputRange,
   resolveGroundingUris,
 } from "./utils";
-import { findOrCreateColumn, writeColumn, sanitizeForCell } from "./safe-writes";
+import { findOrCreateColumn, writeColumn, sanitizeForCell, writeSafeValue } from "./safe-writes";
 import { CONFIG } from "./config";
 import type {
   RunConfig,
@@ -159,7 +159,7 @@ export function extractText(config: ExtractTextConfig, jobId?: string): void {
 
     const fileId = extractId(cellValue);
     const text = truncateText(extractTextUniversal(fileId), 49000);
-    sheet.getRange(rowIdx, outputCol).setValue(text);
+    writeSafeValue(sheet.getRange(rowIdx, outputCol), text);
     SpreadsheetApp.flush();
   }
 }
