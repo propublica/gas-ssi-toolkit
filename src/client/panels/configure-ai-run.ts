@@ -350,7 +350,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
               const chunks = computeChunks(rangeInfo, CHUNK_SIZE);
               return this.runChunks(jobId, config, chunks);
             }
-            return runBatchAI(config, jobId);
+            return runBatchAI(config, jobId).then(() => undefined);
           }),
         )
         .catch((err: Error) => {

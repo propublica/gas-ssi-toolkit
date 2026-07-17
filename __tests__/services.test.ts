@@ -86,6 +86,37 @@ describe("runBatchAI", () => {
     handlers.reject(new Error("api error"));
     await expect(promise).rejects.toThrow("api error");
   });
+
+  it("resolves with the RunStats returned by the RPC call", async () => {
+    const handlers = captureHandlers();
+    const config = { promptCols: [{ col: "col_a", kind: "text" }], outputCol: "out" };
+    const stats = {
+      rowCount: 10,
+      totalTimeMs: 4200,
+      totalInputTokens: 500,
+      totalOutputTokens: 300,
+      totalTokenCost: 0.002,
+      totalGroundingQueries: 0,
+      totalGroundingCost: 0,
+      testedAt: 1234567890,
+      config: {
+        promptCols: [{ col: "col_a", kind: "text" }],
+        tools: [],
+        prefixWithColName: false,
+      },
+    };
+    const promise = services.runBatchAI(config as import("../src/shared/types").RunConfig);
+    handlers.resolve(stats);
+    await expect(promise).resolves.toEqual(stats);
+  });
+
+  it("resolves with null when the RPC call returns null", async () => {
+    const handlers = captureHandlers();
+    const config = { promptCols: [{ col: "col_a", kind: "text" }], outputCol: "out" };
+    const promise = services.runBatchAI(config as import("../src/shared/types").RunConfig);
+    handlers.resolve(null);
+    await expect(promise).resolves.toBeNull();
+  });
 });
 
 describe("runTool", () => {

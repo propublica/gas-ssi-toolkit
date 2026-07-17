@@ -4,6 +4,7 @@ import type {
   PrepRecipeParams,
   PrepRecipeResult,
   RunConfig,
+  RunStats,
 } from "../shared/types";
 
 export function getSheetHeaders(): Promise<string[]> {
@@ -15,10 +16,10 @@ export function getSheetHeaders(): Promise<string[]> {
   });
 }
 
-export function runBatchAI(config: RunConfig, jobId?: string): Promise<void> {
+export function runBatchAI(config: RunConfig, jobId?: string): Promise<RunStats | null> {
   return new Promise((resolve, reject) => {
     google.script.run
-      .withSuccessHandler(() => resolve())
+      .withSuccessHandler((result: unknown) => resolve(result as RunStats | null))
       .withFailureHandler((err: Error) => reject(err))
       .runBatchAI(config, jobId);
   });
