@@ -1,5 +1,5 @@
 import type { NavigationContext, Panel } from "../types";
-import type { RunConfig, ToolId, ModelId } from "../../shared/types";
+import type { RunConfig, ToolId, ModelId, RunStats } from "../../shared/types";
 import { TagList } from "../components/tag-list";
 import { TokenInput } from "../components/token-input";
 import { PromptColList } from "../components/prompt-col-list";
@@ -227,6 +227,9 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           container
             .querySelector<HTMLButtonElement>("#run-btn")!
             .addEventListener("click", () => this.handleRun(container));
+          container
+            .querySelector<HTMLButtonElement>("#test-btn")!
+            .addEventListener("click", () => this.handleTest(container));
           this.headersLoaded = true;
         }
       },
@@ -374,6 +377,70 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     }
   }
 
+  private handleTest(container: HTMLElement): void {
+    const config = this.assembleRunConfig();
+    if (!config) return;
+
+    const jobId = `test-ai-${Date.now()}`;
+    const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
+
+    const resolveRange: Promise<{ start: number; end: number } | null> = config.rowRange
+      ? Promise.resolve(config.rowRange)
+      : getActiveRangeInfo();
+
+    jobStore
+      .dispatch(
+        jobId,
+        "Test AI Run",
+        resolveRange.then((range) => {
+          if (!range) return null;
+          const cappedEnd = Math.min(range.start + 9, range.end);
+          return runBatchAI({ ...config, rowRange: { start: range.start, end: cappedEnd } }, jobId);
+        }),
+      )
+      .then((stats) => {
+        if (stats) {
+          this.renderTestStats(container, stats);
+          this.flashTestSuccess(testBtn);
+        } else {
+          this.renderTestMessage(
+            container,
+            "Test didn't produce measurable results — check the sheet for errors in the tested rows.",
+          );
+        }
+      })
+      .catch((err: Error) => {
+        globalThis.alert("Error: " + err.message);
+      });
+  }
+
+  private renderTestStats(container: HTMLElement, stats: RunStats): void {
+    const el = container.querySelector<HTMLElement>("#test-results")!;
+    const totalCost = stats.totalTokenCost + stats.totalGroundingCost;
+    const avgCost = totalCost / stats.rowCount;
+    el.innerHTML = `
+      <p>Tested ${stats.rowCount} row${stats.rowCount === 1 ? "" : "s"} in ${(stats.totalTimeMs / 1000).toFixed(1)}s.</p>
+      <p>Avg cost per row: $${avgCost.toFixed(4)} — total cost of this test: $${totalCost.toFixed(4)}</p>
+    `;
+    el.hidden = false;
+  }
+
+  private renderTestMessage(container: HTMLElement, message: string): void {
+    const el = container.querySelector<HTMLElement>("#test-results")!;
+    el.innerHTML = `<p>${message}</p>`;
+    el.hidden = false;
+  }
+
+  private flashTestSuccess(btn: HTMLButtonElement): void {
+    const original = btn.textContent;
+    btn.classList.add("btn-test--success");
+    btn.textContent = "Tested ✓";
+    setTimeout(() => {
+      btn.classList.remove("btn-test--success");
+      btn.textContent = original;
+    }, 3000);
+  }
+
   private assembleRunConfig(): RunConfig | null {
     const promptCols = this.promptColList?.getValue() ?? [];
     if (promptCols.length === 0) {
@@ -480,6 +547,9 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <div id="row-range-container"></div>
       </div>
       <div class="panel-buttons">
+        <p class="field-helper">Execute your configuration across the first 10 rows in your selection. Evaluate for quality. Estimate cost.</p>
+        <button id="test-btn" class="btn-outline">Test</button>
+        <div id="test-results" class="test-results" hidden></div>
         <button id="run-btn" class="btn-run">Run AI</button>
       </div>
     </div>

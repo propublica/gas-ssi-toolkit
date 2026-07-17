@@ -34,6 +34,24 @@ function makeContainer(): HTMLElement {
 
 const DEFAULT_HEADERS = ["col_a", "col_b", "system_prompt", "ai_inference"];
 
+const TEST_STATS: import("../../src/shared/types").RunStats = {
+  rowCount: 10,
+  totalTimeMs: 4200,
+  totalInputTokens: 500,
+  totalOutputTokens: 300,
+  totalTokenCost: 0.002,
+  totalGroundingQueries: 0,
+  totalGroundingCost: 0,
+  testedAt: 1234567890,
+  config: {
+    promptCols: [{ col: "col_a", kind: "text" }],
+    systemPromptCol: undefined,
+    tools: [],
+    prefixWithColName: false,
+    model: "gemini-3.1-flash-lite",
+  },
+};
+
 async function mountAndLoad(
   params?: Partial<RunConfig>,
   savedState?: Partial<SavedState>,
@@ -650,5 +668,133 @@ describe("ConfigureAIRunPanel — model selector", () => {
     const state = panel.unmount();
     expect(state?.model).toBe("gemini-3.1-pro-preview");
     expect(state?.modelExpanded).toBe(true);
+  });
+});
+
+describe("ConfigureAIRunPanel — Test AI", () => {
+  it("alerts and does not call runBatchAI when no user prompt cols selected", async () => {
+    const { container } = await mountAndLoad();
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    expect(globalThis.alert).toHaveBeenCalledWith("Please select at least one User prompt column.");
+    expect(services.runBatchAI).not.toHaveBeenCalled();
+  });
+
+  it("alerts when no output column selected", async () => {
+    const { container } = await mountAndLoad();
+    addPromptCol(container, "col_a");
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    expect(globalThis.alert).toHaveBeenCalledWith("Please select an output column.");
+  });
+
+  it("calls runBatchAI with a row range capped to 10 rows from an explicit rowRange", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 100 },
+    });
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(services.runBatchAI).toHaveBeenCalledWith(
+      expect.objectContaining({ rowRange: { start: 2, end: 11 } }),
+      expect.stringMatching(/^test-ai-\d+$/),
+    );
+  });
+
+  it("caps to the actual range size when the explicit rowRange has fewer than 10 rows", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 5 },
+    });
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(services.runBatchAI).toHaveBeenCalledWith(
+      expect.objectContaining({ rowRange: { start: 2, end: 5 } }),
+      expect.any(String),
+    );
+  });
+
+  it("falls back to the active selection, capped to 10 rows, when no explicit rowRange is set", async () => {
+    (services.getActiveRangeInfo as jest.Mock).mockResolvedValue({ start: 3, end: 200 });
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+    });
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(services.runBatchAI).toHaveBeenCalledWith(
+      expect.objectContaining({ rowRange: { start: 3, end: 12 } }),
+      expect.any(String),
+    );
+  });
+
+  it("shows a neutral message and never calls runBatchAI when there is no active selection", async () => {
+    (services.getActiveRangeInfo as jest.Mock).mockResolvedValue(null);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+    });
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(services.runBatchAI).not.toHaveBeenCalled();
+    const results = container.querySelector<HTMLElement>("#test-results")!;
+    expect(results.hidden).toBe(false);
+    expect(results.textContent).toContain("didn't produce measurable results");
+  });
+
+  it("renders rows tested, time, avg cost, and total cost on success", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 11 },
+    });
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    const results = container.querySelector<HTMLElement>("#test-results")!;
+    expect(results.hidden).toBe(false);
+    expect(results.textContent).toContain("Tested 10 rows");
+  });
+
+  it("flashes a success state on the test button after a successful test", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 11 },
+    });
+    const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
+    testBtn.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(testBtn.classList.contains("btn-test--success")).toBe(true);
+  });
+
+  it("shows a neutral message when runBatchAI returns null (nothing measurable)", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(null);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 11 },
+    });
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    const results = container.querySelector<HTMLElement>("#test-results")!;
+    expect(results.hidden).toBe(false);
+    expect(results.textContent).toContain("didn't produce measurable results");
+  });
+
+  it("alerts on failure", async () => {
+    (services.runBatchAI as jest.Mock).mockRejectedValue(new Error("API error"));
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 11 },
+    });
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(globalThis.alert).toHaveBeenCalledWith("Error: API error");
   });
 });

@@ -340,7 +340,7 @@
             box-sizing: border-box;
         }
 
-        .panel-buttons { display: flex; gap: 8px; margin-top: 24px; }
+        .panel-buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
 
         .btn-run {
             flex: 1;
@@ -357,6 +357,24 @@
 
         .btn-run:hover { background: #1557b0; }
         .btn-run:disabled { background: #9aa0a6; cursor: default; }
+
+        .btn-test--success {
+            background: #34a853;
+            color: white;
+            border-color: #34a853;
+        }
+
+        .test-results {
+            margin-top: 4px;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-size: var(--font-size-200);
+            color: var(--text-secondary);
+        }
+
+        .test-results p { margin: 0 0 4px 0; }
+        .test-results p:last-child { margin-bottom: 0; }
 
         .btn-outline {
             flex: 1;
