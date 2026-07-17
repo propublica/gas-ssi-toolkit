@@ -54,6 +54,11 @@ describe("JobStore", () => {
     expect(job?.state.status).toBe("complete");
   });
 
+  it("resolves with the value the dispatched promise resolves to", async () => {
+    const result = await store.dispatch("job-typed", "Test", Promise.resolve({ rows: 10 }));
+    expect(result).toEqual({ rows: 10 });
+  });
+
   it("marks job error when promise rejects", async () => {
     const listener = jest.fn();
     store.subscribe(listener);
