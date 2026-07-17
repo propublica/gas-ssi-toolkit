@@ -546,7 +546,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <span class="field-label">Rows to process</span>
         <div id="row-range-container"></div>
       </div>
-      <div class="panel-buttons">
+      <div class="panel-buttons panel-buttons--stacked">
         <p class="field-helper">Execute your configuration across the first 10 rows in your selection. Evaluate for quality. Estimate cost.</p>
         <button id="test-btn" class="btn-outline">Test</button>
         <div id="test-results" class="test-results" hidden></div>

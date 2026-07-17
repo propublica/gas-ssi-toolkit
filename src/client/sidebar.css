@@ -340,7 +340,9 @@
             box-sizing: border-box;
         }
 
-        .panel-buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
+        .panel-buttons { display: flex; gap: 8px; margin-top: 24px; }
+
+        .panel-buttons--stacked { flex-direction: column; }
 
         .btn-run {
             flex: 1;
