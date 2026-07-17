@@ -798,3 +798,70 @@ describe("ConfigureAIRunPanel — Test AI", () => {
     expect(globalThis.alert).toHaveBeenCalledWith("Error: API error");
   });
 });
+
+describe("ConfigureAIRunPanel — lastTestStats persistence", () => {
+  it("unmount saves lastTestStats after a successful test", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container, panel } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 11 },
+    });
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    const state = panel.unmount();
+    expect(state?.lastTestStats).toEqual(TEST_STATS);
+  });
+
+  it("unmount saves lastTestStats: null when no test has run yet", async () => {
+    const { container, panel } = await mountAndLoad();
+    addPromptCol(container, "col_a");
+    const state = panel.unmount();
+    expect(state?.lastTestStats).toBeNull();
+  });
+
+  it("restores and renders lastTestStats from savedState when the config still matches", async () => {
+    const { container } = await mountAndLoad(undefined, {
+      promptCols: [{ col: "col_a", kind: "text" as const }],
+      systemPromptCol: "",
+      outputCol: "ai_inference",
+      lastTestStats: TEST_STATS,
+    });
+    const results = container.querySelector<HTMLElement>("#test-results")!;
+    expect(results.hidden).toBe(false);
+    expect(results.textContent).toContain("Tested 10 rows");
+  });
+
+  it("shows a stale notice instead of numbers when the restored config no longer matches", async () => {
+    const { container } = await mountAndLoad(undefined, {
+      promptCols: [{ col: "col_b", kind: "text" as const }], // differs from TEST_STATS.config
+      systemPromptCol: "",
+      outputCol: "ai_inference",
+      lastTestStats: TEST_STATS,
+    });
+    const results = container.querySelector<HTMLElement>("#test-results")!;
+    expect(results.hidden).toBe(false);
+    expect(results.textContent).toContain("Configuration changed since last test");
+  });
+
+  it("does not flash the success state when restoring from savedState", async () => {
+    const { container } = await mountAndLoad(undefined, {
+      promptCols: [{ col: "col_a", kind: "text" as const }],
+      systemPromptCol: "",
+      outputCol: "ai_inference",
+      lastTestStats: TEST_STATS,
+    });
+    const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
+    expect(testBtn.classList.contains("btn-test--success")).toBe(false);
+  });
+
+  it("renders nothing when there is no lastTestStats in savedState", async () => {
+    const { container } = await mountAndLoad(undefined, {
+      promptCols: [{ col: "col_a", kind: "text" as const }],
+      systemPromptCol: "",
+      outputCol: "ai_inference",
+    });
+    const results = container.querySelector<HTMLElement>("#test-results")!;
+    expect(results.hidden).toBe(true);
+  });
+});

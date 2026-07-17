@@ -9,6 +9,7 @@ import { getSheetHeaders, runBatchAI, getActiveRangeInfo } from "../services";
 import { jobStore } from "../job-store";
 import { TOOL_CATALOG } from "../tools";
 import { MODEL_CATALOG } from "../models";
+import { buildConfigSnapshot, configsMatch } from "../../shared/run-stats";
 
 export const CHUNK_SIZE = 40;
 // Warn before dispatch when the batch exceeds this many rows, regardless of chunk count.
@@ -38,6 +39,7 @@ export type SavedState = Required<
   > & {
     toolsExpanded?: boolean;
     modelExpanded?: boolean;
+    lastTestStats?: RunStats | null;
   };
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
@@ -55,6 +57,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private toolsExpanded = false;
   private modelListEl: HTMLElement | null = null;
   private modelExpanded = false;
+  private lastTestStats: RunStats | null = null;
 
   mount(
     container: HTMLElement,
@@ -65,6 +68,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     this.nav = nav;
     this.promptColList = null; // reset so unmount() guards correctly before load
     this.headersLoaded = false;
+    this.lastTestStats = savedState?.lastTestStats ?? null;
     container.innerHTML = this.template();
     this.wireNavButtons(container);
 
@@ -231,6 +235,18 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
             .querySelector<HTMLButtonElement>("#test-btn")!
             .addEventListener("click", () => this.handleTest(container));
           this.headersLoaded = true;
+
+          if (this.lastTestStats) {
+            const liveSnapshot = buildConfigSnapshot(this.currentPreset());
+            if (configsMatch(liveSnapshot, this.lastTestStats.config)) {
+              this.renderTestStats(container, this.lastTestStats);
+            } else {
+              this.renderTestMessage(
+                container,
+                "Configuration changed since last test — click Test to refresh.",
+              );
+            }
+          }
         }
       },
       (err: Error) => {
@@ -259,6 +275,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       toolsExpanded: this.toolsExpanded,
       model: this.getSelectedModel(),
       modelExpanded: this.modelExpanded,
+      lastTestStats: this.lastTestStats,
     };
   }
 
@@ -400,6 +417,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       )
       .then((stats) => {
         if (stats) {
+          this.lastTestStats = stats;
           this.renderTestStats(container, stats);
           this.flashTestSuccess(testBtn);
         } else {
