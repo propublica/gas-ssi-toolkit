@@ -92,4 +92,55 @@ describe("configsMatch", () => {
     });
     expect(configsMatch(a, b)).toBe(false);
   });
+
+  it("returns true for identical data with different top-level key order (google.script.run's RPC bridge does not preserve object key insertion order)", () => {
+    // Real-world data captured from a production false-mismatch report: the client-computed
+    // snapshot and the server round-tripped snapshot held identical values but arrived with
+    // different key order, which a JSON.stringify string comparison treats as unequal.
+    const live = {
+      promptCols: [{ col: "Drive Link", kind: "file" as const }],
+      systemPromptCol: "System Prompt",
+      tools: [],
+      prefixWithColName: false,
+      model: "gemini-3.1-flash-lite" as const,
+    };
+    const cached = {
+      systemPromptCol: "System Prompt",
+      promptCols: [{ col: "Drive Link", kind: "file" as const }],
+      model: "gemini-3.1-flash-lite" as const,
+      prefixWithColName: false,
+      tools: [],
+    };
+    expect(configsMatch(live, cached)).toBe(true);
+  });
+
+  it("returns true for identical promptCols entries with different key order within each element", () => {
+    const a = buildConfigSnapshot({
+      promptCols: [{ col: "a", kind: "text" }],
+      outputCol: "out",
+    });
+    const b = buildConfigSnapshot({
+      promptCols: [{ kind: "text", col: "a" } as unknown as { col: string; kind: "text" }],
+      outputCol: "out",
+    });
+    expect(configsMatch(a, b)).toBe(true);
+  });
+
+  it("still returns false when promptCols differ in order (row order is semantically meaningful)", () => {
+    const a = buildConfigSnapshot({
+      promptCols: [
+        { col: "a", kind: "text" },
+        { col: "b", kind: "text" },
+      ],
+      outputCol: "out",
+    });
+    const b = buildConfigSnapshot({
+      promptCols: [
+        { col: "b", kind: "text" },
+        { col: "a", kind: "text" },
+      ],
+      outputCol: "out",
+    });
+    expect(configsMatch(a, b)).toBe(false);
+  });
 });

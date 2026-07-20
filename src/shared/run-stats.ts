@@ -24,6 +24,33 @@ export function buildConfigSnapshot(config: Partial<RunConfig>): RunStatsConfigS
   };
 }
 
+/**
+ * Order-independent structural equality. google.script.run's serialization bridge
+ * does not preserve object key insertion order when a value round-trips through it
+ * (confirmed from a real false-mismatch report: two structurally identical
+ * RunStatsConfigSnapshots arrived with different top-level key order), so a
+ * JSON.stringify string comparison is not a safe way to compare two values where
+ * one of them may have crossed that boundary. Array element order is preserved
+ * and does matter (e.g. promptCols' row order changes the assembled prompt) —
+ * only object key order is treated as insignificant.
+ */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((item, i) => deepEqual(item, b[i]));
+  }
+  if (a && b && typeof a === "object" && typeof b === "object") {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+    return aKeys.every((key) =>
+      deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
+    );
+  }
+  return false;
+}
+
 export function configsMatch(a: RunStatsConfigSnapshot, b: RunStatsConfigSnapshot): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  return deepEqual(a, b);
 }
