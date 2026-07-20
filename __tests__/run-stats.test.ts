@@ -36,6 +36,29 @@ describe("buildConfigSnapshot", () => {
   it("defaults promptCols to [] when absent (Partial<RunConfig> input)", () => {
     expect(buildConfigSnapshot({}).promptCols).toEqual([]);
   });
+
+  it("normalizes a null systemPromptCol (as google.script.run's RPC bridge may deliver an omitted value) the same as undefined", () => {
+    // TypeScript's RunConfig.systemPromptCol type is string|undefined, but google.script.run
+    // serializes parameters through a JSON-like bridge that can coerce an undefined property
+    // to null in transit — the server sees a value TypeScript's static types say can't happen.
+    const withNull = buildConfigSnapshot({
+      promptCols: [],
+      outputCol: "out",
+      systemPromptCol: null,
+    } as unknown as Partial<RunConfig>);
+    const withUndefined = buildConfigSnapshot({ promptCols: [], outputCol: "out" });
+    expect(configsMatch(withNull, withUndefined)).toBe(true);
+  });
+
+  it("normalizes a null model the same as undefined, for the same reason", () => {
+    const withNull = buildConfigSnapshot({
+      promptCols: [],
+      outputCol: "out",
+      model: null,
+    } as unknown as Partial<RunConfig>);
+    const withUndefined = buildConfigSnapshot({ promptCols: [], outputCol: "out" });
+    expect(configsMatch(withNull, withUndefined)).toBe(true);
+  });
 });
 
 describe("configsMatch", () => {

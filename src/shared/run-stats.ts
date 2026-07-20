@@ -12,10 +12,15 @@ import type { RunConfig, RunStatsConfigSnapshot } from "./types";
 export function buildConfigSnapshot(config: Partial<RunConfig>): RunStatsConfigSnapshot {
   return {
     promptCols: config.promptCols ?? [],
-    systemPromptCol: config.systemPromptCol,
+    // google.script.run serializes parameters through a JSON-like bridge that can
+    // coerce an undefined property to null in transit — normalize both to undefined
+    // so a value that only crossed that RPC boundary on one side of a comparison
+    // (e.g. the server's copy of a RunConfig vs. the client's live component state)
+    // doesn't register as a config change.
+    systemPromptCol: config.systemPromptCol ?? undefined,
     tools: config.tools ?? [],
     prefixWithColName: config.prefixWithColName ?? false,
-    model: config.model,
+    model: config.model ?? undefined,
   };
 }
 
