@@ -241,21 +241,9 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
             .querySelector<HTMLButtonElement>("#test-btn")!
             .addEventListener("click", () => this.handleTest(container));
           this.headersLoaded = true;
-
-          if (this.lastTestStats) {
-            const liveSnapshot = buildConfigSnapshot(this.currentPreset());
-            if (configsMatch(liveSnapshot, this.lastTestStats.config)) {
-              this.renderTestStats(container, this.lastTestStats);
-              this.testButton?.setDone();
-            } else {
-              this.renderTestMessage(
-                container,
-                "Configuration changed since last test — click Test to refresh.",
-              );
-              this.testButton?.setIdle();
-            }
-          }
         }
+
+        this.checkTestStatsFreshness(container);
       },
       (err: Error) => {
         globalThis.alert("Error loading headers: " + err.message);
@@ -457,6 +445,30 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     const el = container.querySelector<HTMLElement>("#test-results")!;
     el.innerHTML = `<p>${message}</p>`;
     el.hidden = false;
+  }
+
+  /**
+   * Re-validates the displayed test results against the live config. Called after
+   * every loadHeaders() resolution (initial mount AND refresh), not just the first
+   * load — otherwise refreshing after an external sheet edit (e.g. a column
+   * disappearing) could leave a stale "Tested ✓" display unvalidated indefinitely.
+   * Skipped while a test is actively running: refresh isn't disabled during a
+   * test, and re-checking against last completion's stats would incorrectly
+   * clobber the in-flight loading state.
+   */
+  private checkTestStatsFreshness(container: HTMLElement): void {
+    if (!this.lastTestStats || this.testButton?.getState() === "loading") return;
+    const liveSnapshot = buildConfigSnapshot(this.currentPreset());
+    if (configsMatch(liveSnapshot, this.lastTestStats.config)) {
+      this.renderTestStats(container, this.lastTestStats);
+      this.testButton?.setDone();
+    } else {
+      this.renderTestMessage(
+        container,
+        "Configuration changed since last test — click Test to refresh.",
+      );
+      this.testButton?.setIdle();
+    }
   }
 
   private assembleRunConfig(): RunConfig | null {

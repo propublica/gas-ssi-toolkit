@@ -280,6 +280,76 @@ describe("ConfigureAIRunPanel — refresh", () => {
     // selections preserved after refresh
     expect(getPromptColValues(container)).toContain("col_a");
   });
+
+  it("re-validates test results on refresh: still shows them when the config still matches", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 11 },
+    });
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    container.querySelector<HTMLButtonElement>("#refresh-btn")!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const results = container.querySelector<HTMLElement>("#test-results")!;
+    expect(results.hidden).toBe(false);
+    expect(results.textContent).toContain("Tested 10 rows");
+    const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
+    expect(testBtn.textContent).toBe("Tested ✓");
+  });
+
+  it("shows a stale notice on refresh when the config changed since the last test", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 11 },
+    });
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    addPromptCol(container, "col_b"); // config changed after the test completed
+
+    container.querySelector<HTMLButtonElement>("#refresh-btn")!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const results = container.querySelector<HTMLElement>("#test-results")!;
+    expect(results.textContent).toContain("Configuration changed since last test");
+    const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
+    expect(testBtn.textContent).toBe("Test");
+  });
+
+  it("does not clobber an in-flight test's loading state if refresh is clicked mid-test", async () => {
+    let resolveStats!: (v: import("../../src/shared/types").RunStats) => void;
+    (services.runBatchAI as jest.Mock).mockReturnValue(
+      new Promise((res) => {
+        resolveStats = res;
+      }),
+    );
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 11 },
+    });
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    await Promise.resolve();
+
+    container.querySelector<HTMLButtonElement>("#refresh-btn")!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
+    expect(testBtn.disabled).toBe(true);
+    expect(testBtn.querySelector(".btn-spinner")).not.toBeNull();
+
+    resolveStats(TEST_STATS);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+  });
 });
 
 describe("ConfigureAIRunPanel — tools TagList", () => {
