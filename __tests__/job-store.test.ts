@@ -1,5 +1,5 @@
 jest.mock("../src/client/services", () => ({
-  getJobProgress: jest.fn().mockResolvedValue(null),
+  getJobProgress: jest.fn().mockResolvedValue(undefined),
 }));
 
 import { JobStore } from "../src/client/job-store";
@@ -164,7 +164,7 @@ describe("JobStore", () => {
   });
 
   it("stops polling after job completes", async () => {
-    mockGetJobProgress.mockResolvedValue(null);
+    mockGetJobProgress.mockResolvedValue(undefined);
 
     await store.dispatch("job-7", "Test", Promise.resolve());
     mockGetJobProgress.mockClear();

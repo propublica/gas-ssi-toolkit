@@ -40,7 +40,7 @@ export type SavedState = Required<
   > & {
     toolsExpanded?: boolean;
     modelExpanded?: boolean;
-    lastTestStats?: RunStats | null;
+    lastTestStats?: RunStats | undefined;
   };
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
@@ -58,7 +58,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private toolsExpanded = false;
   private modelListEl: HTMLElement | null = null;
   private modelExpanded = false;
-  private lastTestStats: RunStats | null = null;
+  private lastTestStats: RunStats | undefined = undefined;
   private testButton: AsyncActionButton | null = null;
 
   mount(
@@ -70,7 +70,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     this.nav = nav;
     this.promptColList = null; // reset so unmount() guards correctly before load
     this.headersLoaded = false;
-    this.lastTestStats = savedState?.lastTestStats ?? null;
+    this.lastTestStats = savedState?.lastTestStats;
     container.innerHTML = this.template();
     this.wireNavButtons(container);
     this.testButton = new AsyncActionButton(
@@ -409,7 +409,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     const jobId = `test-ai-${Date.now()}`;
     this.testButton?.setLoading();
 
-    const resolveRange: Promise<{ start: number; end: number } | null> = config.rowRange
+    const resolveRange: Promise<{ start: number; end: number } | undefined> = config.rowRange
       ? Promise.resolve(config.rowRange)
       : getActiveRangeInfo();
 
@@ -418,7 +418,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         jobId,
         "Test AI Run",
         resolveRange.then((range) => {
-          if (!range) return null;
+          if (!range) return undefined;
           const cappedEnd = Math.min(range.start + 9, range.end);
           return runBatchAI({ ...config, rowRange: { start: range.start, end: cappedEnd } }, jobId);
         }),

@@ -5,8 +5,8 @@
 jest.mock("../../src/client/services", () => ({
   getSheetHeaders: jest.fn(),
   runBatchAI: jest.fn(),
-  getActiveRangeInfo: jest.fn().mockResolvedValue(null),
-  getJobProgress: jest.fn().mockResolvedValue(null),
+  getActiveRangeInfo: jest.fn().mockResolvedValue(undefined),
+  getJobProgress: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("../../src/client/job-store", () => ({
@@ -732,7 +732,7 @@ describe("ConfigureAIRunPanel — Test AI", () => {
   });
 
   it("shows a neutral message and never calls runBatchAI when there is no active selection", async () => {
-    (services.getActiveRangeInfo as jest.Mock).mockResolvedValue(null);
+    (services.getActiveRangeInfo as jest.Mock).mockResolvedValue(undefined);
     const { container } = await mountAndLoad({
       promptCols: [{ col: "col_a", kind: "text" }],
       outputCol: "ai_inference",
@@ -808,8 +808,8 @@ describe("ConfigureAIRunPanel — Test AI", () => {
     expect(testBtn.textContent).toBe("Test");
   });
 
-  it("shows a neutral message when runBatchAI returns null (nothing measurable)", async () => {
-    (services.runBatchAI as jest.Mock).mockResolvedValue(null);
+  it("shows a neutral message when runBatchAI returns undefined (nothing measurable)", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
     const { container } = await mountAndLoad({
       promptCols: [{ col: "col_a", kind: "text" }],
       outputCol: "ai_inference",
@@ -849,11 +849,11 @@ describe("ConfigureAIRunPanel — lastTestStats persistence", () => {
     expect(state?.lastTestStats).toEqual(TEST_STATS);
   });
 
-  it("unmount saves lastTestStats: null when no test has run yet", async () => {
+  it("unmount saves lastTestStats: undefined when no test has run yet", async () => {
     const { container, panel } = await mountAndLoad();
     addPromptCol(container, "col_a");
     const state = panel.unmount();
-    expect(state?.lastTestStats).toBeNull();
+    expect(state?.lastTestStats).toBeUndefined();
   });
 
   it("restores and renders lastTestStats and the persistent done state when the config still matches", async () => {
