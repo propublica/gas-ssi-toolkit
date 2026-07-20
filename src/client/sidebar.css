@@ -360,12 +360,6 @@
         .btn-run:hover { background: #1557b0; }
         .btn-run:disabled { background: #9aa0a6; cursor: default; }
 
-        .btn-test--success {
-            background: #34a853;
-            color: white;
-            border-color: #34a853;
-        }
-
         .test-results {
             margin-top: 4px;
             padding: 8px 12px;

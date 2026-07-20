@@ -10,6 +10,7 @@ import { jobStore } from "../job-store";
 import { TOOL_CATALOG } from "../tools";
 import { MODEL_CATALOG } from "../models";
 import { buildConfigSnapshot, configsMatch } from "../../shared/run-stats";
+import { AsyncActionButton } from "../components/async-action-button";
 
 export const CHUNK_SIZE = 40;
 // Warn before dispatch when the batch exceeds this many rows, regardless of chunk count.
@@ -58,6 +59,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private modelListEl: HTMLElement | null = null;
   private modelExpanded = false;
   private lastTestStats: RunStats | null = null;
+  private testButton: AsyncActionButton | null = null;
 
   mount(
     container: HTMLElement,
@@ -71,6 +73,10 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     this.lastTestStats = savedState?.lastTestStats ?? null;
     container.innerHTML = this.template();
     this.wireNavButtons(container);
+    this.testButton = new AsyncActionButton(
+      container.querySelector<HTMLButtonElement>("#test-btn")!,
+      { idleLabel: "Test", loadingLabel: "Testing...", doneLabel: "Tested ✓" },
+    );
 
     const preset: Partial<RunConfig> = savedState
       ? {
@@ -240,11 +246,13 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
             const liveSnapshot = buildConfigSnapshot(this.currentPreset());
             if (configsMatch(liveSnapshot, this.lastTestStats.config)) {
               this.renderTestStats(container, this.lastTestStats);
+              this.testButton?.setDone();
             } else {
               this.renderTestMessage(
                 container,
                 "Configuration changed since last test — click Test to refresh.",
               );
+              this.testButton?.setIdle();
             }
           }
         }
@@ -399,7 +407,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     if (!config) return;
 
     const jobId = `test-ai-${Date.now()}`;
-    const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
+    this.testButton?.setLoading();
 
     const resolveRange: Promise<{ start: number; end: number } | null> = config.rowRange
       ? Promise.resolve(config.rowRange)
@@ -419,16 +427,18 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         if (stats) {
           this.lastTestStats = stats;
           this.renderTestStats(container, stats);
-          this.flashTestSuccess(testBtn);
+          this.testButton?.setDone();
         } else {
           this.renderTestMessage(
             container,
             "Test didn't produce measurable results — check the sheet for errors in the tested rows.",
           );
+          this.testButton?.setIdle();
         }
       })
       .catch((err: Error) => {
         globalThis.alert("Error: " + err.message);
+        this.testButton?.setIdle();
       });
   }
 
@@ -447,16 +457,6 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     const el = container.querySelector<HTMLElement>("#test-results")!;
     el.innerHTML = `<p>${message}</p>`;
     el.hidden = false;
-  }
-
-  private flashTestSuccess(btn: HTMLButtonElement): void {
-    const original = btn.textContent;
-    btn.classList.add("btn-test--success");
-    btn.textContent = "Tested ✓";
-    setTimeout(() => {
-      btn.classList.remove("btn-test--success");
-      btn.textContent = original;
-    }, 3000);
   }
 
   private assembleRunConfig(): RunConfig | null {

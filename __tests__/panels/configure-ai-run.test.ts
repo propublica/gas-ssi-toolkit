@@ -19,7 +19,7 @@ import { ConfigureAIRunPanel } from "../../src/client/panels/configure-ai-run";
 import type { SavedState } from "../../src/client/panels/configure-ai-run";
 import * as services from "../../src/client/services";
 import type { NavigationContext } from "../../src/client/types";
-import type { RunConfig } from "../../src/shared/types";
+import type { RunConfig, RunStats } from "../../src/shared/types";
 
 const mockNav: NavigationContext = {
   navigate: jest.fn(),
@@ -759,7 +759,28 @@ describe("ConfigureAIRunPanel — Test AI", () => {
     expect(results.textContent).toContain("Tested 10 rows");
   });
 
-  it("flashes a success state on the test button after a successful test", async () => {
+  it("disables the test button and shows a spinner while the test is running", async () => {
+    let resolveStats!: (v: RunStats) => void;
+    (services.runBatchAI as jest.Mock).mockReturnValue(
+      new Promise<RunStats>((res) => {
+        resolveStats = res;
+      }),
+    );
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 11 },
+    });
+    const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
+    testBtn.click();
+    await Promise.resolve();
+    expect(testBtn.disabled).toBe(true);
+    expect(testBtn.querySelector(".btn-spinner")).not.toBeNull();
+    resolveStats(TEST_STATS);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+  });
+
+  it("shows a persistent 'Tested ✓' state on the test button after a successful test", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
     const { container } = await mountAndLoad({
       promptCols: [{ col: "col_a", kind: "text" }],
@@ -769,7 +790,22 @@ describe("ConfigureAIRunPanel — Test AI", () => {
     const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
     testBtn.click();
     for (let i = 0; i < 5; i++) await Promise.resolve();
-    expect(testBtn.classList.contains("btn-test--success")).toBe(true);
+    expect(testBtn.disabled).toBe(false);
+    expect(testBtn.textContent).toBe("Tested ✓");
+  });
+
+  it("returns the test button to idle after a failed test", async () => {
+    (services.runBatchAI as jest.Mock).mockRejectedValue(new Error("boom"));
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 11 },
+    });
+    const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
+    testBtn.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(testBtn.disabled).toBe(false);
+    expect(testBtn.textContent).toBe("Test");
   });
 
   it("shows a neutral message when runBatchAI returns null (nothing measurable)", async () => {
@@ -820,7 +856,7 @@ describe("ConfigureAIRunPanel — lastTestStats persistence", () => {
     expect(state?.lastTestStats).toBeNull();
   });
 
-  it("restores and renders lastTestStats from savedState when the config still matches", async () => {
+  it("restores and renders lastTestStats and the persistent done state when the config still matches", async () => {
     const { container } = await mountAndLoad(undefined, {
       promptCols: [{ col: "col_a", kind: "text" as const }],
       systemPromptCol: "",
@@ -830,9 +866,12 @@ describe("ConfigureAIRunPanel — lastTestStats persistence", () => {
     const results = container.querySelector<HTMLElement>("#test-results")!;
     expect(results.hidden).toBe(false);
     expect(results.textContent).toContain("Tested 10 rows");
+    const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
+    expect(testBtn.textContent).toBe("Tested ✓");
+    expect(testBtn.disabled).toBe(false);
   });
 
-  it("shows a stale notice instead of numbers when the restored config no longer matches", async () => {
+  it("shows a stale notice and resets the button to idle when the restored config no longer matches", async () => {
     const { container } = await mountAndLoad(undefined, {
       promptCols: [{ col: "col_b", kind: "text" as const }], // differs from TEST_STATS.config
       systemPromptCol: "",
@@ -842,17 +881,8 @@ describe("ConfigureAIRunPanel — lastTestStats persistence", () => {
     const results = container.querySelector<HTMLElement>("#test-results")!;
     expect(results.hidden).toBe(false);
     expect(results.textContent).toContain("Configuration changed since last test");
-  });
-
-  it("does not flash the success state when restoring from savedState", async () => {
-    const { container } = await mountAndLoad(undefined, {
-      promptCols: [{ col: "col_a", kind: "text" as const }],
-      systemPromptCol: "",
-      outputCol: "ai_inference",
-      lastTestStats: TEST_STATS,
-    });
     const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
-    expect(testBtn.classList.contains("btn-test--success")).toBe(false);
+    expect(testBtn.textContent).toBe("Test");
   });
 
   it("renders nothing when there is no lastTestStats in savedState", async () => {
