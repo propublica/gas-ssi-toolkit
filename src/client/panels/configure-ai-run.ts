@@ -1,5 +1,5 @@
-import type { NavigationContext, Panel } from "../types";
-import type { RunConfig, ToolId, ModelId, RunStats } from "../../shared/types";
+import type { NavigationContext, Panel, TestRunDisplay } from "../types";
+import type { RunConfig, ToolId, ModelId } from "../../shared/types";
 import { TagList } from "../components/tag-list";
 import { TokenInput } from "../components/token-input";
 import { PromptColList } from "../components/prompt-col-list";
@@ -11,6 +11,7 @@ import { TOOL_CATALOG } from "../tools";
 import { MODEL_CATALOG } from "../models";
 import { buildConfigSnapshot, configsMatch } from "../../shared/run-stats";
 import { AsyncActionButton } from "../components/async-action-button";
+import { formatDuration } from "../format";
 
 export const CHUNK_SIZE = 40;
 // Warn before dispatch when the batch exceeds this many rows, regardless of chunk count.
@@ -40,7 +41,7 @@ export type SavedState = Required<
   > & {
     toolsExpanded?: boolean;
     modelExpanded?: boolean;
-    lastTestStats?: RunStats | undefined;
+    lastTest?: TestRunDisplay | undefined;
   };
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
@@ -58,7 +59,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private toolsExpanded = false;
   private modelListEl: HTMLElement | null = null;
   private modelExpanded = false;
-  private lastTestStats: RunStats | undefined = undefined;
+  private lastTest: TestRunDisplay | undefined = undefined;
   private testButton: AsyncActionButton | null = null;
 
   mount(
@@ -70,7 +71,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     this.nav = nav;
     this.promptColList = null; // reset so unmount() guards correctly before load
     this.headersLoaded = false;
-    this.lastTestStats = savedState?.lastTestStats;
+    this.lastTest = savedState?.lastTest;
     container.innerHTML = this.template();
     this.wireNavButtons(container);
     this.testButton = new AsyncActionButton(
@@ -271,7 +272,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       toolsExpanded: this.toolsExpanded,
       model: this.getSelectedModel(),
       modelExpanded: this.modelExpanded,
-      lastTestStats: this.lastTestStats,
+      lastTest: this.lastTest,
     };
   }
 
@@ -407,14 +408,18 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         "Test AI Run",
         resolveRange.then((range) => {
           if (!range) return undefined;
+          const fullRowCount = range.end - range.start + 1;
           const cappedEnd = Math.min(range.start + 9, range.end);
-          return runBatchAI({ ...config, rowRange: { start: range.start, end: cappedEnd } }, jobId);
+          return runBatchAI(
+            { ...config, rowRange: { start: range.start, end: cappedEnd } },
+            jobId,
+          ).then((stats) => (stats ? { stats, fullRowCount } : undefined));
         }),
       )
-      .then((stats) => {
-        if (stats) {
-          this.lastTestStats = stats;
-          this.renderTestStats(container, stats);
+      .then((test) => {
+        if (test) {
+          this.lastTest = test;
+          this.renderTestStats(container, test);
           this.testButton?.setDone();
         } else {
           this.renderTestMessage(
@@ -430,14 +435,32 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       });
   }
 
-  private renderTestStats(container: HTMLElement, stats: RunStats): void {
+  private renderTestStats(container: HTMLElement, test: TestRunDisplay): void {
     const el = container.querySelector<HTMLElement>("#test-results")!;
+    const { stats, fullRowCount } = test;
     const totalCost = stats.totalTokenCost + stats.totalGroundingCost;
     const avgCost = totalCost / stats.rowCount;
-    el.innerHTML = `
-      <p>Tested ${stats.rowCount} row${stats.rowCount === 1 ? "" : "s"} in ${(stats.totalTimeMs / 1000).toFixed(1)}s.</p>
-      <p>Avg cost per row: $${avgCost.toFixed(4)} — total cost of this test: $${totalCost.toFixed(4)}</p>
-    `;
+
+    const parts = [
+      `<p><strong>Test run:</strong> ${stats.rowCount} row${stats.rowCount === 1 ? "" : "s"} · ` +
+        `$${totalCost.toFixed(4)} · ${formatDuration(stats.totalTimeMs)}</p>`,
+    ];
+
+    if (fullRowCount > stats.rowCount) {
+      const fullCost = avgCost * fullRowCount;
+      const chunkCount = Math.ceil(fullRowCount / CHUNK_SIZE);
+      const fullTimeMs = chunkCount * stats.totalTimeMs;
+      parts.push(
+        `<p><strong>Full run estimate:</strong> ${fullRowCount} rows · ` +
+          `~$${fullCost.toFixed(2)} · ~${formatDuration(fullTimeMs)}</p>`,
+      );
+    }
+
+    if (stats.config.promptCols.some((pc) => pc.kind === "file")) {
+      parts.push(`<p>⚠ Unusually large files may throw off cost and time estimates.</p>`);
+    }
+
+    el.innerHTML = parts.join("");
     el.hidden = false;
   }
 
@@ -457,10 +480,10 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
    * clobber the in-flight loading state.
    */
   private checkTestStatsFreshness(container: HTMLElement): void {
-    if (!this.lastTestStats || this.testButton?.getState() === "loading") return;
+    if (!this.lastTest || this.testButton?.getState() === "loading") return;
     const liveSnapshot = buildConfigSnapshot(this.currentPreset());
-    if (configsMatch(liveSnapshot, this.lastTestStats.config)) {
-      this.renderTestStats(container, this.lastTestStats);
+    if (configsMatch(liveSnapshot, this.lastTest.stats.config)) {
+      this.renderTestStats(container, this.lastTest);
       this.testButton?.setDone();
     } else {
       this.renderTestMessage(
@@ -576,11 +599,18 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <span class="field-label">Rows to process</span>
         <div id="row-range-container"></div>
       </div>
-      <div class="panel-buttons panel-buttons--stacked">
-        <p class="field-helper">Execute your configuration across the first 10 rows in your selection. Evaluate for quality. Estimate cost.</p>
-        <button id="test-btn" class="btn-outline">Test</button>
-        <div id="test-results" class="test-results" hidden></div>
-        <button id="run-btn" class="btn-run">Run AI</button>
+      <div class="finish-panel">
+        <div class="field-group">
+          <p class="step-title">Test your setup</p>
+          <p class="field-helper">Try it out on the first 10 rows — check quality and cost before committing to a full run.</p>
+          <button id="test-btn" class="btn-outline">Test</button>
+          <div id="test-results" class="test-results" hidden></div>
+        </div>
+        <div class="field-group field-group--joined">
+          <p class="step-title">Run on all rows</p>
+          <p class="field-helper">Run across your entire selection. For large runs above ${CHUNK_SIZE} rows, make sure you keep this sidebar open.</p>
+          <button id="run-btn" class="btn-run">Run AI</button>
+        </div>
       </div>
     </div>
   `;

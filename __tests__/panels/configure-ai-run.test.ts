@@ -52,6 +52,11 @@ const TEST_STATS: import("../../src/shared/types").RunStats = {
   },
 };
 
+const TEST_DISPLAY: import("../../src/client/types").TestRunDisplay = {
+  stats: TEST_STATS,
+  fullRowCount: 10,
+};
+
 async function mountAndLoad(
   params?: Partial<RunConfig>,
   savedState?: Partial<SavedState>,
@@ -297,7 +302,8 @@ describe("ConfigureAIRunPanel — refresh", () => {
 
     const results = container.querySelector<HTMLElement>("#test-results")!;
     expect(results.hidden).toBe(false);
-    expect(results.textContent).toContain("Tested 10 rows");
+    expect(results.textContent).toContain("Test run:");
+    expect(results.textContent).toContain("10 rows");
     const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
     expect(testBtn.textContent).toBe("Tested ✓");
   });
@@ -815,7 +821,7 @@ describe("ConfigureAIRunPanel — Test AI", () => {
     expect(results.textContent).toContain("didn't produce measurable results");
   });
 
-  it("renders rows tested, time, avg cost, and total cost on success", async () => {
+  it("renders rows tested, time, and total cost (with a $ sign) on success, with no per-row rate", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
     const { container } = await mountAndLoad({
       promptCols: [{ col: "col_a", kind: "text" }],
@@ -826,7 +832,11 @@ describe("ConfigureAIRunPanel — Test AI", () => {
     for (let i = 0; i < 5; i++) await Promise.resolve();
     const results = container.querySelector<HTMLElement>("#test-results")!;
     expect(results.hidden).toBe(false);
-    expect(results.textContent).toContain("Tested 10 rows");
+    expect(results.textContent).toContain("Test run:");
+    expect(results.textContent).toContain("10 rows");
+    expect(results.textContent).toContain("$0.0020");
+    expect(results.textContent).not.toContain("total");
+    expect(results.textContent).not.toContain("/row");
   });
 
   it("disables the test button and shows a spinner while the test is running", async () => {
@@ -905,8 +915,8 @@ describe("ConfigureAIRunPanel — Test AI", () => {
   });
 });
 
-describe("ConfigureAIRunPanel — lastTestStats persistence", () => {
-  it("unmount saves lastTestStats after a successful test", async () => {
+describe("ConfigureAIRunPanel — lastTest persistence", () => {
+  it("unmount saves lastTest after a successful test", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
     const { container, panel } = await mountAndLoad({
       promptCols: [{ col: "col_a", kind: "text" }],
@@ -916,26 +926,27 @@ describe("ConfigureAIRunPanel — lastTestStats persistence", () => {
     container.querySelector<HTMLButtonElement>("#test-btn")!.click();
     for (let i = 0; i < 5; i++) await Promise.resolve();
     const state = panel.unmount();
-    expect(state?.lastTestStats).toEqual(TEST_STATS);
+    expect(state?.lastTest).toEqual(TEST_DISPLAY);
   });
 
-  it("unmount saves lastTestStats: undefined when no test has run yet", async () => {
+  it("unmount saves lastTest: undefined when no test has run yet", async () => {
     const { container, panel } = await mountAndLoad();
     addPromptCol(container, "col_a");
     const state = panel.unmount();
-    expect(state?.lastTestStats).toBeUndefined();
+    expect(state?.lastTest).toBeUndefined();
   });
 
-  it("restores and renders lastTestStats and the persistent done state when the config still matches", async () => {
+  it("restores and renders lastTest and the persistent done state when the config still matches", async () => {
     const { container } = await mountAndLoad(undefined, {
       promptCols: [{ col: "col_a", kind: "text" as const }],
       systemPromptCol: "",
       outputCol: "ai_inference",
-      lastTestStats: TEST_STATS,
+      lastTest: TEST_DISPLAY,
     });
     const results = container.querySelector<HTMLElement>("#test-results")!;
     expect(results.hidden).toBe(false);
-    expect(results.textContent).toContain("Tested 10 rows");
+    expect(results.textContent).toContain("Test run:");
+    expect(results.textContent).toContain("10 rows");
     const testBtn = container.querySelector<HTMLButtonElement>("#test-btn")!;
     expect(testBtn.textContent).toBe("Tested ✓");
     expect(testBtn.disabled).toBe(false);
@@ -946,7 +957,7 @@ describe("ConfigureAIRunPanel — lastTestStats persistence", () => {
       promptCols: [{ col: "col_b", kind: "text" as const }], // differs from TEST_STATS.config
       systemPromptCol: "",
       outputCol: "ai_inference",
-      lastTestStats: TEST_STATS,
+      lastTest: TEST_DISPLAY,
     });
     const results = container.querySelector<HTMLElement>("#test-results")!;
     expect(results.hidden).toBe(false);
@@ -955,7 +966,7 @@ describe("ConfigureAIRunPanel — lastTestStats persistence", () => {
     expect(testBtn.textContent).toBe("Test");
   });
 
-  it("renders nothing when there is no lastTestStats in savedState", async () => {
+  it("renders nothing when there is no lastTest in savedState", async () => {
     const { container } = await mountAndLoad(undefined, {
       promptCols: [{ col: "col_a", kind: "text" as const }],
       systemPromptCol: "",
@@ -963,5 +974,66 @@ describe("ConfigureAIRunPanel — lastTestStats persistence", () => {
     });
     const results = container.querySelector<HTMLElement>("#test-results")!;
     expect(results.hidden).toBe(true);
+  });
+
+  it("shows a labeled full-run cost and time estimate when the tested range is smaller than the full selection", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 100 },
+    });
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    const results = container.querySelector<HTMLElement>("#test-results")!;
+    expect(results.textContent).toContain("Test run:");
+    expect(results.textContent).toContain("Full run estimate:");
+    expect(results.textContent).toContain("99 rows");
+    expect(results.textContent).toContain("$0.02");
+  });
+
+  it("does not show a full-run estimate when the tested range covers the full selection", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 11 },
+    });
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    const results = container.querySelector<HTMLElement>("#test-results")!;
+    expect(results.textContent).not.toContain("Full run estimate");
+  });
+
+  it("shows a file-size caveat when a prompt column is file-kind", async () => {
+    const fileStats = {
+      ...TEST_STATS,
+      config: { ...TEST_STATS.config, promptCols: [{ col: "col_a", kind: "file" as const }] },
+    };
+    (services.runBatchAI as jest.Mock).mockResolvedValue(fileStats);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "file" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 11 },
+    });
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    const results = container.querySelector<HTMLElement>("#test-results")!;
+    expect(results.textContent).toContain(
+      "Unusually large files may throw off cost and time estimates.",
+    );
+  });
+
+  it("does not show the file-size caveat when all prompt columns are text-kind", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 11 },
+    });
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    const results = container.querySelector<HTMLElement>("#test-results")!;
+    expect(results.textContent).not.toContain("Unusually large files");
   });
 });
