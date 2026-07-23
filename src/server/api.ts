@@ -9,7 +9,7 @@
 
 import { CONFIG } from "./config";
 import { TOOL_REGISTRY } from "./tools";
-import type { GeminiRequest, GeminiResponse, GeminiCodePair } from "./types";
+import type { GeminiRequest, GeminiResponse, GeminiCodePair, GeminiUsageMetadata } from "./types";
 
 /**
  * Assemble the Gemini generateContent request payload from a GeminiRequest.
@@ -96,8 +96,11 @@ export function callGeminiAPI(req: GeminiRequest): GeminiResponse {
     | GeminiResponse["groundingMetadata"]
     | undefined;
 
+  const usageMetadata = json.usageMetadata as GeminiUsageMetadata | undefined;
+
   return {
     text,
+    usageMetadata,
     ...(groundingMetadata !== undefined && { groundingMetadata }),
     ...(codePairs.length > 0 && { codePairs }),
   };
@@ -163,8 +166,11 @@ export function callGeminiAPIBatch(reqs: GeminiRequest[]): GeminiResponse[] {
       | GeminiResponse["groundingMetadata"]
       | undefined;
 
+    const usageMetadata = json.usageMetadata as GeminiUsageMetadata | undefined;
+
     return {
       text,
+      usageMetadata,
       ...(groundingMetadata !== undefined && { groundingMetadata }),
       ...(codePairs.length > 0 && { codePairs }),
     };

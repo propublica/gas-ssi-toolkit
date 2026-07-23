@@ -199,6 +199,23 @@
             padding-top: 16px;
         }
 
+        /* Test and Run are two steps of one flow — no divider between them. */
+        .field-group + .field-group.field-group--joined {
+            border-top: none;
+            padding-top: 8px;
+        }
+
+        /* Sets the Test/Run section apart as the form's closing "finish line" —
+           a soft tint instead of a bordered box, so it doesn't eat lateral space. */
+        .finish-panel {
+            margin-top: 24px;
+            padding: 16px;
+            border-radius: 8px;
+            background: rgba(26, 115, 232, 0.06);
+        }
+
+        .finish-panel .field-group:last-child { margin-bottom: 0; }
+
         .field-label {
             display: block;
             font-size: var(--font-size-300);
@@ -342,6 +359,20 @@
 
         .panel-buttons { display: flex; gap: 8px; margin-top: 24px; }
 
+        .step-title {
+            margin: 0 0 4px 0;
+            font-weight: 500;
+            font-size: var(--font-size-300);
+            color: var(--text-main);
+        }
+
+        #test-btn, #run-btn {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 8px;
+        }
+
         .btn-run {
             flex: 1;
             padding: 10px;
@@ -357,6 +388,19 @@
 
         .btn-run:hover { background: #1557b0; }
         .btn-run:disabled { background: #9aa0a6; cursor: default; }
+
+        .test-results {
+            margin-top: 4px;
+            padding: 8px 12px;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: var(--font-size-200);
+            color: var(--text-secondary);
+        }
+
+        .test-results p { margin: 0 0 4px 0; }
+        .test-results p:last-child { margin-bottom: 0; }
 
         .btn-outline {
             flex: 1;

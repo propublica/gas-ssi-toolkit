@@ -16,7 +16,7 @@ export class JobStore {
     };
   }
 
-  dispatch(id: string, label: string, fn: Promise<void>): Promise<void> {
+  dispatch<T>(id: string, label: string, fn: Promise<T>): Promise<T> {
     const job: Job = {
       id,
       label,
@@ -61,7 +61,10 @@ export class JobStore {
     this.pollIntervals.set(id, interval);
 
     return fn.then(
-      () => this.complete(id),
+      (result) => {
+        this.complete(id);
+        return result;
+      },
       (err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
         this.fail(id, message);

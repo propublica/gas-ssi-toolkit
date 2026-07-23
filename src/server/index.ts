@@ -10,6 +10,8 @@
 
 export { SSI } from "./customFunctions";
 import { callGeminiAPIBatch } from "./api";
+import { computeRunStats } from "./cost-tracking";
+import { buildConfigSnapshot } from "../shared/run-stats";
 import {
   fetchDriveMetadata,
   downloadDriveFiles,
@@ -28,6 +30,7 @@ import {
   truncateText,
   resolveColumns,
   writeJobProgress,
+  writeRunStats,
   interpolateTemplate,
   flattenArg,
   markAIOutputRange,
@@ -44,6 +47,7 @@ import {
 import { CONFIG } from "./config";
 import type {
   RunConfig,
+  RunStats,
   PrepRecipeParams,
   PrepRecipeResult,
   ImportDriveLinksConfig,
@@ -304,7 +308,8 @@ export function formatMarkdownSelection(): void {
 // per sub-batch = init + upload), so 10 keeps each fetchAll well within that limit.
 const FILE_PIPELINE_BATCH_SIZE = 10;
 
-export function runBatchAI(config: RunConfig, jobId?: string): void {
+export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
+  const startTime = Date.now();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getActiveSheet();
   const ui = SpreadsheetApp.getUi();
@@ -312,7 +317,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
   const headers = getSheetHeaders();
   if (headers.length === 0) {
     ui.alert("Error", "The active sheet has no column headers.", ui.ButtonSet.OK);
-    return;
+    return null;
   }
 
   // Validate prompt columns (required — at least one)
@@ -331,7 +336,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
         : "Please select at least one prompt column.",
       ui.ButtonSet.OK,
     );
-    return;
+    return null;
   }
 
   // Validate system prompt column (if selected)
@@ -344,7 +349,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
         `Could not find column: ${config.systemPromptCol}`,
         ui.ButtonSet.OK,
       );
-      return;
+      return null;
     }
     systemPromptIdx = idxs[0];
   }
@@ -367,7 +372,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
     numRows = config.rowRange.end - config.rowRange.start + 1;
   } else {
     const range = sheet.getActiveRange();
-    if (!range) return;
+    if (!range) return null;
     startRow = range.getRow();
     numRows = range.getNumRows();
   }
@@ -377,7 +382,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
   const apiKey = PropertiesService.getScriptProperties().getProperty(CONFIG.API_KEY_PROPERTY);
   if (!apiKey) {
     ui.alert("Error", `${CONFIG.API_KEY_PROPERTY} script property not set`, ui.ButtonSet.OK);
-    return;
+    return null;
   }
 
   const cache = CacheService.getUserCache();
@@ -516,7 +521,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
   if (requests.length === 0 && directWrites.size === 0) {
     SpreadsheetApp.getActive().toast("No rows to process.", "Info", 5);
     SpreadsheetApp.flush();
-    return;
+    return null;
   }
 
   const results = requests.length > 0 ? callGeminiAPIBatch(requests) : [];
@@ -573,6 +578,24 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
     "Success",
     5,
   );
+
+  let stats: RunStats | null = null;
+  try {
+    const computed: RunStats = {
+      ...computeRunStats(results, Date.now() - startTime, config.model ?? CONFIG.DEFAULT_MODEL),
+      testedAt: startTime,
+      config: buildConfigSnapshot(config),
+    };
+    if (computed.rowCount > 0) {
+      writeRunStats(cache, ss.getId(), computed);
+      stats = computed;
+    }
+  } catch (_e) {
+    // Stats/cost tracking is best-effort and must never fail the underlying
+    // AI run, which has already fully completed by this point.
+  }
+
+  return stats;
 }
 
 // ==========================================

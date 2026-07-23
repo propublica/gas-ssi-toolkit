@@ -39,9 +39,13 @@ function inlineSidebarHtml({ template, css }) {
       const templateContent = readFileSync(resolve(template), "utf-8");
       const cssContent = readFileSync(resolve(css), "utf-8");
 
+      // Replacer functions (not plain strings) — String.replace() treats a string
+      // replacement's "$" sequences specially ($$, $&, $1, etc.), which would
+      // silently corrupt any such sequence occurring in the compiled JS or CSS
+      // (e.g. a literal "$" immediately before a template-literal interpolation).
       const assembled = templateContent
-        .replace("{{STYLES}}", `<style>\n${cssContent}\n</style>`)
-        .replace("{{SCRIPTS}}", `<script>\n${code}\n</script>`);
+        .replace("{{STYLES}}", () => `<style>\n${cssContent}\n</style>`)
+        .replace("{{SCRIPTS}}", () => `<script>\n${code}\n</script>`);
 
       this.emitFile({ type: "asset", fileName: "Sidebar.html", source: assembled });
 
@@ -81,7 +85,7 @@ function showSidebar() { _GASEntry.showSidebar(); }
 function formatMarkdownSelection() { _GASEntry.formatMarkdownSelection(); }
 function runTool(fn, jobId) { _GASEntry.runTool(fn, jobId); }
 function getSheetHeaders() { return _GASEntry.getSheetHeaders(); }
-function runBatchAI(config, jobId) { _GASEntry.runBatchAI(config, jobId); }
+function runBatchAI(config, jobId) { return _GASEntry.runBatchAI(config, jobId); }
 function importDriveLinks(config, jobId) { _GASEntry.importDriveLinks(config, jobId); }
 function extractText(config, jobId) { _GASEntry.extractText(config, jobId); }
 function sampleRowsToEvaluation(jobId) { _GASEntry.sampleRowsToEvaluation(jobId); }

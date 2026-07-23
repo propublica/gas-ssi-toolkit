@@ -49,6 +49,41 @@ function captureHandlers(): { resolve: (v: unknown) => void; reject: (e: Error) 
   };
 }
 
+describe("normalizeNulls", () => {
+  it("returns primitives unchanged", () => {
+    expect(services.normalizeNulls(5)).toBe(5);
+    expect(services.normalizeNulls("x")).toBe("x");
+    expect(services.normalizeNulls(true)).toBe(true);
+  });
+
+  it("converts a top-level null to undefined — no position-dependent exception", () => {
+    expect(services.normalizeNulls(null)).toBeUndefined();
+  });
+
+  it("preserves a top-level undefined unchanged", () => {
+    expect(services.normalizeNulls(undefined)).toBeUndefined();
+  });
+
+  it("converts a null object property to undefined", () => {
+    expect(services.normalizeNulls({ a: null, b: "x" })).toEqual({ a: undefined, b: "x" });
+  });
+
+  it("converts a null array element to undefined", () => {
+    expect(services.normalizeNulls([1, null, "x"])).toEqual([1, undefined, "x"]);
+  });
+
+  it("normalizes null at any nesting depth", () => {
+    expect(services.normalizeNulls({ config: { systemPromptCol: null, tools: [] } })).toEqual({
+      config: { systemPromptCol: undefined, tools: [] },
+    });
+  });
+
+  it("leaves an object with no nulls completely unchanged", () => {
+    const value = { promptCols: [{ col: "a", kind: "text" }], model: "gemini-3.1-flash-lite" };
+    expect(services.normalizeNulls(value)).toEqual(value);
+  });
+});
+
 describe("getSheetHeaders", () => {
   it("calls google.script.run.getSheetHeaders and resolves with headers", async () => {
     const handlers = captureHandlers();
@@ -85,6 +120,63 @@ describe("runBatchAI", () => {
     });
     handlers.reject(new Error("api error"));
     await expect(promise).rejects.toThrow("api error");
+  });
+
+  it("resolves with the RunStats returned by the RPC call", async () => {
+    const handlers = captureHandlers();
+    const config = { promptCols: [{ col: "col_a", kind: "text" }], outputCol: "out" };
+    const stats = {
+      rowCount: 10,
+      totalTimeMs: 4200,
+      totalInputTokens: 500,
+      totalOutputTokens: 300,
+      totalTokenCost: 0.002,
+      totalGroundingQueries: 0,
+      totalGroundingCost: 0,
+      testedAt: 1234567890,
+      config: {
+        promptCols: [{ col: "col_a", kind: "text" }],
+        tools: [],
+        prefixWithColName: false,
+      },
+    };
+    const promise = services.runBatchAI(config as import("../src/shared/types").RunConfig);
+    handlers.resolve(stats);
+    await expect(promise).resolves.toEqual(stats);
+  });
+
+  it("resolves with undefined when the RPC call returns null", async () => {
+    const handlers = captureHandlers();
+    const config = { promptCols: [{ col: "col_a", kind: "text" }], outputCol: "out" };
+    const promise = services.runBatchAI(config as import("../src/shared/types").RunConfig);
+    handlers.resolve(null);
+    await expect(promise).resolves.toBeUndefined();
+  });
+
+  it("normalizes a null nested inside the returned config (google.script.run boundary coercion)", async () => {
+    const handlers = captureHandlers();
+    const config = { promptCols: [{ col: "col_a", kind: "text" }], outputCol: "out" };
+    const promise = services.runBatchAI(config as import("../src/shared/types").RunConfig);
+    handlers.resolve({
+      rowCount: 10,
+      totalTimeMs: 1000,
+      totalInputTokens: 100,
+      totalOutputTokens: 50,
+      totalTokenCost: 0.001,
+      totalGroundingQueries: 0,
+      totalGroundingCost: 0,
+      testedAt: 1234567890,
+      config: {
+        promptCols: [{ col: "col_a", kind: "text" }],
+        systemPromptCol: null, // as google.script.run's bridge may deliver an omitted value
+        tools: [],
+        prefixWithColName: false,
+        model: null,
+      },
+    });
+    const result = await promise;
+    expect(result?.config.systemPromptCol).toBeUndefined();
+    expect(result?.config.model).toBeUndefined();
   });
 });
 
@@ -194,11 +286,11 @@ describe("getJobProgress", () => {
     expect(mockRun.getJobProgress).toHaveBeenCalledWith("job-123");
   });
 
-  it("resolves with null when no progress is available", async () => {
+  it("resolves with undefined when no progress is available", async () => {
     const handlers = captureHandlers();
     const promise = services.getJobProgress("job-456");
     handlers.resolve(null);
-    await expect(promise).resolves.toBeNull();
+    await expect(promise).resolves.toBeUndefined();
   });
 
   it("rejects on failure", async () => {
@@ -219,11 +311,11 @@ describe("getActiveRangeInfo", () => {
     expect(mockRun.getActiveRangeInfo).toHaveBeenCalledTimes(1);
   });
 
-  it("resolves with null when no range is active", async () => {
+  it("resolves with undefined when no range is active", async () => {
     const handlers = captureHandlers();
     const promise = services.getActiveRangeInfo();
     handlers.resolve(null);
-    await expect(promise).resolves.toBeNull();
+    await expect(promise).resolves.toBeUndefined();
   });
 
   it("rejects on failure", async () => {

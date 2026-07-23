@@ -101,3 +101,42 @@ export interface ExtractTextConfig {
   /** Inclusive row range (1-based data rows) over which extraction runs. Absent = use active sheet selection. */
   rowRange?: { start: number; end: number };
 }
+
+// ── Run stats (cost/time tracking) ───────────────────────────────
+
+/**
+ * The subset of RunConfig that affects cost — used to detect whether a
+ * cached RunStats is still relevant to the currently configured run.
+ * Deliberately excludes outputCol, includeGrounding, and applyMarkdown,
+ * which affect where/how output is written, not what it costs to generate.
+ */
+export type RunStatsConfigSnapshot = Pick<
+  RunConfig,
+  "promptCols" | "systemPromptCol" | "tools" | "prefixWithColName" | "model"
+>;
+
+/**
+ * Measured cost/time/token stats from a single runBatchAI invocation
+ * (a full run, one chunk of a full run, or a capped Test click).
+ * Stores totals, not averages — per-row figures are a trivial division
+ * wherever displayed.
+ */
+export interface RunStats {
+  /** Rows successfully measured (had usageMetadata in the response). */
+  rowCount: number;
+  /** Wall-clock time for the whole invocation. */
+  totalTimeMs: number;
+  /** Sum of promptTokenCount (already includes tool-use/cached-content overhead). */
+  totalInputTokens: number;
+  /** Sum of (candidatesTokenCount + thoughtsTokenCount) — both billed at the output rate. */
+  totalOutputTokens: number;
+  /** USD, token pricing only. */
+  totalTokenCost: number;
+  /** Sum of groundingMetadata.webSearchQueries.length across measured rows. */
+  totalGroundingQueries: number;
+  /** USD, at the Standard grounding rate. Ignores the shared monthly free quota. */
+  totalGroundingCost: number;
+  /** Timestamp (ms) when this invocation started. */
+  testedAt: number;
+  config: RunStatsConfigSnapshot;
+}
