@@ -45,7 +45,7 @@ export class RowRange {
     selRadio.checked = !selected;
     const selHint = document.createElement("span");
     selHint.className = "optional";
-    selHint.textContent = " (rows currently highlighted on the sheet)";
+    selHint.textContent = " (current selection)";
     selLabel.append(selRadio, " Use sheet selection", selHint);
 
     const rangeLabel = document.createElement("label");
