@@ -3,7 +3,7 @@ import type { RunConfig, ToolId, ModelId } from "../../shared/types";
 import { TagList } from "../components/tag-list";
 import { TokenInput } from "../components/token-input";
 import { PromptColList } from "../components/prompt-col-list";
-import { RowRange } from "../components/row-range";
+import { RowRange, sanitizeRowRange, type RowRangeValue } from "../components/row-range";
 import { PanelLoader } from "../components/panel-loader";
 import { getSheetHeaders, runBatchAI, getActiveRangeInfo } from "../services";
 import { jobStore } from "../job-store";
@@ -326,6 +326,16 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     };
   }
 
+  private resolveRowRange(range: RowRangeValue): RowRangeValue | null {
+    const sanitized = sanitizeRowRange(range);
+    if (!sanitized) {
+      globalThis.alert(
+        "Row 1 is the header row and can't be processed. Please select a data row range.",
+      );
+    }
+    return sanitized;
+  }
+
   private handleRun(_container: HTMLElement): void {
     const config = this.assembleRunConfig();
     if (!config) return;
@@ -363,11 +373,11 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           jobId,
           "Batch AI Run",
           getActiveRangeInfo().then((rangeInfo) => {
-            if (rangeInfo) {
-              const chunks = computeChunks(rangeInfo, CHUNK_SIZE);
-              return this.runChunks(jobId, config, chunks);
-            }
-            return runBatchAI(config, jobId).then(() => undefined);
+            if (!rangeInfo) return runBatchAI(config, jobId).then(() => undefined);
+            const sanitized = this.resolveRowRange(rangeInfo);
+            if (!sanitized) return;
+            const chunks = computeChunks(sanitized, CHUNK_SIZE);
+            return this.runChunks(jobId, config, chunks);
           }),
         )
         .catch((err: Error) => {
@@ -407,11 +417,12 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         jobId,
         "Test AI Run",
         resolveRange.then((range) => {
-          if (!range) return undefined;
-          const fullRowCount = range.end - range.start + 1;
-          const cappedEnd = Math.min(range.start + 9, range.end);
+          const sanitized = range ? this.resolveRowRange(range) : null;
+          if (!sanitized) return undefined;
+          const fullRowCount = sanitized.end - sanitized.start + 1;
+          const cappedEnd = Math.min(sanitized.start + 9, sanitized.end);
           return runBatchAI(
-            { ...config, rowRange: { start: range.start, end: cappedEnd } },
+            { ...config, rowRange: { start: sanitized.start, end: cappedEnd } },
             jobId,
           ).then((stats) => (stats ? { stats, fullRowCount } : undefined));
         }),
@@ -506,7 +517,12 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       globalThis.alert("Please select an output column.");
       return null;
     }
-    const rowRange = this.rowRangeComp?.getValue();
+    const rawRowRange = this.rowRangeComp?.getValue();
+    let rowRange: RowRangeValue | undefined;
+    if (rawRowRange) {
+      rowRange = this.resolveRowRange(rawRowRange) ?? undefined;
+      if (!rowRange) return null;
+    }
     const tools = (this.toolsList?.getValue() ?? []) as ToolId[];
     const includeGrounding = this.includeGroundingCb?.checked ?? false;
     const applyMarkdown = this.applyMarkdownCb?.checked ?? false;
