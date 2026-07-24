@@ -43,10 +43,7 @@ export class RowRange {
     selRadio.name = groupName;
     selRadio.value = "selection";
     selRadio.checked = !selected;
-    const selHint = document.createElement("span");
-    selHint.className = "optional";
-    selHint.textContent = " (current selection)";
-    selLabel.append(selRadio, " Use sheet selection", selHint);
+    selLabel.append(selRadio, " Use highlighted rows");
 
     const rangeLabel = document.createElement("label");
     const rangeRadio = document.createElement("input");
