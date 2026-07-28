@@ -4,11 +4,20 @@ The SSI Toolkit is a Google Sheets sidebar for AI-assisted investigations. This 
 
 Recipes (the curated, one-click AI workflows) also appear in the sidebar, but they're still being refined and aren't part of this alpha round — feel free to ignore that button for now.
 
+## Installing the add-on
+
+The following directions only apply if your organization distributes SSI Toolkit as a **Google Workspace Editor add-on** (installed once, available across every Sheet you open). If you're working with a **container-bound** copy of the toolkit (attached directly to one specific Sheet), skip ahead to [Getting oriented](#getting-oriented).
+
+1. Open your organization's Marketplace listing for the add-on: `<Marketplace URL — ask your admin>`
+2. Click **Install**, and grant the requested permissions when prompted.
+
 ## Getting oriented
 
-Open the sidebar from the **SSI Toolkit** menu at the top of the Sheet, then click **📐 Open SSI Toolkit**. The sidebar organizes its buttons into two groups:
+Open the sidebar using the **📐 Open SSI Toolkit** menu option. If installed as an Editor Add on, the SSI Toolkit will be available as a item under **Extensions**.  
 
-- **Main Tools** — Recipes (not covered here) and Run AI Inference
+The sidebar organizes its buttons into two groups:
+
+- **Main Tools** — Recipes and Run AI Inference
 - **Extras** — Import Drive Links, Sample Rows, Extract Text, and Format Markdown
 
 ## Run AI Inference
