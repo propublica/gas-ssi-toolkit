@@ -153,10 +153,10 @@ text because "Apply markdown formatting" was off. Keep the before/after images h
 Every item below was verified against source. Items marked **(new)** are absent from the
 current guide.
 
-### Run AI Inference
+### Pitfalls — Run AI Inference
 
 | Behavior | Source |
-|---|---|
+| --- | --- |
 | **(new)** The output column header turns orange and gets a note reading "Some cells in this column may be AI-generated"; the output cells turn pale yellow. Expected, not a bug. | `utils.ts:159-171` |
 | **(new)** A response beginning with `=`, `+`, or `-` is written with a leading apostrophe so Sheets shows it as text. A response containing `IMAGE(`, `IMPORTDATA(`, `IMPORTXML(`, `IMPORTHTML(`, `IMPORTRANGE(`, or `IMPORTFEED(` is discarded and replaced with `[SSI Error: ...]`. Asking the AI to write spreadsheet formulas will not work. | `safe-writes.ts:13,29-35` |
 | **(new)** A new output column is appended at the far right of the sheet, past every existing column — not next to your data. | `safe-writes.ts:106` |
@@ -171,19 +171,19 @@ current guide.
 | Row 1 is the header row and is never processed. | `row-range.ts:7` |
 | If a column was renamed or deleted, use the ↻ button to reload the column list. | `configure-ai-run.ts:304` |
 
-### Import Drive Links
+### Pitfalls — Import Drive Links
 
 | Behavior | Source |
-|---|---|
+| --- | --- |
 | **(new) CORRECTION.** The current guide says links are appended "starting from the sheet's next empty row." That is wrong. Writing always begins at **row 2** and overwrites whatever is in the output column. Importing into a column that already holds data destroys it. | `safe-writes.ts:79` |
 | **(new)** The File Types filter matches by MIME prefix, so "Images" captures every image format. Selecting nothing includes every file. | `import-drive-links.ts:15-22`, `utils.ts:56-59` |
 | Recursive — includes every subfolder. | `utils.ts:62-65` |
 | No row range control; the row count is determined by how many files are found. | `index.ts:111` |
 
-### Extract Text
+### Pitfalls — Extract Text
 
 | Behavior | Source |
-|---|---|
+| --- | --- |
 | **(new)** Rows whose cell isn't a recognizable Drive link are skipped silently — no error, and the output cell is left untouched. | `index.ts:167-169` |
 | **(new)** A link is recognized only if it contains `drive.google.com` or `/d/`. A bare file ID pasted without the surrounding URL is skipped. | `utils.ts:25-27` |
 | **(new)** Unsupported file types write the literal string `[Skipped: Unsupported Type]` into the cell. Google Docs, PDFs, and images work; Google Sheets, `.docx`, plain text, audio, and video do not. | `drive.ts:64` |
@@ -191,10 +191,10 @@ current guide.
 | **(new)** Rows are written one at a time with a flush, so you watch the column fill in. There is no cancel. | `index.ts:173-174` |
 | Requires the Drive advanced service; you'll get a "Setup Required" alert if it's off. | `drive.ts:16-30` |
 
-### Sample Rows
+### Pitfalls — Sample Rows
 
 | Behavior | Source |
-|---|---|
+| --- | --- |
 | **(new)** Running it a second time **appends** to the existing `_evaluation` sheet rather than replacing it, so repeated runs accumulate — and with the same seed and size, they accumulate duplicates. | `index.ts:236` |
 | **(new)** The header row is copied only when the `_evaluation` sheet is first created. | `index.ts:227-231` |
 | **(new)** A non-numeric seed, or `0`, silently becomes 42. | `index.ts:224` |
@@ -202,10 +202,10 @@ current guide.
 | Operates on the whole active sheet and ignores any cell selection. | `index.ts:197` |
 | Same seed + same size + unchanged sheet = same rows. | `utils.ts:72-80` |
 
-### Format Markdown
+### Pitfalls — Format Markdown
 
 | Behavior | Source |
-|---|---|
+| --- | --- |
 | **(new)** It overwrites the cell, so the original markdown characters are gone. Undo is the only way back. | `index.ts:301` |
 | **(new)** The "Formatted N cell(s)" count includes only cells actually changed, so a lower number than expected means some cells were skipped, not that it failed. | `index.ts:286-302` |
 | Acts on the current selection with no confirmation — check what's highlighted first. | `index.ts:278` |
