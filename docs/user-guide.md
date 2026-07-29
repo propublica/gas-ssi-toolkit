@@ -40,7 +40,7 @@ You have a folder of documents and need them as rows before you can extract text
 
 ![Run AI Inference button](images/user-guide/btn-run-ai-inference.png)
 
-Sends a Gemini prompt for each row and writes the answer into an output column.
+Sends a Gemini prompt for each row and writes the answer into an output column. The tool approaches each row in the spreadsheet as a fresh single-turn AI interaction. The AI can’t see data in other rows, and it can’t see columns you don’t feed it.
 
 ### When to reach for this
 
