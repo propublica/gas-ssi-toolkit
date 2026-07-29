@@ -71,6 +71,11 @@ module.exports = {
       branches: 80,
       functions: 100,
     },
+    "./src/server/gemini-auth.ts": {
+      statements: 100,
+      branches: 100,
+      functions: 100,
+    },
     "./src/client/router.ts": {
       statements: 90,
       branches: 85,
