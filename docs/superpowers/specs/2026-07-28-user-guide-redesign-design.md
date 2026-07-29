@@ -86,6 +86,7 @@ splitting it would either duplicate it or bury half of it.
   ## Installing the add-on                      unchanged
   ## Getting oriented                           unchanged
   ## Working the tools together                 NEW
+  ## Don't forget about other spreadsheet tools NEW
 
   ## ▶️ Run AI Inference
   ## 📂 Import Drive Links
@@ -98,18 +99,66 @@ splitting it would either duplicate it or bury half of it.
 
 ### Working the tools together
 
-Short block — a paragraph and a chain, not a tutorial. Its job is to explain that the
-Extras exist to feed Run AI Inference, which is invisible from the sidebar's flat
-"Main Tools / Extras" grouping.
+Grounded in one concrete scenario rather than described abstractly. The sidebar's flat
+"Main Tools / Extras" split hides the fact that the Extras exist to feed Run AI Inference,
+and that the payoff of the whole chain is an ordinary spreadsheet you can sort and filter.
 
-The document-dump chain: **Import Drive Links** (folder → one row per file) → **Extract
-Text** (links → words in the sheet) → **Sample Rows** (pull a manageable subset) → **Run AI
-Inference** on the sample → read the results by hand and revise the prompt → **Run AI
-Inference** on everything.
+Framing: *say you have a document dump and you want to research it across a few different
+categories. Here's how these tools chain together into a sheet you can actually work.*
 
-The point to make explicitly: iterate on a small sample, not on the full dataset. Every
-row is a separate paid API call, so a prompt you fix after 5,000 rows costs 5,000 rows
-twice.
+1. **Import the documents into the sheet** — Import Drive Links turns a Drive folder into
+   one row per document.
+2. **Extract the text** — Extract Text puts the words in the sheet. This is your grounding
+   surface: the thing you check the AI's answers against later.
+3. **Decide what you're pulling out, and draft a first-pass prompt.** A chatbot is genuinely
+   useful for this part — describe your documents and what you need, and iterate on the
+   wording there before bringing it into the sheet.
+4. **Run AI Inference — Test first.** Read the output on those rows, revise the prompt, test
+   again. Reach for Sample Rows when you want a fixed subset to iterate against so
+   successive attempts are comparable. Then run the full set.
+5. **Use spreadsheet functions to split and ground the output.** Pull the individual
+   categories out of the AI's answer into their own columns, and add a column that checks
+   each claim against the extracted text — a `SEARCH()` against the source column will tell
+   you whether a quoted sentence actually appears in the document.
+6. **Filter, sort, pivot, report.**
+
+Make the cost point explicit at step 4: every row is a separate paid API call, so iterate on
+a handful of rows, not on the full dataset. A prompt you fix after 5,000 rows costs you
+5,000 rows twice.
+
+Step 5 hands off directly to the next section.
+
+### Don't forget about other spreadsheet tools
+
+Author-supplied copy, to be used close to as-written:
+
+> SSI is best leveraged in conjunction with all the trappings of traditional spreadsheet
+> work. Don't forget about [functions](https://support.google.com/docs/table/25273?hl=en)
+> (`=IF()`, `=CONCAT()`, etc), column [filters and
+> sorts](https://support.google.com/docs/answer/3540681?hl=en&co=GENIE.Platform%3DDesktop),
+> [data validation rules](https://spreadsheetpoint.com/data-validation-google-sheets/), your
+> [conditional
+> formatting](https://support.google.com/docs/answer/78413?hl=en&co=GENIE.Platform%3DDesktop),
+> [pivot tables](https://support.google.com/docs/answer/1272900?hl=en&co=GENIE.Platform%3DDesktop),
+> etc. These remain powerful tools in your toolkit. The more you use them, the more likely
+> you are to get reliable results. Remember, **we get better results when we ask the AI to
+> do less**.
+>
+> And don't forget about existing AI-powered features of Google Sheets. The [`=AI()`
+> function](https://support.google.com/docs/answer/15877199?hl=en) lacks the full featureset
+> of the SSI Toolkit, but is still great for simple text classification or other small tasks
+> – and it's free to use. The embedded Gemini chat window is great for helping write those
+> thorny spreadsheet functions like
+> `=IFERROR(SPLIT(REGEXREPLACE($O11, "[\s\S]*?""contextual_snippet"":\s*""([^""]+)""|[\s\S]+", "$1|"), "|"), "")`
+
+Placed immediately after "Working the tools together" because step 5 of that chain depends
+on exactly these features — the two sections reinforce each other, and the `REGEXREPLACE`
+example above is a concrete instance of the splitting work step 5 describes.
+
+**One open item before publishing:** confirm that `=AI()` is in fact free for the
+organization's Workspace edition. Gemini-in-Workspace availability has varied by tier, and
+an incorrect "it's free to use" in an alpha guide is the kind of claim a reporter will act
+on. If it turns out to be edition-dependent, soften to "included with many Workspace plans."
 
 ### ▶️ Run AI Inference
 
@@ -162,7 +211,7 @@ knows nothing about the other rows.
 | **Point Test at the rows you actually care about.** It takes the first 10 of your selection, so highlight a range starting at a document you know is hard rather than accepting rows 2–11. | `configure-ai-run.ts:423` |
 | **Test is not a dry run.** It performs real inference, costs real money, and writes real answers into the output column for those 10 rows. | `configure-ai-run.ts:424` |
 | **Add a second column for evidence.** Run again asking for the verbatim sentence that supports the answer. Spot-checking then means reading two cells side by side instead of reopening the source document. | technique |
-| **Extract text first when documents are text-heavy.** Extracted text is cheaper to send, reusable across runs, and searchable in the sheet. Reach for file mode when layout, tables, or images carry the meaning — in file mode Google Docs are converted to PDF and Sheets to CSV before sending. File mode is also much faster on large image sets, since it moves files in parallel batches of 10 while Extract Text OCRs them one at a time. | `index.ts:443,463-464` |
+| **Extract text first when documents are text-heavy.** Extracted text is cheaper to send, reusable across runs, and searchable in the sheet — and it gives you something to check the AI's answers against. Reach for file mode when layout, tables, or images carry the meaning; in file mode Google Docs are converted to PDF and Sheets to CSV before sending. | `index.ts:463-464` |
 | **Google Search costs real money per query.** $14 per 1,000 searches — about 1.4 cents each, and one row can issue more than one. On Flash Lite that dwarfs token cost, so enabling Search for 5,000 rows is a different decision than for 50. The displayed cost also assumes you pay for every query; Google's free 5,000/month grounding quota is invisible to the add-on, so the real bill may be lower. | `pricing.ts:31-35` |
 | **Don't ask the AI to write formulas.** An answer starting with `=`, `+`, or `-` lands as plain text with an apostrophe in front. An answer containing `IMAGE()` or any `IMPORT…()` function is thrown out entirely and replaced with an error — a deliberate guard against a malicious document rewriting your sheet. | `safe-writes.ts:13,29-35` |
 | **The output column turns orange and yellow on purpose.** The header gets an orange fill and a note reading "Some cells in this column may be AI-generated"; the answer cells get a pale yellow tint. Not a bug. | `utils.ts:159-171` |
@@ -208,7 +257,7 @@ the model directly.
 | **Only three kinds of file work.** Google Docs, PDFs, and images. Everything else — Google Sheets, `.docx`, plain text, audio, video — writes the literal string `[Skipped: Unsupported Type]` into the cell. Filter the column for that string before trusting the run. | `drive.ts:64` |
 | **Rows without a recognizable Drive link are skipped in silence.** No error, and the output cell is left untouched. A link only counts if it contains `drive.google.com` or `/d/`, so a bare file ID pasted without its URL is ignored. | `index.ts:167-169`, `utils.ts:25-27` |
 | **Once it starts, it finishes.** Unlike an AI run, extraction isn't batched — hitting ✕ shows "Stopping…" but every row in your range still gets processed. Rows are written and flushed one at a time, so you can watch it go, but you can't call it off. Start with a small row range. | `index.ts:154-175`, `configure-ai-run.ts:398` |
-| **OCR is slow, and it's one file at a time.** Each PDF or image is converted to a temporary Google Doc, read, and deleted — several blocking operations per file, run strictly in sequence. A few hundred images is a long wait. If OCR speed is the bottleneck and you only need the AI's answer rather than the text itself, file mode in Run AI Inference is the faster route: it moves files in parallel batches of 10. | `drive.ts:48-61`, `index.ts:154-175`, `index.ts:443` |
+| **Give it time.** Google Docs are read directly and come back quickly. PDFs and images have to be converted before their text can be read, so they take noticeably longer — budget real time for a folder of a few hundred scans. | `drive.ts:44-61` |
 | **"Setup Required" means the Drive service is off.** Enable Drive API in the Apps Script editor's Services list. | `drive.ts:16-30` |
 
 ### 🎲 Sample Rows
@@ -283,6 +332,9 @@ row-1 rule and the ↻ refresh button — move into the Run AI Inference tips li
   documentation about AI in reporting practice, not a tool reference read mid-task.
 - Recipes. Still being refined and excluded from this alpha round; the existing one-line
   note in the intro stays.
+- The `=SSI()` custom function. It is live and registered for cell autocomplete
+  (`rollup.config.js:99`), but it is not part of the alpha and must not be mentioned — including
+  in the spreadsheet-tools section, where it would otherwise sit naturally beside `=AI()`.
 - The grounding column's naming convention. The panel already renders `<output>_grounding`
   as a live badge (`configure-ai-run.ts:609`), so documenting it would be pure echo.
 - `README.md`. Its scope split with the user guide was settled in commit 21d1449.
