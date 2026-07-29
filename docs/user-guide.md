@@ -39,32 +39,58 @@ SSI is best leveraged in conjunction with all the trappings of traditional sprea
 
 And don't forget about existing AI-powered features of Google Sheets. The [`=AI()` function](https://support.google.com/docs/answer/15877199?hl=en) lacks the full featureset of the SSI Toolkit, but is still great for simple text classification or other small tasks — and it's free to use, subject to usage limits. The embedded Gemini chat window is great for helping write those thorny spreadsheet functions like `=IFERROR(SPLIT(REGEXREPLACE($O11, "[\s\S]*?""contextual_snippet"":\s*""([^""]+)""|[\s\S]+", "$1|"), "|"), "")`
 
-## Run AI Inference
+## ▶️ Run AI Inference
 
-Runs a Gemini prompt against each selected row and writes the response into an output column. Supports plain text prompts, file/document inputs from Google Drive, and optional extra capabilities like web search.
+<!-- ![Run AI Inference button](images/user-guide/btn-run-ai-inference.png) -->
 
-![Run AI Inference panel — prompts and output](images/user-guide/run-ai-inference-top.png)
+Sends a Gemini prompt for each row and writes the answer into an output column. Clicking it opens a configuration panel — nothing runs until you press **Test** or **Run AI**.
 
-![Run AI Inference panel — model and tools](images/user-guide/run-ai-inference-model-tools.png)
+### When to reach for this
 
-![Run AI Inference panel — row range, test/run buttons](images/user-guide/run-ai-inference-rows-run.png)
+The task is the same question asked once per row: summarize, classify, extract a field, translate, check against a rule. It's the wrong tool for a question about the dataset as a whole, because each row is an independent request that knows nothing about the other rows.
 
-**Steps:**
+### The three components of AI inference
 
-1. Click **▶️ Run AI Inference** from Main Tools.
-2. *(Optional)* Choose a **System prompt column** — a column whose text sets the AI's role and behavior before it sees any row data.
-3. Add one or more **User prompt columns** — the content the AI actually reads for each row. Click **+ Add column** for more than one, and toggle each between **text** (the column's text is inserted into the prompt) and **file** (the column holds a Drive link, and its file contents are sent to the AI). Check **Prefix with column name** if you want the column name to pass into the AI as a label: `<column name>: <my cell data>`.
-4. Choose an **Output column** — pick an existing column or type a new name to create one. Check **Apply markdown formatting** if you want the AI's response rendered with headings/bold/etc. rather than as plain text.
-5. *(Optional)* Expand **MODEL** to pick between **Gemini 3.1 Flash Lite** (fast, good for most tasks — summarizing, extraction, translation, bulk categorization) and **Gemini 3.1 Pro Preview** (slower, better for real reasoning over ambiguous or conflicting sources).
-6. *(Optional)* Expand **TOOLS** to give the AI extra capabilities: **Google Search** (grounds answers in live web results), **URL Context** (fetches and reads URLs mentioned in the prompt), and **Code Execution** (runs Python for calculations). If you select any tool, you can also check **Include grounding column** to write out an extra column of the sources/citations the AI used alongside its answer.
-7. Set **Rows to process**. You have the option of either running the AI on the rows currently highlighted on the sheet, or explicitly setting a start and end row directly.
-8. Click **Test** to run just the first 10 rows of your selection. This shows actual cost and time for those rows, plus an estimate for the full run — a good way to check quality and cost before committing.
-9. When you're satisfied, click **Run AI** to process every selected row. For runs over 200 rows, you'll see a confirmation dialog with a time estimate — keep the sidebar open until it finishes, since closing it stops the run after the current batch.
+#### 1. Set your columns
 
-**Good to know:**
+Three columns do three different jobs, and the panel explains each as you fill it in. What it doesn't tell you:
 
-- The Test button always samples the first 10 rows of your current selection, not a random sample.
-- If you change any configuration after testing, the test results are marked stale until you test again.
+**Text or file.** Each user prompt column carries a small toggle reading `Text ⇄` or `File ⇄`. In **text** mode the cell's characters are sent as they are — so a cell holding a Drive URL sends the AI the URL itself, which it cannot open. In **file** mode the cell is treated as a Drive link: the document is fetched and its contents are sent. Google Docs are converted to PDF and Google Sheets to CSV on the way.
+
+**Order matters.** The `↑` and `↓` buttons change the order the AI receives your columns in.
+
+Checking **Apply markdown formatting** turns the response into real rich text instead of leaving `**asterisks**` sitting in the cell.
+
+#### 2. AI configuration
+
+Choose a model and tools based on what the task needs. The panel describes each model when you expand the section.
+
+For tools: reach for **URL Context** when your own cells contain links you want read, **Google Search** when the answer isn't in your data at all, and **Code Execution** for arithmetic you'd rather not have the model do in its head.
+
+#### 3. Run
+
+**Test** runs the first 10 rows of your range and reports what those rows actually cost and how long they took, plus a projection for the full run. Use it whenever the prompt is new, the model changed, or you've added a tool — and skip it only when you're re-running a setup you've already validated. Change any setting after testing and the results are marked stale until you test again.
+
+**Run AI** then processes every row in your range.
+
+### Tips & gotchas
+
+- **Fill your system prompt down every row.** It's read from each row's own cell, so an instruction typed only into row 2 means every row after it runs with no system prompt at all — silently, with no warning, and returning output that looks perfectly plausible.
+- **Rows with nothing in the prompt columns are skipped, not blanked.** The output cell is left exactly as it was, so a leftover value from an earlier run stays put and reads like a fresh answer.
+- **Turn on "Prefix with column name" when you feed more than one text column.** It sends each value as `Column name: value` so the AI can tell them apart. Without it, several columns arrive as one undifferentiated block of text.
+- **Ask for a constrained answer when you plan to filter.** "Reply only YES, NO, or UNCLEAR" gives you a column you can sort, filter, and pivot. An open-ended question gives you a paragraph you have to read.
+- **Point Test at the rows you actually care about.** It takes the first 10 rows of your selection, not a random 10 — so highlight a range starting at a document you know is difficult rather than accepting rows 2–11.
+- **Test is not a dry run.** It performs real inference, costs real money, and writes real answers into the output column for those 10 rows.
+- **Add a second column for evidence.** Run again asking for the verbatim sentence that supports the answer. Spot-checking then means reading two cells side by side instead of reopening the source document.
+- **Extract text first when your documents are text-heavy.** Extracted text is cheaper to send, reusable across runs, searchable in the sheet, and gives you something to check the AI against. Reach for file mode when layout, tables, or images carry the meaning.
+- **Google Search costs real money per query.** It's billed at $14 per 1,000 searches — about 1.4 cents each, and a single row can issue more than one. That dwarfs the token cost on Flash Lite, so switching Search on for 5,000 rows is a different decision than for 50. The cost shown also assumes you pay for every query; Google's free monthly grounding allowance is invisible to the add-on, so your real bill may be lower.
+- **Don't ask the AI to write formulas.** An answer starting with `=`, `+`, or `-` lands as plain text with an apostrophe in front of it. An answer containing `IMAGE()` or any `IMPORT…()` function is thrown out entirely and replaced with an error — a deliberate guard against a malicious document rewriting your sheet.
+- **The output column turns orange and yellow on purpose.** The header gets an orange fill and a note reading "Some cells in this column may be AI-generated"; the answer cells get a pale yellow tint. That's a reminder, not a bug.
+- **To stop a run, hit the ✕ at the bottom of the sidebar.** It won't stop on the spot — the toolkit sends rows to the AI in batches of 40, so it finishes the batch it's on first, and up to 39 more rows may still fill in. Closing the sidebar behaves the same way.
+- **A failed file leaves an error in the cell.** If a row's Drive file can't be downloaded, `[File error: …]` is written to its output cell and no inference is attempted for that row.
+- **A new output column lands at the far right of the sheet**, past every existing column — not beside your data.
+- **Watch the row range.** Choosing "Specify range" but leaving either box empty quietly falls back to your highlighted selection. Entering a start row higher than the end row produces the misleading alert "Row 1 is the header row and can't be processed." Row 1 is never processed under any setting.
+- **Renamed or deleted a column mid-session?** Hit ↻ in the panel header to reload the column list.
 
 ## Import Drive Links
 
