@@ -13,7 +13,7 @@ The following directions only apply if your organization distributes SSI Toolkit
 
 ## Getting oriented
 
-Open the sidebar using the **📐 Open SSI Toolkit** menu option. If installed as an Editor Add on, the SSI Toolkit will be available as a item under **Extensions**.  
+Open the sidebar using the **📐 Open SSI Toolkit** menu option. If installed as an Editor add-on, the SSI Toolkit will be available as an item under **Extensions**.
 
 The sidebar organizes its buttons into two groups:
 
@@ -29,7 +29,7 @@ Say you have a document dump and you want to research it across a few different 
 1. **Import the documents into the sheet.** Import Drive Links turns a Drive folder into one row per document.
 2. **Extract the text.** Extract Text puts the words in the sheet. This is your grounding surface — the thing you check the AI's answers against later.
 3. **Decide what you're pulling out, and draft a first-pass prompt.** A chatbot is genuinely useful here. Describe your documents and what you need, and get the wording roughly right before bringing it into the sheet.
-4. **Run AI Inference — Test first.** Read the output on those rows, revise the prompt, and test again. Every row is a separate paid API call, so iterate on a handful of rows rather than on the full dataset — a prompt you fix after 5,000 rows costs you 5,000 rows twice. Reach for Sample Rows when you want a fixed subset to iterate against, so successive attempts are comparable. Then run the full set.
+4. **Run AI Inference — Test first.** Test runs the first 10 rows of your range. Read the output on those rows, revise the prompt, and test again. Every row is a separate paid API call, so iterate on a handful of rows rather than on the full dataset — a prompt you fix after 5,000 rows costs you 5,000 rows twice. Reach for Sample Rows when you want a fixed subset to iterate against, so successive attempts are comparable. Then run the full set.
 5. **Use spreadsheet functions to split and ground the output.** Pull the individual categories out of the AI's answer into their own columns. Then add a column that checks each claim against the extracted text — a `SEARCH()` against the source column will tell you whether a quoted sentence actually appears in the document.
 6. **Filter, sort, pivot, report.**
 
@@ -53,7 +53,7 @@ The task is the same question asked once per row: summarize, classify, extract a
 
 #### 1. Set your columns
 
-Three columns do three different jobs, and the panel explains each as you fill it in. What it doesn't tell you:
+Three kinds of column do three different jobs, and the panel explains each as you fill it in. What it doesn't tell you:
 
 **Text or file.** Each user prompt column carries a small toggle reading `Text ⇄` or `File ⇄`. In **text** mode the cell's characters are sent as they are — so a cell holding a Drive URL sends the AI the URL itself, which it cannot open. In **file** mode the cell is treated as a Drive link: the document is fetched and its contents are sent. Google Docs are converted to PDF and Google Sheets to CSV on the way.
 
@@ -84,7 +84,8 @@ For tools: reach for **URL Context** when your own cells contain links you want 
 - **Add a second column for evidence.** Run again asking for the verbatim sentence that supports the answer. Spot-checking then means reading two cells side by side instead of reopening the source document.
 - **Extract text first when your documents are text-heavy.** Extracted text is cheaper to send, reusable across runs, searchable in the sheet, and gives you something to check the AI against. Reach for file mode when layout, tables, or images carry the meaning.
 - **Google Search costs real money per query.** It's billed at $14 per 1,000 searches — about 1.4 cents each, and a single row can issue more than one. That dwarfs the token cost on Flash Lite, so switching Search on for 5,000 rows is a different decision than for 50. The cost shown also assumes you pay for every query; Google's free monthly grounding allowance is invisible to the add-on, so your real bill may be lower.
-- **Don't ask the AI to write formulas.** An answer starting with `=`, `+`, or `-` lands as plain text with an apostrophe in front of it. An answer containing `IMAGE()` or any `IMPORT…()` function is thrown out entirely and replaced with an error — a deliberate guard against a malicious document rewriting your sheet.
+- **Turn on the grounding column when you'll need to show your work.** Once you've selected any tool, a checkbox appears offering an extra column alongside your answers. It records the searches the AI ran and the sources it drew on, as clickable links — or, if Code Execution ran, the code and its output instead. That's the difference between an answer you can check and one you have to take on faith.
+- **Don't ask the AI to write formulas.** An answer starting with `=`, `+`, or `-` lands as plain text with an apostrophe in front of it. If that answer also contains `IMAGE()` or any `IMPORT…()` function, it's thrown out entirely and replaced with an error — a deliberate guard against a malicious document rewriting your sheet. Those function names sitting mid-sentence in ordinary prose are left alone; it's only formulas that get caught.
 - **The output column turns orange and yellow on purpose.** The header gets an orange fill and a note reading "Some cells in this column may be AI-generated"; the answer cells get a pale yellow tint. That's a reminder, not a bug.
 - **To stop a run, hit the ✕ at the bottom of the sidebar.** It won't stop on the spot — the toolkit sends rows to the AI in batches of 40, so it finishes the batch it's on first, and up to 39 more rows may still fill in. Closing the sidebar behaves the same way.
 - **A failed file leaves an error in the cell.** If a row's Drive file can't be downloaded, `[File error: …]` is written to its output cell and no inference is attempted for that row.
@@ -104,7 +105,7 @@ You have a folder of documents and need them as rows before you can extract text
 
 ### Tips & gotchas
 
-- **It overwrites, starting at row 2.** Writing begins at row 2 of the output column and continues down for as many files as it finds, replacing whatever was there. Point it at a column that already holds data and that data is gone.
+- **It overwrites from row 2 down — but only as far as it goes.** Writing begins at row 2 and continues for as many files as it finds. It does not clear the column first, so importing 10 files into a column that held 500 links replaces the first 10 and leaves the other 490 sitting underneath. Use a fresh column, or clear the old one before importing.
 - **It recurses into every subfolder.** A folder of folders returns everything underneath it, flattened into a single column with no indication of which subfolder each file came from.
 - **You can't choose how many rows you get.** There's no row range — the row count is however many files it finds.
 - **Split a mixed dump by running it once per file type.** The File Types filter matches by category, so "Images" catches every image format. Selecting nothing at all includes every file.
@@ -122,7 +123,7 @@ You want the words themselves in the sheet — searchable with Ctrl+F, filterabl
 ### Tips & gotchas
 
 - **Long documents are cut off mid-sentence.** The panel's 49,000-character cap is a Google Sheets limit, and a truncated cell ends with `... [TRUNCATED]`. Nothing else flags it, so don't assume a cell holds a whole document — search the column for that marker before running AI over it.
-- **Only three kinds of file work.** Google Docs, PDFs, and images. Everything else — Google Sheets, `.docx`, plain text, audio, video — writes the literal string `[Skipped: Unsupported Type]` into the cell. Filter for that string before trusting the results.
+- **Only three kinds of file work.** Google Docs, PDFs, and images. Everything else — Google Sheets, `.docx`, plain text, audio, video — writes the literal string `[Skipped: Unsupported Type]` into the cell, and a file the service can't read at all (permissions, a corrupt scan, a timeout) writes `[Error: …]`. Filter for both before trusting the results.
 - **Rows without a recognizable Drive link are skipped in silence.** No error, and the output cell is left untouched. A link only counts if it looks like a Drive URL, so a bare file ID pasted without the surrounding URL is ignored.
 - **Once it starts, it finishes.** Unlike an AI run, extraction isn't batched — hitting ✕ won't halt it, and every row in your range still gets processed. Rows are written one at a time so you can watch it go, but you can't call it off. Start with a small row range.
 - **Give it time.** Google Docs are read directly and come back quickly. PDFs and images have to be converted before their text can be read, so they take noticeably longer — budget real time for a folder of a few hundred scans.
