@@ -26,7 +26,7 @@
 **Created:**
 - `src/server/gemini-auth.ts` — sole owner of `GEMINI_API_KEY`. Two functions, two constants. No URL, payload, or response concerns.
 - `__tests__/gemini-auth.test.ts` — unit tests for the above.
-- `__tests__/credential-hygiene.test.ts` — source-scanning regression guard for T17.
+- `__tests__/api-key-hygiene.test.ts` — source-scanning regression guard for T17.
 
 **Modified:**
 - `src/server/api.ts` — header swap in `callGeminiAPI` (`:55-66`) and `callGeminiAPIBatch` (`:114-127`); delete `invokeGemini` (`:180-189`).
@@ -730,7 +730,7 @@ deleted — gemini-auth.ts is the only module that names the property."
 The fix is six lines; without this test, a future `countTokens` or embeddings endpoint reintroduces T17 silently. The guard asserts two invariants: no credential is interpolated into a URL, and only `gemini-auth.ts` names the key property.
 
 **Files:**
-- Create: `__tests__/credential-hygiene.test.ts`
+- Create: `__tests__/api-key-hygiene.test.ts`
 
 **Interfaces:**
 - Consumes: the finished state of Tasks 1-3 (this test scans `src/server/` as a whole).
@@ -738,7 +738,7 @@ The fix is six lines; without this test, a future `countTokens` or embeddings en
 
 - [ ] **Step 1: Write the test**
 
-Create `__tests__/credential-hygiene.test.ts`. The `/// <reference types="node" />` directive is required — `tsconfig.client.json` deliberately omits `"node"` from `types` because it collides with the `google-apps-script` `MimeType` declaration, so files needing `fs` opt in individually (same pattern as `__tests__/markdown-to-rich-text.test.ts`).
+Create `__tests__/api-key-hygiene.test.ts`. The `/// <reference types="node" />` directive is required — `tsconfig.client.json` deliberately omits `"node"` from `types` because it collides with the `google-apps-script` `MimeType` declaration, so files needing `fs` opt in individually (same pattern as `__tests__/markdown-to-rich-text.test.ts`).
 
 ```ts
 /// <reference types="node" />
@@ -804,7 +804,7 @@ describe("credential hygiene in src/server", () => {
 - [ ] **Step 2: Run the test to verify it passes against the fixed code**
 
 ```bash
-npx jest __tests__/credential-hygiene.test.ts
+npx jest __tests__/api-key-hygiene.test.ts
 ```
 
 Expected: PASS. (Unlike the earlier tasks, this test codifies an invariant Tasks 1-3 already established — it should be green immediately.)
@@ -820,7 +820,7 @@ A guard test that cannot fail is worthless, so prove it fails. Temporarily reint
 Then run:
 
 ```bash
-npx jest __tests__/credential-hygiene.test.ts
+npx jest __tests__/api-key-hygiene.test.ts
 ```
 
 Expected: FAIL on `api.ts does not put a credential in a URL query string`, with the offending line number in the diff.
@@ -829,7 +829,7 @@ Expected: FAIL on `api.ts does not put a credential in a URL query string`, with
 
 ```bash
 git checkout src/server/api.ts
-npx jest __tests__/credential-hygiene.test.ts
+npx jest __tests__/api-key-hygiene.test.ts
 ```
 
 Expected: PASS. Confirm `git diff src/server/api.ts` is empty before continuing.
@@ -837,7 +837,7 @@ Expected: PASS. Confirm `git diff src/server/api.ts` is empty before continuing.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add __tests__/credential-hygiene.test.ts
+git add __tests__/api-key-hygiene.test.ts
 git commit -m "test(security): guard against credentials in request URLs (T17/R24)"
 ```
 
@@ -858,7 +858,7 @@ git commit -m "test(security): guard against credentials in request URLs (T17/R2
 `docs/threat_models/ssi-toolkit-threat-model.md` line 204 currently describes the vulnerability in the present tense. Append this sentence to the end of that table cell (before the closing `|`), preserving the existing prose so the historical finding stays readable:
 
 ```text
- Fixed 2026-07-29 (AI-78/R24): all three call sites now authenticate with the `x-goog-api-key` header via `src/server/gemini-auth.ts`, so no credential appears in a request URL and a `UrlFetchApp` exception can no longer echo one. `__tests__/credential-hygiene.test.ts` fails the build if the pattern returns. The R25 half of this threat remains open — `runInference()` and `SSI()` still write raw exception messages into cells, which is a general information-disclosure gap even without the key in scope (see AI-79)
+ Fixed 2026-07-29 (AI-78/R24): all three call sites now authenticate with the `x-goog-api-key` header via `src/server/gemini-auth.ts`, so no credential appears in a request URL and a `UrlFetchApp` exception can no longer echo one. `__tests__/api-key-hygiene.test.ts` fails the build if the pattern returns. The R25 half of this threat remains open — `runInference()` and `SSI()` still write raw exception messages into cells, which is a general information-disclosure gap even without the key in scope (see AI-79)
 ```
 
 - [ ] **Step 2: Update the R24 mitigation row**
@@ -874,7 +874,7 @@ Line 237 — append the implementation note to that row's Description cell:
 Line 285 — flip Status from `Open` to `Closed` and note the follow-on:
 
 ```text
-| High | Closed | [AI-78](https://linear.app/propublica/issue/AI-78/fix-t17-gemini-api-key-sent-via-url-query-string) | — | Fix T17 — API key in URL | Done 2026-07-29 — `GEMINI_API_KEY` now sent via the `x-goog-api-key` header from `src/server/gemini-auth.ts`; source-scanning guard in `__tests__/credential-hygiene.test.ts`. R25/AI-79 (echoed exceptions) still open (R24) |
+| High | Closed | [AI-78](https://linear.app/propublica/issue/AI-78/fix-t17-gemini-api-key-sent-via-url-query-string) | — | Fix T17 — API key in URL | Done 2026-07-29 — `GEMINI_API_KEY` now sent via the `x-goog-api-key` header from `src/server/gemini-auth.ts`; source-scanning guard in `__tests__/api-key-hygiene.test.ts`. R25/AI-79 (echoed exceptions) still open (R24) |
 ```
 
 Leave the PR column as `—` for now, matching the AI-89 row's precedent; backfill it after the PR exists if desired.
