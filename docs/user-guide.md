@@ -1,6 +1,6 @@
 # SSI Toolkit — User Guide
 
-The SSI Toolkit is a Google Sheets sidebar for AI-assisted investigations. This guide walks through each tool available in this alpha round: **Run AI Inference**, **Import Drive Links**, **Sample Rows**, **Extract Text**, and **Format Markdown**.
+The SSI Toolkit is a Google Sheets sidebar for AI-assisted investigations. This guide covers each tool available in this alpha round: **Run AI Inference**, **Import Drive Links**, **Extract Text**, **Sample Rows**, and **Format Markdown**.
 
 Recipes (the curated, one-click AI workflows) also appear in the sidebar, but they're still being refined and aren't part of this alpha round — feel free to ignore that button for now.
 
@@ -19,6 +19,25 @@ The sidebar organizes its buttons into two groups:
 
 - **Main Tools** — Recipes and Run AI Inference
 - **Extras** — Import Drive Links, Sample Rows, Extract Text, and Format Markdown
+
+## Working the tools together
+
+The sidebar splits the toolkit into "Main Tools" and "Extras," which undersells what the Extras are for: they exist to get your material into the sheet so Run AI Inference has something to work on. The payoff at the end of the chain is an ordinary spreadsheet — one you can sort, filter, and pivot like any other.
+
+Say you have a document dump and you want to research it across a few different categories. Here's how these tools chain together into a sheet you can actually work:
+
+1. **Import the documents into the sheet.** Import Drive Links turns a Drive folder into one row per document.
+2. **Extract the text.** Extract Text puts the words in the sheet. This is your grounding surface — the thing you check the AI's answers against later.
+3. **Decide what you're pulling out, and draft a first-pass prompt.** A chatbot is genuinely useful here. Describe your documents and what you need, and get the wording roughly right before bringing it into the sheet.
+4. **Run AI Inference — Test first.** Read the output on those rows, revise the prompt, and test again. Every row is a separate paid API call, so iterate on a handful of rows rather than on the full dataset — a prompt you fix after 5,000 rows costs you 5,000 rows twice. Reach for Sample Rows when you want a fixed subset to iterate against, so successive attempts are comparable. Then run the full set.
+5. **Use spreadsheet functions to split and ground the output.** Pull the individual categories out of the AI's answer into their own columns. Then add a column that checks each claim against the extracted text — a `SEARCH()` against the source column will tell you whether a quoted sentence actually appears in the document.
+6. **Filter, sort, pivot, report.**
+
+## Don't forget about other spreadsheet tools
+
+SSI is best leveraged in conjunction with all the trappings of traditional spreadsheet work. Don't forget about [functions](https://support.google.com/docs/table/25273?hl=en) (`=IF()`, `=CONCAT()`, etc), column [filters and sorts](https://support.google.com/docs/answer/3540681?hl=en&co=GENIE.Platform%3DDesktop), [data validation rules](https://spreadsheetpoint.com/data-validation-google-sheets/), your [conditional formatting](https://support.google.com/docs/answer/78413?hl=en&co=GENIE.Platform%3DDesktop), [pivot tables](https://support.google.com/docs/answer/1272900?hl=en&co=GENIE.Platform%3DDesktop), etc. These remain powerful tools in your toolkit. The more you use them, the more likely you are to get reliable results. Remember, **we get better results when we ask the AI to do less**.
+
+And don't forget about existing AI-powered features of Google Sheets. The [`=AI()` function](https://support.google.com/docs/answer/15877199?hl=en) lacks the full featureset of the SSI Toolkit, but is still great for simple text classification or other small tasks — and it's free to use, subject to usage limits. The embedded Gemini chat window is great for helping write those thorny spreadsheet functions like `=IFERROR(SPLIT(REGEXREPLACE($O11, "[\s\S]*?""contextual_snippet"":\s*""([^""]+)""|[\s\S]+", "$1|"), "|"), "")`
 
 ## Run AI Inference
 
@@ -125,11 +144,3 @@ Unlike the other tools, Format Markdown doesn't have its own panel or column pic
 - Because it works on your highlighted selection rather than a configured column, it's easy to click without meaning to — double check your selection first.
 - Cells that aren't text, or that don't parse as valid markdown, are left untouched.
 - You'll see a confirmation like "Formatted 6 cell(s)" when it finishes.
-
-## Troubleshooting
-
-- **"Row 1 is the header row and can't be processed."** — Your selection or entered row range started at row 1. Reselect or re-enter starting at row 2 or later.
-- **"Please select at least one User prompt column." / "Please select an output column."** (Run AI Inference) — A required field was left empty; fill it in and try again.
-- **"Please enter a Google Drive folder link."** (Import Drive Links) — The folder field was left blank.
-- **"The sheet '\<name\>' appears to be empty."** (Sample Rows) — There are no data rows below the header to sample from.
-- **No response after clicking Run AI or Test** — Check that the sheet still has the columns you configured; if a column was renamed or deleted, use the refresh (↻) button in the panel to reload columns.
