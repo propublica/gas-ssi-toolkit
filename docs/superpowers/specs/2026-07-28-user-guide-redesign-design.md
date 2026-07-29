@@ -147,7 +147,7 @@ Author-supplied copy, to be used close to as-written:
 > And don't forget about existing AI-powered features of Google Sheets. The [`=AI()`
 > function](https://support.google.com/docs/answer/15877199?hl=en) lacks the full featureset
 > of the SSI Toolkit, but is still great for simple text classification or other small tasks
-> – and it's free to use. The embedded Gemini chat window is great for helping write those
+> – and it's free to use, subject to usage limits. The embedded Gemini chat window is great for helping write those
 > thorny spreadsheet functions like
 > `=IFERROR(SPLIT(REGEXREPLACE($O11, "[\s\S]*?""contextual_snippet"":\s*""([^""]+)""|[\s\S]+", "$1|"), "|"), "")`
 
@@ -155,10 +155,9 @@ Placed immediately after "Working the tools together" because step 5 of that cha
 on exactly these features — the two sections reinforce each other, and the `REGEXREPLACE`
 example above is a concrete instance of the splitting work step 5 describes.
 
-**One open item before publishing:** confirm that `=AI()` is in fact free for the
-organization's Workspace edition. Gemini-in-Workspace availability has varied by tier, and
-an incorrect "it's free to use" in an alpha guide is the kind of claim a reporter will act
-on. If it turns out to be edition-dependent, soften to "included with many Workspace plans."
+`=AI()` is confirmed free on this organization's Workspace edition, but it carries usage
+limits — hence "subject to usage limits" in the copy above. Don't drop that qualifier; a
+reporter who plans a large job around a free function needs to know a ceiling exists.
 
 ### ▶️ Run AI Inference
 
