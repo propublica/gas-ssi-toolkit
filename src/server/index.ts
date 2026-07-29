@@ -513,7 +513,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
       hasFileInputs ? fileUriMap : undefined,
     );
     if (req !== null) {
-      requests.push({ ...req, apiKey, modelName: config.model });
+      requests.push({ ...req, modelName: config.model });
       rowIndices.push(i);
     }
   }
