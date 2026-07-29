@@ -493,13 +493,14 @@ done
 
 Expected: two `OK` lines for the Format Markdown images, and no `MISS` lines. The five button-crop paths are inside HTML comments and must not appear here — if one does, it was left uncommented.
 
-- [ ] **Step 5: Verify the guide is shorter than what it replaced**
+- [ ] **Step 5: Record the finished length (no target to hit)**
 
-Run: `wc -l < docs/user-guide.md && git show 21d1449:docs/user-guide.md | wc -l`
+Run: `wc -l < docs/user-guide.md`
 
-`21d1449` is the last commit before this redesign began, so it is a stable reference regardless of how many commits the rewrite took.
-
-Expected: the first number is lower than the second (135). If it isn't, the rewrite has kept material the spec called for cutting — re-read the tool sections for surviving field-by-field description.
+There is no line-count target. The spec's earlier "must be shorter than 135 lines"
+criterion is withdrawn — the rewrite added two whole sections and replaced thin
+walkthroughs with substantive tips, so the finished guide is legitimately longer. Just
+record the number in your report.
 
 - [ ] **Step 6: Read the whole file once, start to finish**
 

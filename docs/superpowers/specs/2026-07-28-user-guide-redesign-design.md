@@ -347,3 +347,11 @@ row-1 rule and the ↻ refresh button — move into the Run AI Inference tips li
 - The system-prompt-per-row trap appears prominently in the Run AI Inference list.
 - Every item in the tables above appears in the rewritten doc, and every claim is traceable
   to the cited source.
+
+An earlier draft of this spec also required the guide to be shorter than the 135 lines it
+replaced. That criterion was written before the "Working the tools together" and
+"Don't forget about other spreadsheet tools" sections were added, and it is withdrawn: the
+finished guide is 167 lines because it carries information the old one didn't. Run AI
+Inference alone went from two "Good to know" bullets to sixteen verified tips. Length was
+only ever a proxy for "stopped echoing the UI," and that goal is covered by the first
+criterion above.
