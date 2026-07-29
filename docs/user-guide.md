@@ -92,81 +92,76 @@ For tools: reach for **URL Context** when your own cells contain links you want 
 - **Watch the row range.** Choosing "Specify range" but leaving either box empty quietly falls back to your highlighted selection. Entering a start row higher than the end row produces the misleading alert "Row 1 is the header row and can't be processed." Row 1 is never processed under any setting.
 - **Renamed or deleted a column mid-session?** Hit ↻ in the panel header to reload the column list.
 
-## Import Drive Links
+## 📂 Import Drive Links
 
-Recursively lists files from a Google Drive folder into a column, one file link per row.
+<!-- ![Import Drive Links button](images/user-guide/btn-import-drive-links.png) -->
 
-![Import Drive Links panel, configured](images/user-guide/import-drive-links.png)
+Walks a Google Drive folder and every subfolder beneath it, writing one file link per row into a column.
 
-**Steps:**
+### When to reach for this
 
-1. Click **📂 Import Drive Links** from Extras.
-2. Paste a Google Drive folder URL or ID into **Drive Folder**.
-3. Choose an **Output Column** — pick an existing column or type a new name to create one.
-4. *(Optional)* Under **File Types**, select which kinds to filter by (Google Docs, Google Sheets, PDFs, Images, Audio, Video). Leave blank to include everything.
-5. Click **Import Links**.
+You have a folder of documents and need them as rows before you can extract text or run AI over them. This is usually the first step of a document-dump investigation.
 
-**Good to know:**
+### Tips & gotchas
 
-- This tool searches the folder recursively, including subfolders.
-- There's no row-range control here — it appends one row per file found, starting from the sheet's next empty row in the output column.
+- **It overwrites, starting at row 2.** Writing begins at row 2 of the output column and continues down for as many files as it finds, replacing whatever was there. Point it at a column that already holds data and that data is gone.
+- **It recurses into every subfolder.** A folder of folders returns everything underneath it, flattened into a single column with no indication of which subfolder each file came from.
+- **You can't choose how many rows you get.** There's no row range — the row count is however many files it finds.
+- **Split a mixed dump by running it once per file type.** The File Types filter matches by category, so "Images" catches every image format. Selecting nothing at all includes every file.
 
-## Sample Rows
+## 📜 Extract Text
 
-Pulls a reproducible random sample of rows from your sheet into a new sheet, useful for testing a prompt on a manageable subset before running it on everything.
+<!-- ![Extract Text button](images/user-guide/btn-extract-text.png) -->
 
-![Sample Rows — "Sample Data" prompt](images/user-guide/sample-rows-count-dialog.png)
+Reads the Drive link in each row and writes that document's text into another column. Google Docs are read directly; PDFs and images go through OCR.
 
-![Sample Rows — "Random Seed" prompt](images/user-guide/sample-rows-seed-dialog.png)
+### When to reach for this
 
-**Steps:**
+You want the words themselves in the sheet — searchable with Ctrl+F, filterable, and usable as a text prompt column. Typically this runs right after Import Drive Links. Skip it if you plan to use file mode in Run AI Inference, which sends documents to the model directly.
 
-1. Click **🎲 Sample Rows** from Extras.
-2. When prompted, enter how many rows you'd like to sample.
-3. When prompted for a seed, enter a number (or leave it — it defaults to 42). Using the same seed and sample size always produces the same sample, which is useful if you want to compare prompt changes against an identical set of rows.
-4. The tool copies your header row plus the sampled rows into a new sheet named `<your sheet name>_evaluation`, and switches you to it.
+### Tips & gotchas
 
-**Good to know:**
+- **Long documents are cut off mid-sentence.** The panel's 49,000-character cap is a Google Sheets limit, and a truncated cell ends with `... [TRUNCATED]`. Nothing else flags it, so don't assume a cell holds a whole document — search the column for that marker before running AI over it.
+- **Only three kinds of file work.** Google Docs, PDFs, and images. Everything else — Google Sheets, `.docx`, plain text, audio, video — writes the literal string `[Skipped: Unsupported Type]` into the cell. Filter for that string before trusting the results.
+- **Rows without a recognizable Drive link are skipped in silence.** No error, and the output cell is left untouched. A link only counts if it looks like a Drive URL, so a bare file ID pasted without the surrounding URL is ignored.
+- **Once it starts, it finishes.** Unlike an AI run, extraction isn't batched — hitting ✕ won't halt it, and every row in your range still gets processed. Rows are written one at a time so you can watch it go, but you can't call it off. Start with a small row range.
+- **Give it time.** Google Docs are read directly and come back quickly. PDFs and images have to be converted before their text can be read, so they take noticeably longer — budget real time for a folder of a few hundred scans.
+- **"Setup Required" means the Drive service is off.** Enable the Drive API in the Apps Script editor's Services list.
 
-- This tool works on the entire active sheet — it ignores any cell selection.
-- If you run it again with the same seed and sample size against an unchanged sheet, you'll get the same rows.
-- Running it again appends to the existing `_evaluation` sheet rather than overwriting it.
+## 🎲 Sample Rows
 
-## Extract Text
+<!-- ![Sample Rows button](images/user-guide/btn-sample-rows.png) -->
 
-Pulls text out of a Google Doc, PDF, or image (via OCR) linked in a column, and writes the extracted text into another column. Pairs naturally with Import Drive Links.
+Asks how many rows you want, then asks for a seed, then copies your header row plus that many randomly chosen rows into a new sheet named `<your sheet name>_evaluation` and switches you to it. There's no panel — two dialogs, and then you're on a new sheet.
 
-![Extract Text panel, configured](images/user-guide/extract-text.png)
+### When to reach for this
 
-**Steps:**
+Spot-checking. Pull a manageable subset, run a prompt against it, and read the results by hand before committing to the full dataset.
 
-1. Click **📜 Extract Text** from Extras.
-2. Choose the **Source Column** containing the Drive links to extract from.
-3. Choose an **Output Column** — pick an existing column or type a new name to create one.
-4. Set the **Row Range**. You have the option of either extracting text from the rows currently highlighted on the sheet, or explicitly setting a start and end row directly.
-5. Click **Extract Text**.
+### Tips & gotchas
 
-**Good to know:**
+- **Write the seed down.** The same seed and sample size against an unchanged sheet always returns the same rows, which is how you compare two prompt versions on identical data. Change the seed to draw a different sample of the same size.
+- **Running it again appends — it doesn't replace.** A second run adds to the existing `_evaluation` sheet, so repeated runs accumulate, and repeating with the same seed and size accumulates duplicates. Delete or rename the sheet first if you want a clean sample.
+- **The header row is copied only when the sheet is first created.**
+- **A non-numeric seed, or `0`, silently becomes 42.**
+- **It ignores your selection entirely** and samples the whole active sheet. The sample size has to be between 1 and the number of data rows.
 
-- Extracted text is truncated at 49,000 characters per cell, a limitation of Google Sheets.
-- PDFs and Images are OCR'd via a temporary Google Doc conversion — this can take a few seconds per image.
+## 📝 Format Markdown
 
-## Format Markdown
+<!-- ![Format Markdown button](images/user-guide/btn-format-markdown.png) -->
 
-Unlike the other tools, Format Markdown doesn't have its own panel or column pickers — it acts directly on whatever cells you currently have highlighted on the sheet.
+Rewrites your currently highlighted cells in place, turning markdown syntax into real formatting. No panel, no column pickers, no confirmation — it acts the moment you click.
+
+### When to reach for this
+
+A run came back full of `**asterisks**` and `## hashes` as literal text because "Apply markdown formatting" was switched off.
 
 ![Cells with markdown syntax, before formatting](images/user-guide/format-markdown-before.png)
 
-**Steps:**
+![The same cells after clicking Format Markdown](images/user-guide/format-markdown-after.png)
 
-1. On the sheet itself, select the cell or range of cells you want to format — these should contain plain text written with markdown syntax (headings with `#`, `**bold**`, `*italic*`, `~~strikethrough~~`, `` `inline code` ``, links).
-2. Click **📝 Format Markdown** from Extras.
-3. Each selected cell is rewritten in place with real formatting (headings, bold, italics, etc.) applied — no output column needed.
+### Tips & gotchas
 
-![Same cells after clicking Format Markdown](images/user-guide/format-markdown-after.png)
-
-**Good to know:**
-
-- Because it works on your highlighted selection rather than a configured column, it's easy to click without meaning to — double check your selection first.
-- Cells that aren't text, or that don't parse as valid markdown, are left untouched.
-- You'll see a confirmation like "Formatted 6 cell(s)" when it finishes.
+- **Check what's highlighted first.** There's no panel and no confirmation, so it's easy to click with the wrong range selected.
+- **The original markdown characters are gone afterward.** The cell is rewritten in place, and undo is the only way back.
+- **A lower count than you expected doesn't mean it failed.** "Formatted 6 cell(s)" counts only the cells it actually changed — non-text cells, empty cells, and cells that don't parse as markdown are left untouched and not counted.
