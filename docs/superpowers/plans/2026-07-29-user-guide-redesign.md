@@ -18,7 +18,8 @@
 - **Recipes stay excluded.** The existing one-line note in the intro is the only mention.
 - **Do not document the grounding column's naming convention.** The panel already renders `<output>_grounding` as a live badge, so explaining it would be pure echo.
 - **Do not add material on accuracy thresholds or when to trust AI output.** That belongs in separate documentation about AI in reporting practice, not in a tool reference read mid-task.
-- **Do not modify** `README.md`, any file under `src/`, or the front matter of `docs/user-guide.md` (title, intro, "Installing the add-on", "Getting oriented" — lines 1–21 of the current file).
+- **Do not modify** `README.md` or any file under `src/`.
+- **Front matter of `docs/user-guide.md` is frozen** (title, intro, "Installing the add-on", "Getting oriented" — lines 1–21) with exactly one authorized exception: line 3's tool list, updated in Task 1 Step 2. In particular **line 21 must not change** — it describes the sidebar's actual button order, which really is Import Drive Links, Sample Rows, Extract Text, Format Markdown, and is correct as written.
 - **Keep** `docs/images/user-guide/format-markdown-before.png` and `format-markdown-after.png`.
 - **No repo tooling covers `docs/`** — `npm run format` and `lint-staged` are scoped to `src/**/*.ts`. Do not run prettier against markdown; it would introduce formatting the repo does not apply elsewhere.
 - **Commit after every task.** Branch is `add-user-guide-docs`; stay on it.
@@ -59,7 +60,19 @@ Run: `sed -n '14,23p' docs/user-guide.md`
 
 Expected: line 21 is the `- **Extras** — Import Drive Links, Sample Rows, Extract Text, and Format Markdown` bullet, and line 22 is blank. Insert the new sections after line 21. If the line numbers differ, locate the end of the "Getting oriented" section and insert there instead.
 
-- [ ] **Step 2: Insert the "Working the tools together" section**
+- [ ] **Step 2: Update line 3's tool list to match the new section order**
+
+Task 3 moves Extract Text above Sample Rows, so the intro's enumeration has to follow. Also replace "walks through" — it described the numbered walkthroughs this rewrite deletes.
+
+Replace line 3 exactly:
+
+```markdown
+The SSI Toolkit is a Google Sheets sidebar for AI-assisted investigations. This guide covers each tool available in this alpha round: **Run AI Inference**, **Import Drive Links**, **Extract Text**, **Sample Rows**, and **Format Markdown**.
+```
+
+This is the only authorized edit to lines 1–21. Leave line 21 alone — it lists the sidebar's real button order, which is unchanged.
+
+- [ ] **Step 3: Insert the "Working the tools together" section**
 
 Insert immediately after the "Getting oriented" section:
 
@@ -78,7 +91,7 @@ Say you have a document dump and you want to research it across a few different 
 6. **Filter, sort, pivot, report.**
 ```
 
-- [ ] **Step 3: Insert the "Don't forget about other spreadsheet tools" section**
+- [ ] **Step 4: Insert the "Don't forget about other spreadsheet tools" section**
 
 Insert immediately after the section added in Step 2. Use this copy as-written — it is author-supplied:
 
@@ -90,11 +103,11 @@ SSI is best leveraged in conjunction with all the trappings of traditional sprea
 And don't forget about existing AI-powered features of Google Sheets. The [`=AI()` function](https://support.google.com/docs/answer/15877199?hl=en) lacks the full featureset of the SSI Toolkit, but is still great for simple text classification or other small tasks — and it's free to use, subject to usage limits. The embedded Gemini chat window is great for helping write those thorny spreadsheet functions like `=IFERROR(SPLIT(REGEXREPLACE($O11, "[\s\S]*?""contextual_snippet"":\s*""([^""]+)""|[\s\S]+", "$1|"), "|"), "")`
 ```
 
-- [ ] **Step 4: Delete the Troubleshooting section**
+- [ ] **Step 5: Delete the Troubleshooting section**
 
 Delete the entire `## Troubleshooting` heading and all five bullets beneath it (the last section in the file). Its two informative entries — the row-1 rule and the ↻ refresh button — are re-added in Task 2, so nothing is lost.
 
-- [ ] **Step 5: Verify the structure**
+- [ ] **Step 6: Verify the structure**
 
 Run: `grep -n '^## ' docs/user-guide.md`
 
@@ -114,13 +127,13 @@ Expected output, in this order:
 
 There must be no `## Troubleshooting` line. Note that Sample Rows currently precedes Extract Text; Task 3 reorders them.
 
-- [ ] **Step 6: Verify no banned string was introduced and `=SSI` is absent**
+- [ ] **Step 7: Verify no banned string was introduced and `=SSI` is absent**
 
 Run: `grep -nE "SSI\(\)|Sets the AI's role|The content the AI acts on|Where the AI's response" docs/user-guide.md`
 
 Expected: no output (exit status 1).
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add docs/user-guide.md
@@ -404,9 +417,11 @@ Expected, in exactly this order:
 
 - [ ] **Step 8: Verify the old walkthrough scaffolding is gone**
 
-Run: `grep -nE "^\*\*Steps:\*\*|^\*\*Good to know:\*\*|^[0-9]+\. Click \*\*" docs/user-guide.md`
+Run: `grep -nE "^\*\*Steps:\*\*|^\*\*Good to know:\*\*|from (Main Tools|Extras)\." docs/user-guide.md`
 
 Expected: no output (exit status 1). Any hit means a numbered walkthrough or "Good to know" block survived and must be removed.
+
+Do **not** broaden this to `^[0-9]+\. Click \*\*` — that also matches line 12 of the protected front matter (`2. Click **Install**, and grant the requested permissions…`), which legitimately survives, so the check would never pass.
 
 - [ ] **Step 9: Commit**
 
