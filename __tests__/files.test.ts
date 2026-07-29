@@ -8,6 +8,12 @@
   fetchAll: jest.fn(),
 };
 
+(globalThis as any).PropertiesService = {
+  getScriptProperties: jest.fn().mockReturnValue({
+    getProperty: jest.fn().mockReturnValue("test-api-key"),
+  }),
+};
+
 // ── Import after mocks ─────────────────────────────────────────
 
 import { uploadFilesToGemini } from "../src/server/files";
@@ -62,7 +68,7 @@ describe("uploadFilesToGemini", () => {
       ["file1", "application/pdf"],
       ["file2", "image/png"],
     ]);
-    const { uploads } = uploadFilesToGemini(files, mimeTypes, "test-key");
+    const { uploads } = uploadFilesToGemini(files, mimeTypes);
     expect(uploads.get("file1")).toEqual({
       uri: "https://generativelanguage.googleapis.com/v1beta/files/abc",
       mimeType: "application/pdf",
@@ -74,7 +80,7 @@ describe("uploadFilesToGemini", () => {
   });
 
   it("returns empty map for empty input", () => {
-    const { uploads } = uploadFilesToGemini(new Map(), new Map(), "key");
+    const { uploads } = uploadFilesToGemini(new Map(), new Map());
     expect(uploads.size).toBe(0);
     expect(UrlFetchApp.fetchAll as jest.Mock).not.toHaveBeenCalled();
   });
@@ -85,7 +91,7 @@ describe("uploadFilesToGemini", () => {
     ]);
     const files = new Map([["fileId", makeBlob("fileId")]]);
     const mimeTypes = new Map([["fileId", "application/pdf"]]);
-    const { uploads, errors } = uploadFilesToGemini(files, mimeTypes, "key");
+    const { uploads, errors } = uploadFilesToGemini(files, mimeTypes);
     expect(uploads.size).toBe(0);
     expect(errors.get("fileId")).toContain("429");
   });
@@ -96,7 +102,7 @@ describe("uploadFilesToGemini", () => {
     ]);
     const files = new Map([["fileId", makeBlob("fileId")]]);
     const mimeTypes = new Map([["fileId", "application/pdf"]]);
-    const { uploads, errors } = uploadFilesToGemini(files, mimeTypes, "key");
+    const { uploads, errors } = uploadFilesToGemini(files, mimeTypes);
     expect(uploads.size).toBe(0);
     expect(errors.get("fileId")).toContain("session URI");
   });
@@ -112,7 +118,7 @@ describe("uploadFilesToGemini", () => {
       ]);
     const files = new Map([["fileId", makeBlob("fileId")]]);
     const mimeTypes = new Map([["fileId", "application/pdf"]]);
-    const { uploads, errors } = uploadFilesToGemini(files, mimeTypes, "key");
+    const { uploads, errors } = uploadFilesToGemini(files, mimeTypes);
     expect(uploads.size).toBe(0);
     expect(errors.get("fileId")).toContain("quota exceeded");
   });
@@ -123,7 +129,7 @@ describe("uploadFilesToGemini", () => {
       .mockReturnValueOnce([{ getResponseCode: () => 429, getContentText: () => "" }]);
     const files = new Map([["fileId", makeBlob("fileId")]]);
     const mimeTypes = new Map([["fileId", "application/pdf"]]);
-    const { uploads, errors } = uploadFilesToGemini(files, mimeTypes, "key");
+    const { uploads, errors } = uploadFilesToGemini(files, mimeTypes);
     expect(uploads.size).toBe(0);
     expect(errors.get("fileId")).toContain("429");
   });
@@ -136,7 +142,7 @@ describe("uploadFilesToGemini", () => {
       ]);
     const files = new Map([["fileId", makeBlob("fileId")]]);
     const mimeTypes = new Map([["fileId", "application/pdf"]]);
-    const { uploads, errors } = uploadFilesToGemini(files, mimeTypes, "key");
+    const { uploads, errors } = uploadFilesToGemini(files, mimeTypes);
     expect(uploads.size).toBe(0);
     expect(errors.get("fileId")).toContain("Invalid JSON");
   });
@@ -145,15 +151,69 @@ describe("uploadFilesToGemini", () => {
     (UrlFetchApp.fetchAll as jest.Mock)
       .mockReturnValueOnce([mockInitResponse("https://upload.example.com/s1")])
       .mockReturnValueOnce([mockUploadResponse("https://example.com/f1", "application/pdf")]);
-    uploadFilesToGemini(
-      new Map([["f1", makeBlob("f1")]]),
-      new Map([["f1", "application/pdf"]]),
-      "key",
-    );
+    uploadFilesToGemini(new Map([["f1", makeBlob("f1")]]), new Map([["f1", "application/pdf"]]));
     const initCall = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
     expect(initCall[0].headers["X-Goog-Upload-Protocol"]).toBe("resumable");
     expect(initCall[0].headers["X-Goog-Upload-Command"]).toBe("start");
     expect(initCall[0].headers["X-Goog-Upload-Header-Content-Type"]).toBe("application/pdf");
+  });
+
+  it("authenticates the init request with a header, never in the URL", () => {
+    (UrlFetchApp.fetchAll as jest.Mock)
+      .mockReturnValueOnce([mockInitResponse("https://upload.example.com/s1")])
+      .mockReturnValueOnce([mockUploadResponse("https://example.com/f", "application/pdf")]);
+
+    uploadFilesToGemini(new Map([["f1", makeBlob("f1")]]), new Map([["f1", "application/pdf"]]));
+
+    const initCall = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
+    expect(initCall[0].url).not.toContain("test-api-key");
+    expect(initCall[0].url).not.toContain("key=");
+    expect(initCall[0].headers["x-goog-api-key"]).toBe("test-api-key");
+    // The resumable-protocol headers must survive the merge
+    expect(initCall[0].headers["X-Goog-Upload-Protocol"]).toBe("resumable");
+  });
+
+  it("sends no credential on the phase-2 upload request", () => {
+    (UrlFetchApp.fetchAll as jest.Mock)
+      .mockReturnValueOnce([mockInitResponse("https://upload.example.com/s1")])
+      .mockReturnValueOnce([mockUploadResponse("https://example.com/f", "application/pdf")]);
+
+    uploadFilesToGemini(new Map([["f1", makeBlob("f1")]]), new Map([["f1", "application/pdf"]]));
+
+    // The session URI returned by phase 1 is self-authenticating — Google's own
+    // docs send no key here, so adding one would only widen exposure.
+    const uploadCall = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[1][0];
+    expect(uploadCall[0].headers["x-goog-api-key"]).toBeUndefined();
+  });
+
+  it("resolves the credential once per batch, not once per file", () => {
+    (UrlFetchApp.fetchAll as jest.Mock)
+      .mockReturnValueOnce([
+        mockInitResponse("https://upload.example.com/s1"),
+        mockInitResponse("https://upload.example.com/s2"),
+        mockInitResponse("https://upload.example.com/s3"),
+      ])
+      .mockReturnValueOnce([
+        mockUploadResponse("https://example.com/a", "application/pdf"),
+        mockUploadResponse("https://example.com/b", "application/pdf"),
+        mockUploadResponse("https://example.com/c", "application/pdf"),
+      ]);
+
+    const getProperty = PropertiesService.getScriptProperties().getProperty as jest.Mock;
+    getProperty.mockClear();
+    uploadFilesToGemini(
+      new Map([
+        ["f1", makeBlob("f1")],
+        ["f2", makeBlob("f2")],
+        ["f3", makeBlob("f3")],
+      ]),
+      new Map([
+        ["f1", "application/pdf"],
+        ["f2", "application/pdf"],
+        ["f3", "application/pdf"],
+      ]),
+    );
+    expect(getProperty).toHaveBeenCalledTimes(1);
   });
 
   it("passes Blob directly as payload in upload request — no Array.from()", () => {
@@ -161,7 +221,7 @@ describe("uploadFilesToGemini", () => {
     (UrlFetchApp.fetchAll as jest.Mock)
       .mockReturnValueOnce([mockInitResponse("https://upload.example.com/s1")])
       .mockReturnValueOnce([mockUploadResponse("https://example.com/f1", "application/pdf")]);
-    uploadFilesToGemini(new Map([["f1", blob]]), new Map([["f1", "application/pdf"]]), "key");
+    uploadFilesToGemini(new Map([["f1", blob]]), new Map([["f1", "application/pdf"]]));
     const uploadCall = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[1][0];
     expect(uploadCall[0].payload).toBe(blob);
   });
@@ -171,11 +231,7 @@ describe("uploadFilesToGemini", () => {
     (UrlFetchApp.fetchAll as jest.Mock)
       .mockReturnValueOnce([mockInitResponse(sessionUri)])
       .mockReturnValueOnce([mockUploadResponse("https://example.com/f1", "application/pdf")]);
-    uploadFilesToGemini(
-      new Map([["f1", makeBlob("f1")]]),
-      new Map([["f1", "application/pdf"]]),
-      "key",
-    );
+    uploadFilesToGemini(new Map([["f1", makeBlob("f1")]]), new Map([["f1", "application/pdf"]]));
     const uploadCall = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[1][0];
     expect(uploadCall[0].url).toBe(sessionUri);
   });
@@ -193,7 +249,7 @@ describe("uploadFilesToGemini", () => {
       ["f1", "application/pdf"],
       ["f2", "application/pdf"],
     ]);
-    const { uploads, errors } = uploadFilesToGemini(files, mimeTypes, "key");
+    const { uploads, errors } = uploadFilesToGemini(files, mimeTypes);
     expect(UrlFetchApp.fetchAll as jest.Mock).toHaveBeenCalledTimes(1);
     expect(uploads.size).toBe(0);
     expect(errors.size).toBe(2);

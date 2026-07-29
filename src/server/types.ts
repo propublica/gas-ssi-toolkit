@@ -11,7 +11,6 @@
 import type { ModelId, PromptColumnSpec, ToolId } from "../shared/types";
 
 export interface AppConfig {
-  API_KEY_PROPERTY: string;
   DEFAULT_MODEL: ModelId;
   /**
    * Inline data size limits for the Gemini REST API.
