@@ -6,7 +6,7 @@ Recipes (the curated, one-click AI workflows) also appear in the sidebar, but th
 
 ## Installing the add-on
 
-The following directions only apply if your organization distributes SSI Toolkit as a **Google Workspace Editor add-on** (installed once, available across every Sheet you open). If you're working with a **container-bound** copy of the toolkit (attached directly to one specific Sheet), skip ahead to [Getting oriented](#getting-oriented).
+The following steps only apply if your organization distributes SSI Toolkit as a **Google Workspace Editor add-on** (installed once, available across every Sheet you open). If you're working with a **container-bound** copy of the toolkit (attached directly to one specific Sheet), the menu referenced below should appear automatically.
 
 1. Open your organization's Marketplace listing for the add-on: `<Marketplace URL — ask your admin>`
 2. Click **Install**, and grant the requested permissions when prompted.
@@ -142,7 +142,7 @@ A run came back full of `**asterisks**` and `## hashes` as literal text because 
 
 Chain the SSI Toolkit and Google Sheets functions together to accomplish whatever your reporting situation requires.
 
-Say you have a document dump in Google Drive and you want to research it across a few different categories. Here's how these tools work together create a filterable, sortable, reportable spreadsheet:
+Say you have a document dump in Google Drive and you want to research it across a few different categories. Here's how these tools work together to create a filterable, sortable, reportable spreadsheet:
 
 1. **Import the documents into the sheet.** Import Drive Links turns a Drive folder into one row per document.
 2. **Extract the text.** Extract Text puts the words in the sheet. This is your grounding surface — the thing you check the AI's answers against later.
