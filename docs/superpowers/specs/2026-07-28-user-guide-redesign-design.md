@@ -70,9 +70,9 @@ item leads with a **bolded takeaway**, then explains the mechanism. Never the re
 > error string.~~
 >
 > **Don't ask the AI to write formulas.** An answer starting with `=` lands as plain text
-> with an apostrophe in front of it. An answer containing `IMAGE()` or any `IMPORT…()`
-> function is thrown out entirely and replaced with an error — a deliberate guard against a
-> malicious document rewriting your sheet.
+> with an apostrophe in front of it. If that answer also contains `IMAGE()` or any
+> `IMPORT…()` function, it's thrown out entirely and replaced with an error — a deliberate
+> guard against a malicious document rewriting your sheet.
 
 Tips and gotchas are deliberately not split into separate subsections. The most valuable
 items are both at once: "fill the system prompt down" is a technique *and* a trap, and
@@ -212,7 +212,7 @@ knows nothing about the other rows.
 | **Add a second column for evidence.** Run again asking for the verbatim sentence that supports the answer. Spot-checking then means reading two cells side by side instead of reopening the source document. | technique |
 | **Extract text first when documents are text-heavy.** Extracted text is cheaper to send, reusable across runs, and searchable in the sheet — and it gives you something to check the AI's answers against. Reach for file mode when layout, tables, or images carry the meaning; in file mode Google Docs are converted to PDF and Sheets to CSV before sending. | `index.ts:463-464` |
 | **Google Search costs real money per query.** $14 per 1,000 searches — about 1.4 cents each, and one row can issue more than one. On Flash Lite that dwarfs token cost, so enabling Search for 5,000 rows is a different decision than for 50. The displayed cost also assumes you pay for every query; Google's free 5,000/month grounding quota is invisible to the add-on, so the real bill may be lower. | `pricing.ts:31-35` |
-| **Don't ask the AI to write formulas.** An answer starting with `=`, `+`, or `-` lands as plain text with an apostrophe in front. An answer containing `IMAGE()` or any `IMPORT…()` function is thrown out entirely and replaced with an error — a deliberate guard against a malicious document rewriting your sheet. | `safe-writes.ts:13,29-35` |
+| **Don't ask the AI to write formulas.** An answer starting with `=`, `+`, or `-` lands as plain text with an apostrophe in front. If that answer *also* contains `IMAGE()` or any `IMPORT…()` function it is discarded and replaced with an error — a deliberate guard against a malicious document rewriting your sheet. Note the guard is conditional: `sanitizeForCell` returns early unless the first character is `=`, `+`, or `-`, so those function names in ordinary prose pass through untouched. | `safe-writes.ts:13,29-35` |
 | **The output column turns orange and yellow on purpose.** The header gets an orange fill and a note reading "Some cells in this column may be AI-generated"; the answer cells get a pale yellow tint. Not a bug. | `utils.ts:159-171` |
 | **To stop a run, hit the ✕ at the bottom of the sidebar.** It won't stop on the spot — the toolkit sends rows to the AI in batches of 40, so it finishes the batch it's on before halting, and up to 39 more rows may still fill in. Closing the sidebar behaves the same way. | `configure-ai-run.ts:16,398`, `job-store.ts:83` |
 | **A failed file leaves an error in the cell.** If a row's Drive file can't be downloaded, `[File error: …]` is written to its output cell and no inference is attempted for that row. | `index.ts:503` |
@@ -233,7 +233,7 @@ investigation.
 
 | Item | Source |
 | --- | --- |
-| **It overwrites, starting at row 2.** Writing always begins at row 2 of the output column and continues down for as many files as it finds, replacing whatever was there. Point it at a column that already holds data and that data is gone. *(The current guide states the opposite — see Corrections below.)* | `safe-writes.ts:79` |
+| **It overwrites from row 2 down — but only as far as it goes.** Writing always begins at row 2 and continues for as many files as it finds. `writeColumn` never clears the column first, so this is a *partial* overwrite: importing 10 files over a column holding 500 replaces the first 10 and leaves 490 stale rows underneath. The mitigation is to clear the column or use a fresh one, not merely to expect replacement. *(The current guide states the opposite — see Corrections below.)* | `safe-writes.ts:79` |
 | **It recurses into every subfolder.** A folder of folders returns everything underneath it, flattened into one column with no indication of which subfolder each file came from. | `utils.ts:62-65` |
 | **You can't choose how many rows you get.** There's no row range — the row count is however many files are found. | `index.ts:111` |
 | **Split a mixed dump by running it once per file type.** The File Types filter matches by MIME prefix, so "Images" catches every image format. Selecting nothing includes every file. | `import-drive-links.ts:15-22`, `utils.ts:56-59` |
@@ -253,7 +253,7 @@ the model directly.
 | Item | Source |
 | --- | --- |
 | **Long documents are cut off mid-sentence.** The panel's 49,000-character cap is a Sheets limit, and a truncated cell ends with `... [TRUNCATED]`. Nothing else flags it, so don't assume a cell holds the whole document — check for that marker before running AI over the column. | `utils.ts:87`, `extract-text.ts:152` |
-| **Only three kinds of file work.** Google Docs, PDFs, and images. Everything else — Google Sheets, `.docx`, plain text, audio, video — writes the literal string `[Skipped: Unsupported Type]` into the cell. Filter the column for that string before trusting the run. | `drive.ts:64` |
+| **Only three kinds of file work.** Google Docs, PDFs, and images. Everything else — Google Sheets, `.docx`, plain text, audio, video — writes `[Skipped: Unsupported Type]` into the cell, and a file the service cannot read at all writes `[Error: …]`. Filter for both before trusting the run. | `drive.ts:64,66` |
 | **Rows without a recognizable Drive link are skipped in silence.** No error, and the output cell is left untouched. A link only counts if it contains `drive.google.com` or `/d/`, so a bare file ID pasted without its URL is ignored. | `index.ts:167-169`, `utils.ts:25-27` |
 | **Once it starts, it finishes.** Unlike an AI run, extraction isn't batched — hitting ✕ shows "Stopping…" but every row in your range still gets processed. Rows are written and flushed one at a time, so you can watch it go, but you can't call it off. Start with a small row range. | `index.ts:154-175`, `configure-ai-run.ts:398` |
 | **Give it time.** Google Docs are read directly and come back quickly. PDFs and images have to be converted before their text can be read, so they take noticeably longer — budget real time for a folder of a few hundred scans. | `drive.ts:44-61` |
@@ -303,6 +303,11 @@ says the tool "appends one row per file found, starting from the sheet's next em
 the output column." It does not. `writeColumn` always writes from row 2 down
 (`safe-writes.ts:79`), overwriting existing values. As written, the guide invites data loss.
 
+The replacement must also be precise about *how much* it overwrites. `writeColumn` writes
+exactly `values.length` rows and never clears the column, so a smaller import leaves the
+tail of a previous one in place — two imports spliced together, with every downstream row
+range computed off a column the reporter believes is shorter than it is.
+
 ## Images
 
 Current state: nine screenshots, five full-panel shots (three for Run AI Inference, one
@@ -335,7 +340,10 @@ row-1 rule and the ↻ refresh button — move into the Run AI Inference tips li
   (`rollup.config.js:99`), but it is not part of the alpha and must not be mentioned — including
   in the spreadsheet-tools section, where it would otherwise sit naturally beside `=AI()`.
 - The grounding column's naming convention. The panel already renders `<output>_grounding`
-  as a live badge (`configure-ai-run.ts:609`), so documenting it would be pure echo.
+  as a live badge (`configure-ai-run.ts:609`), so documenting it would be pure echo. Note
+  this excludes only the *name*: the final review found the feature itself was never covered
+  anywhere, and the author approved adding a tip for it. What the column records — the
+  searches run and sources drawn on, or executed code and its output — is in scope.
 - `README.md`. Its scope split with the user guide was settled in commit 21d1449.
 
 ## Success criteria
