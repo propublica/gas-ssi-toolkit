@@ -13,12 +13,9 @@ The following directions only apply if your organization distributes SSI Toolkit
 
 ## Getting oriented
 
-Open the sidebar using the **📐 Open SSI Toolkit** menu option. If installed as an Editor Add on, the SSI Toolkit will be available as a item under **Extensions**.  
+Open the sidebar using the **📐 Open SSI Toolkit** menu option. If installed as an Editor Add on, the SSI Toolkit will be available as a item under **Extensions**.
 
-The sidebar organizes its buttons into two groups:
-
-- **Main Tools** — Recipes and Run AI Inference
-- **Extras** — Import Drive Links, Sample Rows, Extract Text, and Format Markdown
+This guide covers five tools: **Run AI Inference**, **Import Drive Links**, **Extract Text**, **Sample Rows**, and **Format Markdown**.
 
 ## Working the tools together
 
