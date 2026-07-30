@@ -164,10 +164,14 @@ You're about to process 5,000 rows across 125 chunks.
 Estimated cost: ~$18.40, based on your last run of 10 rows.
 Consider narrowing your row range first.
 
+Unusually large files may throw off this estimate.
+
 Keep this sidebar open until the run finishes.
 ```
 
-The sidebar line appends only when `chunkCount > 1`, evaluated independently of which body fired — a 40-row Pro Preview run over large files can cross $10 in a single chunk. No time figure and no file-size caveat: both are already communicated in the panel's own helper text.
+The sidebar line appends only when `chunkCount > 1`, evaluated independently of which body fired — a 40-row Pro Preview run over large files can cross $10 in a single chunk. **No time figure**, since there is no defensible one to show.
+
+The file caveat appends only to the cost body, and only when a live prompt column is file-kind. It qualifies a number, so it has nothing to say on the untested body, where no estimate exists. This is AI-87's panel caveat relocated rather than duplicated — the panel's copy is removed in the same change — and reworded from "may throw off cost and time estimates," since there is no longer a time figure for it to qualify.
 
 ### `handleRun` restructure
 

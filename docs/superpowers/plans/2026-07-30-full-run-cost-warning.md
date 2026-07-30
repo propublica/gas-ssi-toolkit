@@ -172,9 +172,9 @@ git commit -m "feat(ai-88): add projectFullRunCost and cost threshold constant"
 
 The panel's measured-run state takes its final shape: it can hold a measurement from a full run as well as a Test, and it no longer stores a row count. This is where AI-87's frozen-`fullRowCount` bug is removed at the root — the panel stops projecting, so it has nothing that can go stale.
 
-**Deliberate AI-87 behavior changes in this task** (both flagged in the spec — the second is a consequence the spec notes only implicitly):
+**Deliberate AI-87 behavior changes in this task:**
 1. The panel's "Full run estimate:" line is removed. The projection moves to the Run dialog in Task 5.
-2. The "Unusually large files may throw off cost and time estimates." caveat is removed. It existed to qualify the projection; with the panel showing only *measured* facts there is no estimate for it to qualify, and the spec forbids re-stating file caveats in the dialog.
+2. The file-size caveat is removed **from the panel**. It existed to qualify the projection, and with the panel showing only *measured* facts there is no estimate for it to qualify. It is **re-added to the dialog** in Task 5, alongside the projected cost it actually qualifies.
 
 **Files:**
 - Modify: `src/client/types.ts:97-107` (replace the interface and its comment block)
@@ -756,13 +756,16 @@ was resolved inside the dispatch rather than before it."
 
 The feature itself. Two mutually exclusive bodies — you cannot lack an estimate and have an expensive one.
 
+`buildRunWarning` is a **pure exported function**, not a private method. It needs no panel state — only a row range, a chunk count, an already-freshness-checked measurement, and whether any prompt column is file-kind. Keeping it pure means its ten branch combinations are tested as direct calls in the root test file (2-3 lines each) instead of through ten panel mounts (~13 lines each), and it makes the 70% branch threshold on this file easy to hold. The panel retains only the one-line freshness filter, using the already-tested `configsMatch`.
+
 **Files:**
-- Modify: `src/client/panels/configure-ai-run.ts` (delete `CHUNK_WARN_THRESHOLD` at lines 17-19, add `buildRunWarning`, replace the confirm block in `handleRunAsync`)
-- Test: `__tests__/panels/configure-ai-run.test.ts`
+- Modify: `src/client/panels/configure-ai-run.ts` (delete `CHUNK_WARN_THRESHOLD` at lines 17-19, add exported `buildRunWarning`, replace the confirm block in `handleRunAsync`)
+- Test: `__tests__/configure-ai-run.test.ts` (the ten pure branch tests)
+- Test: `__tests__/panels/configure-ai-run.test.ts` (three DOM tests only)
 
 **Interfaces:**
-- Consumes: `projectFullRunCost` and `COST_WARN_THRESHOLD_USD` (Task 1); `this.lastRun` (Task 2); `buildConfigSnapshot` and `configsMatch` (already imported at line 12); `CHUNK_SIZE`.
-- Produces: `private buildRunWarning(rowRange: { start: number; end: number }, chunkCount: number): string | null`.
+- Consumes: `projectFullRunCost` and `COST_WARN_THRESHOLD_USD` (Task 1); `MeasuredRun` and `this.lastRun` (Task 2); `buildConfigSnapshot` and `configsMatch` (already imported at line 12); `CHUNK_SIZE`.
+- Produces: `buildRunWarning(rowRange: { start: number; end: number }, chunkCount: number, measured: MeasuredRun | undefined, hasFileCols: boolean): string | null` — exported.
 
 - [ ] **Step 1: Mock `confirm` globally**
 
@@ -776,128 +779,135 @@ beforeEach(() => {
 });
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [ ] **Step 2: Write the failing pure tests**
 
-Append a new describe to `__tests__/panels/configure-ai-run.test.ts`:
+In `__tests__/configure-ai-run.test.ts`, extend the import from Task 1 to add `buildRunWarning`, and add a `MeasuredRun` type import:
+
+```ts
+import {
+  computeChunks,
+  projectFullRunCost,
+  buildRunWarning,
+  COST_WARN_THRESHOLD_USD,
+} from "../src/client/panels/configure-ai-run";
+import type { RunStats } from "../src/shared/types";
+import type { MeasuredRun } from "../src/client/types";
+```
+
+Append at the end of the file. `SAMPLE` is the fixture already defined in Task 1 ($0.02 over 10 rows = $0.002/row):
 
 ```ts
 // $5.00 over 10 rows = $0.50/row — crosses the $10 threshold at 21+ rows.
-const EXPENSIVE_STATS: RunStats = { ...TEST_STATS, totalTokenCost: 5 };
-const MEASURED_EXPENSIVE: import("../../src/client/types").MeasuredRun = {
-  stats: EXPENSIVE_STATS,
+const EXPENSIVE: MeasuredRun = {
+  stats: { ...SAMPLE, totalTokenCost: 5 },
   source: "test",
 };
+const CHEAP: MeasuredRun = { stats: SAMPLE, source: "test" };
 
-/** savedState whose config matches TEST_STATS.config, so configsMatch passes. */
-function matchingState(overrides: Partial<SavedState>): Partial<SavedState> {
-  return {
-    promptCols: [{ col: "col_a", kind: "text" as const }],
-    systemPromptCol: "",
-    outputCol: "ai_inference",
-    ...overrides,
-  };
-}
+describe("buildRunWarning", () => {
+  describe("untested runs", () => {
+    it("nudges above the chunk size", () => {
+      const text = buildRunWarning({ start: 2, end: 42 }, 2, undefined, false)!;
+      expect(text).toContain("41 rows across 2 chunks");
+      expect(text).toContain("You haven't tested this configuration");
+    });
 
-describe("ConfigureAIRunPanel — pre-run cost warning", () => {
-  it("nudges an untested run above the chunk size", async () => {
+    it("returns null at or below the chunk size", () => {
+      expect(buildRunWarning({ start: 2, end: 41 }, 1, undefined, false)).toBeNull();
+    });
+
+    it("omits the file caveat, having no estimate to qualify", () => {
+      const text = buildRunWarning({ start: 2, end: 42 }, 2, undefined, true)!;
+      expect(text).not.toContain("Unusually large files");
+    });
+  });
+
+  describe("measured runs", () => {
+    it("warns with a projected cost above the threshold", () => {
+      // 41 rows × $0.50/row = $20.50
+      const text = buildRunWarning({ start: 2, end: 42 }, 2, EXPENSIVE, false)!;
+      expect(text).toContain("Estimated cost: ~$20.50");
+      expect(text).toContain("based on your last run of 10 rows");
+      expect(text).toContain("Consider narrowing your row range first.");
+      expect(text).not.toContain("You haven't tested");
+    });
+
+    it("returns null below the threshold, at any size", () => {
+      // $0.002/row × 5,000 rows = $10 exactly — not "greater than", so no warning.
+      expect(buildRunWarning({ start: 2, end: 5001 }, 125, CHEAP, false)).toBeNull();
+    });
+
+    it("projects from the row count it is given, not the measured sample size", () => {
+      // 1,000 rows × $0.50/row = $500.00 — not the $5.00 the sample itself cost.
+      const text = buildRunWarning({ start: 2, end: 1001 }, 25, EXPENSIVE, false)!;
+      expect(text).toContain("Estimated cost: ~$500.00");
+    });
+
+    it("singularizes a one-row sample", () => {
+      const oneRow: MeasuredRun = {
+        stats: { ...SAMPLE, rowCount: 1, totalTokenCost: 1 },
+        source: "test",
+      };
+      const text = buildRunWarning({ start: 2, end: 42 }, 2, oneRow, false)!;
+      expect(text).toContain("based on your last run of 1 row.");
+    });
+
+    it("appends the file caveat when a prompt column is file-kind", () => {
+      const text = buildRunWarning({ start: 2, end: 42 }, 2, EXPENSIVE, true)!;
+      expect(text).toContain("Unusually large files may throw off this estimate.");
+    });
+  });
+
+  describe("sidebar reminder", () => {
+    it("appends for a multi-chunk run", () => {
+      const text = buildRunWarning({ start: 2, end: 42 }, 2, EXPENSIVE, false)!;
+      expect(text).toContain("Keep this sidebar open until the run finishes.");
+    });
+
+    it("is omitted for a single-chunk run that warns on cost alone", () => {
+      const text = buildRunWarning({ start: 2, end: 41 }, 1, EXPENSIVE, false)!;
+      expect(text).toContain("Estimated cost:");
+      expect(text).not.toContain("Keep this sidebar open");
+    });
+  });
+});
+```
+
+- [ ] **Step 2b: Write the three DOM tests**
+
+Only wiring is left to verify at the DOM level: that the panel filters staleness before calling, that the built string reaches `confirm`, and that cancelling aborts. Append to `__tests__/panels/configure-ai-run.test.ts`:
+
+```ts
+describe("ConfigureAIRunPanel — pre-run warning wiring", () => {
+  it("passes a config-matched measurement through, producing a cost warning", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
-    const { container } = await mountAndLoad({
-      promptCols: [{ col: "col_a", kind: "text" }],
+    const { container } = await mountAndLoad(undefined, {
+      promptCols: [{ col: "col_a", kind: "text" as const }],
+      systemPromptCol: "",
       outputCol: "ai_inference",
-      rowRange: { start: 2, end: 42 }, // 41 rows > CHUNK_SIZE 40
+      rowRange: { start: 2, end: 42 },
+      lastRun: { stats: { ...TEST_STATS, totalTokenCost: 5 }, source: "test" },
     });
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     for (let i = 0; i < 5; i++) await Promise.resolve();
     const text = (globalThis.confirm as jest.Mock).mock.calls[0][0] as string;
-    expect(text).toContain("41 rows across 2 chunks");
-    expect(text).toContain("You haven't tested this configuration");
-    expect(text).toContain("Keep this sidebar open until the run finishes.");
-  });
-
-  it("does not warn an untested run at or below the chunk size", async () => {
-    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
-    const { container } = await mountAndLoad({
-      promptCols: [{ col: "col_a", kind: "text" }],
-      outputCol: "ai_inference",
-      rowRange: { start: 2, end: 41 }, // exactly 40 rows
-    });
-    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    for (let i = 0; i < 5; i++) await Promise.resolve();
-    expect(globalThis.confirm).not.toHaveBeenCalled();
-    expect(services.runBatchAI).toHaveBeenCalled();
-  });
-
-  it("warns with a projected cost when the measurement crosses the threshold", async () => {
-    (services.runBatchAI as jest.Mock).mockResolvedValue(EXPENSIVE_STATS);
-    const { container } = await mountAndLoad(
-      undefined,
-      matchingState({ rowRange: { start: 2, end: 42 }, lastRun: MEASURED_EXPENSIVE }),
-    );
-    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    for (let i = 0; i < 5; i++) await Promise.resolve();
-    const text = (globalThis.confirm as jest.Mock).mock.calls[0][0] as string;
-    // 41 rows × $0.50/row = $20.50
     expect(text).toContain("Estimated cost: ~$20.50");
-    expect(text).toContain("based on your last run of 10 rows");
-    expect(text).toContain("Consider narrowing your row range first.");
-    expect(text).not.toContain("You haven't tested");
   });
 
-  it("does not warn when the projected cost is under the threshold", async () => {
-    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
-    const { container } = await mountAndLoad(
-      undefined,
-      // TEST_STATS is $0.0002/row, so even 5,000 rows is only ~$1.
-      matchingState({ rowRange: { start: 2, end: 5001 }, lastRun: MEASURED_TEST }),
-    );
-    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    for (let i = 0; i < 5; i++) await Promise.resolve();
-    expect(globalThis.confirm).not.toHaveBeenCalled();
-    expect(services.runBatchAI).toHaveBeenCalled();
-  });
-
-  it("treats a config-mismatched measurement as untested", async () => {
+  it("filters out a config-mismatched measurement, falling back to the nudge", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
     const { container } = await mountAndLoad(undefined, {
       promptCols: [{ col: "col_b", kind: "text" as const }], // differs from TEST_STATS.config
       systemPromptCol: "",
       outputCol: "ai_inference",
       rowRange: { start: 2, end: 42 },
-      lastRun: MEASURED_EXPENSIVE,
+      lastRun: { stats: { ...TEST_STATS, totalTokenCost: 5 }, source: "test" },
     });
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     for (let i = 0; i < 5; i++) await Promise.resolve();
     const text = (globalThis.confirm as jest.Mock).mock.calls[0][0] as string;
     expect(text).toContain("You haven't tested this configuration");
     expect(text).not.toContain("Estimated cost");
-  });
-
-  it("projects from the live row range, not the range measured earlier", async () => {
-    (services.runBatchAI as jest.Mock).mockResolvedValue(EXPENSIVE_STATS);
-    const { container } = await mountAndLoad(
-      undefined,
-      // Measurement covered 10 rows; the live range is 1,000.
-      matchingState({ rowRange: { start: 2, end: 1001 }, lastRun: MEASURED_EXPENSIVE }),
-    );
-    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    for (let i = 0; i < 5; i++) await Promise.resolve();
-    const text = (globalThis.confirm as jest.Mock).mock.calls[0][0] as string;
-    // 1,000 rows × $0.50/row = $500.00 — not the $5.00 the sample itself cost.
-    expect(text).toContain("Estimated cost: ~$500.00");
-  });
-
-  it("omits the sidebar reminder for a single-chunk run", async () => {
-    (services.runBatchAI as jest.Mock).mockResolvedValue(EXPENSIVE_STATS);
-    const { container } = await mountAndLoad(
-      undefined,
-      // 40 rows = exactly one chunk, but $20 of cost.
-      matchingState({ rowRange: { start: 2, end: 41 }, lastRun: MEASURED_EXPENSIVE }),
-    );
-    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    for (let i = 0; i < 5; i++) await Promise.resolve();
-    const text = (globalThis.confirm as jest.Mock).mock.calls[0][0] as string;
-    expect(text).toContain("Estimated cost:");
-    expect(text).not.toContain("Keep this sidebar open");
   });
 
   it("does not dispatch when the user cancels", async () => {
@@ -936,78 +946,113 @@ Verify nothing else references it: `grep -rn "CHUNK_WARN_THRESHOLD" src/ __tests
 
 - [ ] **Step 5: Add `buildRunWarning`**
 
-Insert as a private method directly above `handleRun`:
+Insert as a module-level export directly below `projectFullRunCost` (from Task 1). Note `measured` arrives **already freshness-checked** — this function does no `configsMatch` of its own, which is what keeps it free of panel state.
 
 ```ts
-  /**
-   * Assembles the pre-run confirmation text, or null when no dialog is warranted.
-   *
-   * The two bodies are mutually exclusive by construction: a run either has a
-   * usable measurement or it doesn't. An untested run is only worth interrupting
-   * once it is large enough to chunk; a measured one is judged purely on cost,
-   * at any size.
-   *
-   * Cost is the only threshold. Time is deliberately absent: the projection
-   * undercounts by up to ~4x for file-mode runs, because the file sub-batch loop
-   * in runBatchAI is sequential (a deliberate memory guard), and gating on a
-   * known-wrong number is worse than not gating. See the AI-88 spec.
-   */
-  private buildRunWarning(
-    rowRange: { start: number; end: number },
-    chunkCount: number,
-  ): string | null {
-    const rowCount = rowRange.end - rowRange.start + 1;
-    const liveSnapshot = buildConfigSnapshot(this.currentPreset());
-    const measured =
-      this.lastRun && configsMatch(liveSnapshot, this.lastRun.stats.config)
-        ? this.lastRun
-        : undefined;
+/**
+ * Assembles the pre-run confirmation text, or null when no dialog is warranted.
+ *
+ * The two bodies are mutually exclusive by construction: a run either has a
+ * usable measurement or it doesn't. An untested run is only worth interrupting
+ * once it is large enough to chunk; a measured one is judged purely on cost, at
+ * any size — a single 40-row chunk on a costly model can cross the threshold.
+ *
+ * Cost is the only threshold. Time is deliberately absent: the projection
+ * undercounts by up to ~4x for file-mode runs, because the file sub-batch loop in
+ * runBatchAI is sequential (a deliberate memory guard), and gating on a
+ * known-wrong number is worse than not gating. See the AI-88 spec.
+ *
+ * @param measured Already validated against the live config by the caller. Pass
+ *   undefined for "no usable measurement" — this function does not re-check
+ *   freshness, which is what keeps it pure and directly testable.
+ * @param hasFileCols Whether any live prompt column is file-kind, which makes
+ *   the projection less reliable (per-row cost varies with file size).
+ */
+export function buildRunWarning(
+  rowRange: { start: number; end: number },
+  chunkCount: number,
+  measured: MeasuredRun | undefined,
+  hasFileCols: boolean,
+): string | null {
+  const rowCount = rowRange.end - rowRange.start + 1;
+  const preamble = `You're about to process ${rowCount} rows across ${chunkCount} chunks.\n\n`;
 
-    let body: string | null = null;
-    if (!measured) {
-      if (rowCount > CHUNK_SIZE) {
-        body =
-          `You're about to process ${rowCount} rows across ${chunkCount} chunks.\n\n` +
-          `You haven't tested this configuration, so there's no cost estimate. ` +
-          `Cancel and click Test to see what a full run will cost.`;
-      }
-    } else {
-      const cost = projectFullRunCost(measured.stats, rowCount);
-      if (cost > COST_WARN_THRESHOLD_USD) {
-        const sampleRows = measured.stats.rowCount;
-        body =
-          `You're about to process ${rowCount} rows across ${chunkCount} chunks.\n\n` +
-          `Estimated cost: ~$${cost.toFixed(2)}, based on your last run of ` +
-          `${sampleRows} row${sampleRows === 1 ? "" : "s"}.\n` +
-          `Consider narrowing your row range first.`;
+  let body: string | null = null;
+  if (!measured) {
+    if (rowCount > CHUNK_SIZE) {
+      body =
+        preamble +
+        `You haven't tested this configuration, so there's no cost estimate. ` +
+        `Cancel and click Test to see what a full run will cost.`;
+    }
+  } else {
+    const cost = projectFullRunCost(measured.stats, rowCount);
+    if (cost > COST_WARN_THRESHOLD_USD) {
+      const sampleRows = measured.stats.rowCount;
+      body =
+        preamble +
+        `Estimated cost: ~$${cost.toFixed(2)}, based on your last run of ` +
+        `${sampleRows} row${sampleRows === 1 ? "" : "s"}.\n` +
+        `Consider narrowing your row range first.`;
+      // Only qualifies a figure that exists — the untested body has no estimate
+      // for this caveat to modify.
+      if (hasFileCols) {
+        body += `\n\nUnusually large files may throw off this estimate.`;
       }
     }
-
-    if (body === null) return null;
-    // Appended independently of which body fired: a single 40-row chunk on a
-    // costly model can cross the threshold without being a multi-chunk run.
-    return chunkCount > 1 ? `${body}\n\nKeep this sidebar open until the run finishes.` : body;
   }
+
+  if (body === null) return null;
+  // Appended independently of which body fired, since a costly single chunk
+  // warns without being a multi-chunk run.
+  return chunkCount > 1 ? `${body}\n\nKeep this sidebar open until the run finishes.` : body;
+}
 ```
+
+`MeasuredRun` is already imported at line 1 from Task 2.
 
 - [ ] **Step 6: Swap the confirm block in `handleRunAsync`**
 
 Replace the whole `if (rowCount > CHUNK_WARN_THRESHOLD) { ... }` block added in Task 4 with:
 
 ```ts
-    const warning = this.buildRunWarning(rowRange, chunks.length);
+    // Freshness filtering stays here, where the live config lives; buildRunWarning
+    // takes the result so it can stay pure.
+    const liveSnapshot = buildConfigSnapshot(this.currentPreset());
+    const measured =
+      this.lastRun && configsMatch(liveSnapshot, this.lastRun.stats.config)
+        ? this.lastRun
+        : undefined;
+    const hasFileCols = config.promptCols.some((pc) => pc.kind === "file");
+    const warning = this.buildRunWarningText(rowRange, chunks.length, measured, hasFileCols);
     if (warning !== null && !globalThis.confirm(warning)) return;
 ```
 
 The `const rowCount = ...` line above it becomes unused — delete it (`buildRunWarning` derives its own).
 
+To keep the call readable while the function stays module-level, add a one-line private delegate next to `handleRunAsync`:
+
+```ts
+  /** Instance-side seam for the pure buildRunWarning, so tests can spy if ever needed. */
+  private buildRunWarningText(
+    rowRange: { start: number; end: number },
+    chunkCount: number,
+    measured: MeasuredRun | undefined,
+    hasFileCols: boolean,
+  ): string | null {
+    return buildRunWarning(rowRange, chunkCount, measured, hasFileCols);
+  }
+```
+
+If this delegate feels like ceremony, call `buildRunWarning(...)` directly in `handleRunAsync` and skip it — behavior is identical. Prefer the direct call unless the indirection earns its keep.
+
 - [ ] **Step 7: Run tests to verify they pass**
 
 ```bash
-npx jest __tests__/panels/configure-ai-run.test.ts
+npx jest __tests__/configure-ai-run.test.ts __tests__/panels/configure-ai-run.test.ts
 ```
 
-Expected: PASS, whole file.
+Expected: PASS both files — 11 pure branch tests added to the root file, 3 wiring tests to the panel file.
 
 - [ ] **Step 8: Run the full suite, typecheck, lint, format**
 
@@ -1203,6 +1248,16 @@ Adds an open item for the undisclosed grounding free-tier quota."
 
 **2. Placeholder scan.** No TBD/TODO. Every code step carries the actual code. Every test step carries the actual assertions.
 
-**3. Type consistency.** `MeasuredRun` is defined once (Task 2) with fields `stats` and `source`, used identically in Tasks 3 and 5. `projectFullRunCost(stats, rowCount)` is defined in Task 1 and called with that exact signature in Task 5. `buildRunWarning(rowRange, chunkCount)` returns `string | null` and is consumed as such. `handleRun()` is parameterless from Task 4 onward, with the click wiring at line 240 updated in the same task. Renames (`lastTest`→`lastRun`, `renderTestStats`→`renderMeasuredRun`, `checkTestStatsFreshness`→`checkLastRunFreshness`) all land in Task 2, and later tasks use only the new names.
+**3. Type consistency.** `MeasuredRun` is defined once (Task 2) with fields `stats` and `source`, used identically in Tasks 3 and 5. `projectFullRunCost(stats, rowCount)` is defined in Task 1 and called inside `buildRunWarning` in Task 5. `buildRunWarning(rowRange, chunkCount, measured, hasFileCols)` returns `string | null` and is consumed as such. `handleRun()` is parameterless from Task 4 onward, with the click wiring at line 240 updated in the same task. Renames (`lastTest`→`lastRun`, `renderTestStats`→`renderMeasuredRun`, `checkTestStatsFreshness`→`checkLastRunFreshness`) all land in Task 2, and later tasks use only the new names.
+
+**4. Cross-task fixture dependency.** Task 5's pure tests reuse the `SAMPLE` `RunStats` fixture defined by Task 1 in `__tests__/configure-ai-run.test.ts`. Do not run Task 5 before Task 1, and do not rename `SAMPLE`.
+
+## Why `buildRunWarning` is pure
+
+The first draft of this plan made it a private method, which forced all ten branch combinations to be exercised by mounting a panel, populating columns, clicking `#run-btn`, and advancing microtasks — roughly 13 lines of setup per assertion, ~125 lines for the dialog alone, on a feature whose core arithmetic is three lines.
+
+Taking the four things it actually needs as parameters — row range, chunk count, an already-freshness-checked measurement, and a file-columns flag — moves those ten tests to direct calls of 2-3 lines each and leaves only three DOM tests for the wiring the panel genuinely owns: freshness filtering, the string reaching `confirm`, and cancel aborting the dispatch. It also makes the file's 70% branch threshold easy to hold, since every branch is reachable without a DOM.
+
+The lesson generalizes: when a warning's inputs are all values, the string builder does not need to be a method.
 
 **One ordering note for the implementer:** Task 4 deliberately carries the old `CHUNK_WARN_THRESHOLD` confirm forward unchanged so that no commit in this sequence leaves the panel with no pre-run protection at all. Task 5 deletes it. Do not merge Tasks 4 and 5 — the restructure and the new behavior are worth separate review gates.
