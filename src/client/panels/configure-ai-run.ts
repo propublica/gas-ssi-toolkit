@@ -14,9 +14,6 @@ import { AsyncActionButton } from "../components/async-action-button";
 import { formatDuration } from "../format";
 
 export const CHUNK_SIZE = 40;
-// Warn before dispatch when the batch exceeds this many rows, regardless of chunk count.
-// Kept separate from CHUNK_SIZE so small multi-chunk runs don't trigger the dialog.
-export const CHUNK_WARN_THRESHOLD = 200;
 
 /**
  * Warn before a full run when the projected cost exceeds this many US dollars.
@@ -38,6 +35,65 @@ export const COST_WARN_THRESHOLD_USD = 10;
 export function projectFullRunCost(stats: RunStats, rowCount: number): number {
   const perRowCost = (stats.totalTokenCost + stats.totalGroundingCost) / stats.rowCount;
   return perRowCost * rowCount;
+}
+
+/**
+ * Assembles the pre-run confirmation text, or null when no dialog is warranted.
+ *
+ * The two bodies are mutually exclusive by construction: a run either has a
+ * usable measurement or it doesn't. An untested run is only worth interrupting
+ * once it is large enough to chunk; a measured one is judged purely on cost, at
+ * any size — a single 40-row chunk on a costly model can cross the threshold.
+ *
+ * Cost is the only threshold. Time is deliberately absent: the projection
+ * undercounts by up to ~4x for file-mode runs, because the file sub-batch loop in
+ * runBatchAI is sequential (a deliberate memory guard), and gating on a
+ * known-wrong number is worse than not gating. See the AI-88 spec.
+ *
+ * @param measured Already validated against the live config by the caller. Pass
+ *   undefined for "no usable measurement" — this function does not re-check
+ *   freshness, which is what keeps it pure and directly testable.
+ * @param hasFileCols Whether any live prompt column is file-kind, which makes
+ *   the projection less reliable (per-row cost varies with file size).
+ */
+export function buildRunWarning(
+  rowRange: { start: number; end: number },
+  chunkCount: number,
+  measured: MeasuredRun | undefined,
+  hasFileCols: boolean,
+): string | null {
+  const rowCount = rowRange.end - rowRange.start + 1;
+  const preamble = `You're about to process ${rowCount} rows across ${chunkCount} chunks.\n\n`;
+
+  let body: string | null = null;
+  if (!measured) {
+    if (rowCount > CHUNK_SIZE) {
+      body =
+        preamble +
+        `You haven't tested this configuration, so there's no cost estimate. ` +
+        `Cancel and click Test to see what a full run will cost.`;
+    }
+  } else {
+    const cost = projectFullRunCost(measured.stats, rowCount);
+    if (cost > COST_WARN_THRESHOLD_USD) {
+      const sampleRows = measured.stats.rowCount;
+      body =
+        preamble +
+        `Estimated cost: ~$${cost.toFixed(2)}, based on your last run of ` +
+        `${sampleRows} row${sampleRows === 1 ? "" : "s"}.\n` +
+        `Consider narrowing your row range first.`;
+      // Only qualifies a figure that exists — the untested body has no estimate
+      // for this caveat to modify.
+      if (hasFileCols) {
+        body += `\n\nUnusually large files may throw off this estimate.`;
+      }
+    }
+  }
+
+  if (body === null) return null;
+  // Appended independently of which body fired, since a costly single chunk
+  // warns without being a multi-chunk run.
+  return chunkCount > 1 ? `${body}\n\nKeep this sidebar open until the run finishes.` : body;
 }
 
 export function computeChunks(
@@ -406,20 +462,18 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       return;
     }
 
-    const rowCount = rowRange.end - rowRange.start + 1;
     const chunks = computeChunks(rowRange, CHUNK_SIZE);
 
-    if (rowCount > CHUNK_WARN_THRESHOLD) {
-      // ~0.5 s/row estimate reflects ~10x speedup from parallel inference.
-      const estimatedMins = Math.ceil((rowCount * 0.5) / 60) || 1;
-      const ok = globalThis.confirm(
-        `You're about to process ${rowCount} rows across ${chunks.length} chunks.\n\n` +
-          `This will take roughly ${estimatedMins} minutes. ` +
-          `The sidebar must remain open throughout — closing it will stop the run after the current chunk finishes.\n\n` +
-          `Continue?`,
-      );
-      if (!ok) return;
-    }
+    // Freshness filtering stays here, where the live config lives; buildRunWarning
+    // takes the result so it can stay pure.
+    const liveSnapshot = buildConfigSnapshot(this.currentPreset());
+    const measured =
+      this.lastRun && configsMatch(liveSnapshot, this.lastRun.stats.config)
+        ? this.lastRun
+        : undefined;
+    const hasFileCols = config.promptCols.some((pc) => pc.kind === "file");
+    const warning = buildRunWarning(rowRange, chunks.length, measured, hasFileCols);
+    if (warning !== null && !globalThis.confirm(warning)) return;
 
     jobStore
       .dispatch(jobId, "Batch AI Run", this.runChunks(jobId, config, chunks))

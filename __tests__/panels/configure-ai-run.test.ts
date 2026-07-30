@@ -307,9 +307,10 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     });
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     for (let i = 0; i < 10; i++) await Promise.resolve();
-    // 499 rows > CHUNK_WARN_THRESHOLD (200). Before the restructure, confirm()
-    // sat inside `if (config.rowRange)` and this path never set rowRange, so no
-    // warning could fire no matter how many rows were highlighted.
+    // 499 rows exceeds CHUNK_SIZE, so an untested config nudges. Before the
+    // restructure, confirm() sat inside `if (config.rowRange)` and this path
+    // never set rowRange, so no warning could fire no matter how many rows
+    // were highlighted.
     expect(globalThis.confirm).toHaveBeenCalledTimes(1);
     expect((globalThis.confirm as jest.Mock).mock.calls[0][0]).toContain("499 rows");
   });
@@ -1094,5 +1095,50 @@ describe("ConfigureAIRunPanel — full-run stat capture", () => {
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     for (let i = 0; i < 8; i++) await Promise.resolve();
     expect(panel.unmount()?.lastRun).toEqual(MEASURED_TEST);
+  });
+});
+
+describe("ConfigureAIRunPanel — pre-run warning wiring", () => {
+  it("passes a config-matched measurement through, producing a cost warning", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container } = await mountAndLoad(undefined, {
+      promptCols: [{ col: "col_a", kind: "text" as const }],
+      systemPromptCol: "",
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 42 },
+      lastRun: { stats: { ...TEST_STATS, totalTokenCost: 5 }, source: "test" },
+    });
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    const text = (globalThis.confirm as jest.Mock).mock.calls[0][0] as string;
+    expect(text).toContain("Estimated cost: ~$20.50");
+  });
+
+  it("filters out a config-mismatched measurement, falling back to the nudge", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container } = await mountAndLoad(undefined, {
+      promptCols: [{ col: "col_b", kind: "text" as const }], // differs from TEST_STATS.config
+      systemPromptCol: "",
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 42 },
+      lastRun: { stats: { ...TEST_STATS, totalTokenCost: 5 }, source: "test" },
+    });
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    const text = (globalThis.confirm as jest.Mock).mock.calls[0][0] as string;
+    expect(text).toContain("You haven't tested this configuration");
+    expect(text).not.toContain("Estimated cost");
+  });
+
+  it("does not dispatch when the user cancels", async () => {
+    (globalThis.confirm as jest.Mock).mockReturnValue(false);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 42 },
+    });
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(services.runBatchAI).not.toHaveBeenCalled();
   });
 });
