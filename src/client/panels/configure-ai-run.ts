@@ -38,6 +38,35 @@ export function projectFullRunCost(stats: RunStats, rowCount: number): number {
 }
 
 /**
+ * Folds one chunk's measurement into a running total for the whole run.
+ *
+ * Chunks must not simply overwrite one another: computeChunks emits a partial
+ * tail whenever the row count is not a multiple of CHUNK_SIZE, so the final
+ * chunk is usually the smallest and least representative sample of the run —
+ * a 41-row run ends with a 1-row chunk. Dividing a projection by that sample
+ * produces wildly wrong estimates in both directions. Accumulating instead
+ * divides by every row the run actually measured.
+ *
+ * `testedAt` keeps the first chunk's timestamp (the run started there) and
+ * `config` is carried from the first chunk, since every chunk of one run
+ * shares the same configuration.
+ */
+export function accumulateRunStats(running: RunStats | undefined, chunk: RunStats): RunStats {
+  if (!running) return chunk;
+  return {
+    rowCount: running.rowCount + chunk.rowCount,
+    totalTimeMs: running.totalTimeMs + chunk.totalTimeMs,
+    totalInputTokens: running.totalInputTokens + chunk.totalInputTokens,
+    totalOutputTokens: running.totalOutputTokens + chunk.totalOutputTokens,
+    totalTokenCost: running.totalTokenCost + chunk.totalTokenCost,
+    totalGroundingQueries: running.totalGroundingQueries + chunk.totalGroundingQueries,
+    totalGroundingCost: running.totalGroundingCost + chunk.totalGroundingCost,
+    testedAt: running.testedAt,
+    config: running.config,
+  };
+}
+
+/**
  * Assembles the pre-run confirmation text, or null when no dialog is warranted.
  *
  * The two bodies are mutually exclusive by construction: a run either has a
@@ -50,6 +79,8 @@ export function projectFullRunCost(stats: RunStats, rowCount: number): number {
  * runBatchAI is sequential (a deliberate memory guard), and gating on a
  * known-wrong number is worse than not gating. See the AI-88 spec.
  *
+ * @param rowRange The inclusive row range the run would process.
+ * @param chunkCount The number of chunks that range would be split into.
  * @param measured Already validated against the live config by the caller. Pass
  *   undefined for "no usable measurement" — this function does not re-check
  *   freshness, which is what keeps it pure and directly testable.
@@ -490,6 +521,9 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     chunks: Array<{ start: number; end: number }>,
   ): Promise<void> {
     const lastRow = chunks[chunks.length - 1].end;
+    // Local to this invocation so a second run starts its own total rather
+    // than compounding onto a previous run's accumulated stats.
+    let runTotal: RunStats | undefined;
     for (let i = 0; i < chunks.length; i++) {
       if (jobStore.isCancelled(jobId)) break;
       jobStore.setProgress(jobId, `Rows ${chunks[i].start}–${chunks[i].end} of ${lastRow}`);
@@ -498,8 +532,15 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       // fresh for a subsequent one — the pre-run nudge then only appears on a
       // genuinely first run of a configuration. A chunk that measured nothing
       // (every row errored) leaves the previous value alone rather than
-      // clearing a still-useful measurement.
-      if (stats) this.lastRun = { stats, source: "run" };
+      // clearing a still-useful measurement. Chunks are accumulated, not
+      // overwritten: computeChunks' partial tail chunk is usually the
+      // smallest and least representative sample of the run (see
+      // accumulateRunStats), so dividing a cost projection by it alone would
+      // be wildly wrong in either direction.
+      if (stats) {
+        runTotal = accumulateRunStats(runTotal, stats);
+        this.lastRun = { stats: runTotal, source: "run" };
+      }
     }
   }
 

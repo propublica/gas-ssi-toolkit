@@ -1,6 +1,7 @@
 import {
   computeChunks,
   projectFullRunCost,
+  accumulateRunStats,
   buildRunWarning,
 } from "../src/client/panels/configure-ai-run";
 import type { RunStats } from "../src/shared/types";
@@ -78,6 +79,71 @@ describe("projectFullRunCost", () => {
   it("handles a single-row sample", () => {
     const oneRow: RunStats = { ...SAMPLE, rowCount: 1, totalTokenCost: 0.005 };
     expect(projectFullRunCost(oneRow, 40)).toBeCloseTo(0.2, 10);
+  });
+});
+
+describe("accumulateRunStats", () => {
+  it("returns the chunk unchanged when there is no running total yet", () => {
+    expect(accumulateRunStats(undefined, SAMPLE)).toEqual(SAMPLE);
+  });
+
+  it("sums every numeric field across two chunks", () => {
+    const chunkB: RunStats = {
+      ...SAMPLE,
+      rowCount: 5,
+      totalTimeMs: 1000,
+      totalInputTokens: 200,
+      totalOutputTokens: 100,
+      totalTokenCost: 0.01,
+      totalGroundingQueries: 2,
+      totalGroundingCost: 0.03,
+    };
+    const result = accumulateRunStats(SAMPLE, chunkB);
+    expect(result.rowCount).toBe(SAMPLE.rowCount + chunkB.rowCount);
+    expect(result.totalTimeMs).toBe(SAMPLE.totalTimeMs + chunkB.totalTimeMs);
+    expect(result.totalInputTokens).toBe(SAMPLE.totalInputTokens + chunkB.totalInputTokens);
+    expect(result.totalOutputTokens).toBe(SAMPLE.totalOutputTokens + chunkB.totalOutputTokens);
+    expect(result.totalTokenCost).toBeCloseTo(SAMPLE.totalTokenCost + chunkB.totalTokenCost, 10);
+    expect(result.totalGroundingQueries).toBe(
+      SAMPLE.totalGroundingQueries + chunkB.totalGroundingQueries,
+    );
+    expect(result.totalGroundingCost).toBeCloseTo(
+      SAMPLE.totalGroundingCost + chunkB.totalGroundingCost,
+      10,
+    );
+  });
+
+  it("keeps the first chunk's testedAt and config", () => {
+    const chunkB: RunStats = {
+      ...SAMPLE,
+      testedAt: SAMPLE.testedAt + 999,
+      config: { ...SAMPLE.config, model: "gemini-3.1-pro-preview" },
+    };
+    const result = accumulateRunStats(SAMPLE, chunkB);
+    expect(result.testedAt).toBe(SAMPLE.testedAt);
+    expect(result.config).toBe(SAMPLE.config);
+  });
+
+  it("sums numeric fields the same regardless of argument order", () => {
+    const chunkB: RunStats = {
+      ...SAMPLE,
+      rowCount: 7,
+      totalTimeMs: 500,
+      totalInputTokens: 50,
+      totalOutputTokens: 25,
+      totalTokenCost: 0.04,
+      totalGroundingQueries: 1,
+      totalGroundingCost: 0.02,
+    };
+    const forward = accumulateRunStats(SAMPLE, chunkB);
+    const backward = accumulateRunStats(chunkB, SAMPLE);
+    expect(forward.rowCount).toBe(backward.rowCount);
+    expect(forward.totalTimeMs).toBe(backward.totalTimeMs);
+    expect(forward.totalInputTokens).toBe(backward.totalInputTokens);
+    expect(forward.totalOutputTokens).toBe(backward.totalOutputTokens);
+    expect(forward.totalTokenCost).toBeCloseTo(backward.totalTokenCost, 10);
+    expect(forward.totalGroundingQueries).toBe(backward.totalGroundingQueries);
+    expect(forward.totalGroundingCost).toBeCloseTo(backward.totalGroundingCost, 10);
   });
 });
 

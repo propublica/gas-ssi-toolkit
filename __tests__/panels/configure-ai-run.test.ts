@@ -489,6 +489,7 @@ describe("includeGrounding checkbox", () => {
     container.querySelector<HTMLInputElement>("#include-grounding-cb")!.checked = false;
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(services.runBatchAI).toHaveBeenCalled();
     const config = (services.runBatchAI as jest.Mock).mock.calls[0]?.[0] as RunConfig | undefined;
     expect(config?.includeGrounding).toBeUndefined();
   });
@@ -689,6 +690,7 @@ describe("prefixWithColName checkbox", () => {
     container.querySelector<HTMLInputElement>("#prefix-col-name-cb")!.checked = false;
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(services.runBatchAI).toHaveBeenCalled();
     const config = (services.runBatchAI as jest.Mock).mock.calls[0]?.[0] as RunConfig | undefined;
     expect(config?.prefixWithColName).toBeUndefined();
   });
@@ -1097,6 +1099,30 @@ describe("ConfigureAIRunPanel — full-run stat capture", () => {
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     for (let i = 0; i < 8; i++) await Promise.resolve();
     expect(panel.unmount()?.lastRun).toEqual(MEASURED_TEST);
+  });
+
+  it("accumulates stats across a multi-chunk run instead of keeping only the last chunk", async () => {
+    // Rows 2-42 (41 rows) at CHUNK_SIZE 40 -> chunks {2,41} (40 rows) and
+    // {42,42} (1 row). The old code overwrote lastRun with each chunk in turn,
+    // so it ended up holding only the final 1-row chunk's stats.
+    const CHUNK_A_STATS: RunStats = { ...TEST_STATS, rowCount: 40, totalTokenCost: 0.08 };
+    const CHUNK_B_STATS: RunStats = { ...TEST_STATS, rowCount: 1, totalTokenCost: 0.001 };
+    (services.runBatchAI as jest.Mock)
+      .mockResolvedValueOnce(CHUNK_A_STATS)
+      .mockResolvedValueOnce(CHUNK_B_STATS);
+    const { container, panel } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 42 },
+    });
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+    const lastRun = panel.unmount()?.lastRun;
+    expect(lastRun?.stats.rowCount).toBe(CHUNK_A_STATS.rowCount + CHUNK_B_STATS.rowCount);
+    expect(lastRun?.stats.totalTokenCost).toBeCloseTo(
+      CHUNK_A_STATS.totalTokenCost + CHUNK_B_STATS.totalTokenCost,
+      10,
+    );
   });
 });
 
