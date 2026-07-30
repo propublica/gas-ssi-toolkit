@@ -43,11 +43,7 @@ Pure arithmetic, no DOM. Lands in the panel file alongside the existing `compute
 Replace the contents of `__tests__/configure-ai-run.test.ts` line 1 import and append the new describes. The full new import line:
 
 ```ts
-import {
-  computeChunks,
-  projectFullRunCost,
-  COST_WARN_THRESHOLD_USD,
-} from "../src/client/panels/configure-ai-run";
+import { computeChunks, projectFullRunCost } from "../src/client/panels/configure-ai-run";
 import type { RunStats } from "../src/shared/types";
 ```
 
@@ -93,13 +89,9 @@ describe("projectFullRunCost", () => {
     expect(projectFullRunCost(oneRow, 40)).toBeCloseTo(0.2, 10);
   });
 });
-
-describe("COST_WARN_THRESHOLD_USD", () => {
-  it("is $10, the value documented in the AI-88 spec", () => {
-    expect(COST_WARN_THRESHOLD_USD).toBe(10);
-  });
-});
 ```
+
+Do **not** add a test asserting `COST_WARN_THRESHOLD_USD === 10` — asserting a constant equals its own literal verifies nothing. The threshold's value is pinned meaningfully by Task 5's boundary test, which feeds `buildRunWarning` a projection of exactly $10.00 and asserts no warning fires.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -788,7 +780,6 @@ import {
   computeChunks,
   projectFullRunCost,
   buildRunWarning,
-  COST_WARN_THRESHOLD_USD,
 } from "../src/client/panels/configure-ai-run";
 import type { RunStats } from "../src/shared/types";
 import type { MeasuredRun } from "../src/client/types";
@@ -1024,27 +1015,11 @@ Replace the whole `if (rowCount > CHUNK_WARN_THRESHOLD) { ... }` block added in 
         ? this.lastRun
         : undefined;
     const hasFileCols = config.promptCols.some((pc) => pc.kind === "file");
-    const warning = this.buildRunWarningText(rowRange, chunks.length, measured, hasFileCols);
+    const warning = buildRunWarning(rowRange, chunks.length, measured, hasFileCols);
     if (warning !== null && !globalThis.confirm(warning)) return;
 ```
 
-The `const rowCount = ...` line above it becomes unused — delete it (`buildRunWarning` derives its own).
-
-To keep the call readable while the function stays module-level, add a one-line private delegate next to `handleRunAsync`:
-
-```ts
-  /** Instance-side seam for the pure buildRunWarning, so tests can spy if ever needed. */
-  private buildRunWarningText(
-    rowRange: { start: number; end: number },
-    chunkCount: number,
-    measured: MeasuredRun | undefined,
-    hasFileCols: boolean,
-  ): string | null {
-    return buildRunWarning(rowRange, chunkCount, measured, hasFileCols);
-  }
-```
-
-If this delegate feels like ceremony, call `buildRunWarning(...)` directly in `handleRunAsync` and skip it — behavior is identical. Prefer the direct call unless the indirection earns its keep.
+Call the module-level `buildRunWarning` directly — do not add a private delegate method wrapping it. The `const rowCount = ...` line above becomes unused; delete it (`buildRunWarning` derives its own).
 
 - [ ] **Step 7: Run tests to verify they pass**
 
