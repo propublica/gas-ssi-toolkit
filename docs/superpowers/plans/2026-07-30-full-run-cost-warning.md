@@ -597,7 +597,7 @@ Each becomes:
 Append to the `"ConfigureAIRunPanel — Run AI"` describe:
 
 ```ts
-  it("chunks an active-selection run rather than delegating the range to the server", async () => {
+  it("resolves and chunks the active-selection range client-side before dispatching", async () => {
     (services.getActiveRangeInfo as jest.Mock).mockResolvedValue({ start: 2, end: 45 });
     (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
     const { container } = await mountAndLoad({
@@ -606,8 +606,10 @@ Append to the `"ConfigureAIRunPanel — Run AI"` describe:
     });
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     for (let i = 0; i < 10; i++) await Promise.resolve();
-    // 44 rows at CHUNK_SIZE 40 → first chunk 2-41. Previously this path called
-    // runBatchAI with no rowRange at all and let the server resolve it.
+    // 44 rows at CHUNK_SIZE 40 → first chunk 2-41. This chunking behavior
+    // predates the restructure; what the restructure actually changed is
+    // that the range is now resolved before the warning decision, rather
+    // than inside the dispatch callback.
     expect(services.runBatchAI).toHaveBeenCalledWith(
       expect.objectContaining({ rowRange: { start: 2, end: 41 } }),
       expect.stringMatching(/^batch-ai-\d+$/),
