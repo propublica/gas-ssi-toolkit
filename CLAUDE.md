@@ -87,9 +87,13 @@ HtmlService can only serve `.html` files — all JavaScript and CSS must be inli
 **Server:**
 ```
 src/server/index.ts          (entry point — menu, 4 tool orchestrators, UI handlers, re-exports custom functions)
-├── src/server/config.ts         (CONFIG object: API key property name, model name, size limits)
-├── src/server/api.ts            (callGeminiAPI, buildGeminiPayload, invokeGemini — pure HTTP adapter via UrlFetchApp;
-│                                 buildGeminiPayload resolves ToolId[] via TOOL_REGISTRY, splits grounding vs function tools)
+├── src/server/config.ts         (CONFIG object: model name, size limits — API key property name lives in gemini-auth.ts)
+├── src/server/api.ts            (callGeminiAPI, callGeminiAPIBatch, buildGeminiPayload — pure HTTP adapter via
+│                                 UrlFetchApp; credential from gemini-auth.ts; buildGeminiPayload resolves ToolId[]
+│                                 via TOOL_REGISTRY, splits grounding vs function tools)
+├── src/server/gemini-auth.ts    (geminiAuthHeaders, hasGeminiApiKey, API_KEY_PROPERTY, MISSING_API_KEY_MESSAGE —
+│                                 sole owner of GEMINI_API_KEY; the key is sent as the x-goog-api-key header and
+│                                 must never appear in a request URL (T17/R24))
 ├── src/server/inference.ts      (runInference — unified inference handler for menu-triggered AI calls; no SpreadsheetApp dep;
 │                                 returns string|null, null signals caller to skip the row)
 ├── src/server/tools.ts          (TOOL_REGISTRY: Record<ToolId, GeminiTool> — exhaustive at compile time; adding a ToolId
@@ -99,7 +103,7 @@ src/server/index.ts          (entry point — menu, 4 tool orchestrators, UI han
 ├── src/server/drive.ts          (extractTextUniversal, fetchAndEncodeFile, checkDriveService)
 ├── src/server/rich-text.ts      (CellContent, TextRange interfaces; buildRichInferenceCellContent, buildRichGroundingCellContent —
 │                                 pure layer between GeminiResponse and Sheets cell content; no GAS globals)
-├── src/server/customFunctions.ts  (SSI — Sheets custom function; calls invokeGemini directly; always returns string,
+├── src/server/customFunctions.ts  (SSI — Sheets custom function; calls callGeminiAPI directly; always returns string,
 │                                 uses "[SSI Error: ...]" format)
 ├── src/server/utils.ts          (extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive, sampleRows,
 │                                 truncateText, findOrCreateColumn, writeColumn, flattenArg)
@@ -161,7 +165,7 @@ The Gemini tool system spans three layers. `ToolId` (a string union in `shared/t
 
 `buildGeminiPayload` in `api.ts` resolves `ToolId[]` via `TOOL_REGISTRY`, splits by `kind`, and assembles both shapes into the `tools` array of the REST request.
 
-**Propagation path:** `ConfigureAIRunPanel` (UI TagList) → `RunConfig.tools` → `runBatchAI` → `runInference(tools?)` → `invokeGemini` → `callGeminiAPI` → `buildGeminiPayload`. For recipes: `RecipePanel` → `PrepRecipeParams.cols + inputValues` → server resolves `inputId` references and writes columns → `PrepRecipeResult.rowRange` → client calls `buildRunTemplate(prepTemplate)` (derives `promptCols`/`systemPromptCol`/`outputCol` from `RecipeColumn.role`) merged with `definition.settings` and `rowRange` → `preppedRunConfig`.
+**Propagation path:** `ConfigureAIRunPanel` (UI TagList) → `RunConfig.tools` → `runBatchAI` → `runInference(tools?)` → `callGeminiAPI` → `buildGeminiPayload`. For recipes: `RecipePanel` → `PrepRecipeParams.cols + inputValues` → server resolves `inputId` references and writes columns → `PrepRecipeResult.rowRange` → client calls `buildRunTemplate(prepTemplate)` (derives `promptCols`/`systemPromptCol`/`outputCol` from `RecipeColumn.role`) merged with `definition.settings` and `rowRange` → `preppedRunConfig`.
 
 Source files use relative imports (e.g. `../shared/types`). The `@server/*` and `@shared/*` aliases are **Jest-only** (mapped in `jest.config.cjs`) and are not available in TypeScript source.
 
