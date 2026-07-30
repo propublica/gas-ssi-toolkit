@@ -109,6 +109,11 @@ function selectColumn(container: HTMLElement, fieldId: string, value: string): v
 beforeEach(() => {
   jest.clearAllMocks();
   globalThis.alert = jest.fn();
+  // jsdom's confirm() throws "not implemented" if called unmocked. Mocked here
+  // (rather than per-test) for the same reason as getActiveRangeInfo below: a
+  // per-test assignment would leak into later tests since clearAllMocks() only
+  // resets call history, not the underlying implementation/return value.
+  globalThis.confirm = jest.fn().mockReturnValue(true);
   // clearAllMocks() resets call history but not a previously-set mock
   // implementation, so a test that overrides getActiveRangeInfo (e.g. to
   // reject) would otherwise leak that override into every later test in the
@@ -291,6 +296,22 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(globalThis.alert).toHaveBeenCalledWith("Error: range boom");
     expect(services.runBatchAI).not.toHaveBeenCalled();
+  });
+
+  it("warns on a large active-selection run, which the pre-restructure code could not reach", async () => {
+    (services.getActiveRangeInfo as jest.Mock).mockResolvedValue({ start: 2, end: 500 });
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+    });
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    // 499 rows > CHUNK_WARN_THRESHOLD (200). Before the restructure, confirm()
+    // sat inside `if (config.rowRange)` and this path never set rowRange, so no
+    // warning could fire no matter how many rows were highlighted.
+    expect(globalThis.confirm).toHaveBeenCalledTimes(1);
+    expect((globalThis.confirm as jest.Mock).mock.calls[0][0]).toContain("499 rows");
   });
 });
 
