@@ -259,7 +259,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           container.querySelector<HTMLElement>("#config-form")!.style.display = "block";
           container
             .querySelector<HTMLButtonElement>("#run-btn")!
-            .addEventListener("click", () => this.handleRun(container));
+            .addEventListener("click", () => this.handleRun());
           container
             .querySelector<HTMLButtonElement>("#test-btn")!
             .addEventListener("click", () => this.handleTest(container));
@@ -358,54 +358,74 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     return sanitized;
   }
 
-  private handleRun(_container: HTMLElement): void {
+  private handleRun(): void {
+    // Fire-and-forget from a DOM click handler: every failure path inside
+    // handleRunAsync alerts for itself, so there is no rejection to surface here.
+    void this.handleRunAsync();
+  }
+
+  private async handleRunAsync(): Promise<void> {
     const config = this.assembleRunConfig();
     if (!config) return;
 
-    const jobId = `batch-ai-${Date.now()}`;
-
-    if (config.rowRange) {
-      const rowCount = config.rowRange.end - config.rowRange.start + 1;
-      if (rowCount > CHUNK_WARN_THRESHOLD) {
-        const chunkCount = Math.ceil(rowCount / CHUNK_SIZE);
-        // ~0.5 s/row estimate reflects ~10x speedup from parallel inference.
-        const estimatedMins = Math.ceil((rowCount * 0.5) / 60) || 1;
-        const ok = globalThis.confirm(
-          `You're about to process ${rowCount} rows across ${chunkCount} chunks.\n\n` +
-            `This will take roughly ${estimatedMins} minutes. ` +
-            `The sidebar must remain open throughout — closing it will stop the run after the current chunk finishes.\n\n` +
-            `Continue?`,
-        );
-        if (!ok) return;
+    // Resolve the range BEFORE dispatching. The pre-run warning needs the row
+    // count, and resolving up front collapses what used to be two near-duplicate
+    // dispatch paths into one. Previously the active-selection branch resolved
+    // its range inside the dispatch, so those runs were never warned about at all.
+    let rowRange = config.rowRange;
+    if (!rowRange) {
+      let active: { start: number; end: number } | undefined;
+      try {
+        active = await getActiveRangeInfo();
+      } catch (err) {
+        globalThis.alert("Error: " + (err as Error).message);
+        return;
+      }
+      if (active) {
+        const sanitized = this.resolveRowRange(active);
+        if (!sanitized) return;
+        rowRange = sanitized;
       }
     }
 
-    if (config.rowRange) {
-      const chunks = computeChunks(config.rowRange, CHUNK_SIZE);
-      jobStore
-        .dispatch(jobId, "Batch AI Run", this.runChunks(jobId, config, chunks))
-        .catch((err: Error) => {
-          globalThis.alert("Error: " + err.message);
-        });
-    } else {
-      // No explicit row range — query the active sheet selection from the server,
-      // then chunk identically to the explicit rowRange path.
+    const jobId = `batch-ai-${Date.now()}`;
+
+    if (!rowRange) {
+      // Neither an explicit range nor an active selection: let the server fall
+      // back to sheet.getActiveRange(). The row count is unknowable here, so no
+      // warning is possible — this preserves pre-AI-88 behavior for the edge case.
       jobStore
         .dispatch(
           jobId,
           "Batch AI Run",
-          getActiveRangeInfo().then((rangeInfo) => {
-            if (!rangeInfo) return runBatchAI(config, jobId).then(() => undefined);
-            const sanitized = this.resolveRowRange(rangeInfo);
-            if (!sanitized) return;
-            const chunks = computeChunks(sanitized, CHUNK_SIZE);
-            return this.runChunks(jobId, config, chunks);
-          }),
+          runBatchAI(config, jobId).then(() => undefined),
         )
         .catch((err: Error) => {
           globalThis.alert("Error: " + err.message);
         });
+      return;
     }
+
+    const rowCount = rowRange.end - rowRange.start + 1;
+    const chunks = computeChunks(rowRange, CHUNK_SIZE);
+
+    if (rowCount > CHUNK_WARN_THRESHOLD) {
+      // ~0.5 s/row estimate reflects ~10x speedup from parallel inference.
+      const estimatedMins = Math.ceil((rowCount * 0.5) / 60) || 1;
+      const ok = globalThis.confirm(
+        `You're about to process ${rowCount} rows across ${chunks.length} chunks.\n\n` +
+          `This will take roughly ${estimatedMins} minutes. ` +
+          `The sidebar must remain open throughout — closing it will stop the run after the current chunk finishes.\n\n` +
+          `Continue?`,
+      );
+      if (!ok) return;
+    }
+
+    jobStore
+      .dispatch(jobId, "Batch AI Run", this.runChunks(jobId, config, chunks))
+      .catch((err: Error) => {
+        globalThis.alert("Error: " + err.message);
+      });
     // NOTE: loadHeaders() is intentionally NOT called here.
     // Reloading after dispatch caused flicker and re-initialization mid-run.
   }

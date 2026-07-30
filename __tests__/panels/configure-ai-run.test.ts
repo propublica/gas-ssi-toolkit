@@ -109,6 +109,11 @@ function selectColumn(container: HTMLElement, fieldId: string, value: string): v
 beforeEach(() => {
   jest.clearAllMocks();
   globalThis.alert = jest.fn();
+  // clearAllMocks() resets call history but not a previously-set mock
+  // implementation, so a test that overrides getActiveRangeInfo (e.g. to
+  // reject) would otherwise leak that override into every later test in the
+  // file. Re-establish the module's original default here every time.
+  (services.getActiveRangeInfo as jest.Mock).mockResolvedValue(undefined);
 });
 
 describe("ConfigureAIRunPanel — mount", () => {
@@ -202,7 +207,7 @@ describe("ConfigureAIRunPanel — Run AI", () => {
       outputCol: "ai_inference",
     });
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    await Promise.resolve();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(services.runBatchAI).toHaveBeenCalledWith(
       expect.objectContaining({
         promptCols: [{ col: "col_a", kind: "text" }],
@@ -219,7 +224,7 @@ describe("ConfigureAIRunPanel — Run AI", () => {
       outputCol: "ai_inference",
     });
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    await Promise.resolve();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(mockNav.back).not.toHaveBeenCalled();
     expect(services.getSheetHeaders).toHaveBeenCalledTimes(1); // initial load only, no reload
   });
@@ -247,7 +252,7 @@ describe("ConfigureAIRunPanel — Run AI", () => {
       outputCol: "ai_inference",
     });
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    await Promise.resolve();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(services.runBatchAI).toHaveBeenCalledWith(
       expect.objectContaining({
         promptCols: expect.arrayContaining([
@@ -257,6 +262,35 @@ describe("ConfigureAIRunPanel — Run AI", () => {
       }),
       expect.stringMatching(/^batch-ai-\d+$/),
     );
+  });
+
+  it("chunks an active-selection run rather than delegating the range to the server", async () => {
+    (services.getActiveRangeInfo as jest.Mock).mockResolvedValue({ start: 2, end: 45 });
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+    });
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    // 44 rows at CHUNK_SIZE 40 → first chunk 2-41. Previously this path called
+    // runBatchAI with no rowRange at all and let the server resolve it.
+    expect(services.runBatchAI).toHaveBeenCalledWith(
+      expect.objectContaining({ rowRange: { start: 2, end: 41 } }),
+      expect.stringMatching(/^batch-ai-\d+$/),
+    );
+  });
+
+  it("alerts and does not dispatch when resolving the active selection fails", async () => {
+    (services.getActiveRangeInfo as jest.Mock).mockRejectedValue(new Error("range boom"));
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+    });
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(globalThis.alert).toHaveBeenCalledWith("Error: range boom");
+    expect(services.runBatchAI).not.toHaveBeenCalled();
   });
 });
 
@@ -394,7 +428,7 @@ describe("ConfigureAIRunPanel — tools TagList", () => {
     });
     container.querySelector<HTMLButtonElement>('[data-value="google_search"]')!.click();
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    await Promise.resolve();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(services.runBatchAI).toHaveBeenCalledWith(
       expect.objectContaining({ tools: ["google_search"] }),
       expect.stringMatching(/^batch-ai-\d+$/),
@@ -417,7 +451,7 @@ describe("includeGrounding checkbox", () => {
     const cb = container.querySelector<HTMLInputElement>("#include-grounding-cb")!;
     cb.checked = true;
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    await Promise.resolve();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     const config = (services.runBatchAI as jest.Mock).mock.calls[0]?.[0] as RunConfig | undefined;
     expect(config?.includeGrounding).toBe(true);
   });
@@ -430,7 +464,7 @@ describe("includeGrounding checkbox", () => {
     });
     container.querySelector<HTMLInputElement>("#include-grounding-cb")!.checked = false;
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    await Promise.resolve();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     const config = (services.runBatchAI as jest.Mock).mock.calls[0]?.[0] as RunConfig | undefined;
     expect(config?.includeGrounding).toBeUndefined();
   });
@@ -617,7 +651,7 @@ describe("prefixWithColName checkbox", () => {
     });
     container.querySelector<HTMLInputElement>("#prefix-col-name-cb")!.checked = true;
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    await Promise.resolve();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     const config = (services.runBatchAI as jest.Mock).mock.calls[0]?.[0] as RunConfig | undefined;
     expect(config?.prefixWithColName).toBe(true);
   });
@@ -630,7 +664,7 @@ describe("prefixWithColName checkbox", () => {
     });
     container.querySelector<HTMLInputElement>("#prefix-col-name-cb")!.checked = false;
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    await Promise.resolve();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     const config = (services.runBatchAI as jest.Mock).mock.calls[0]?.[0] as RunConfig | undefined;
     expect(config?.prefixWithColName).toBeUndefined();
   });
@@ -714,7 +748,7 @@ describe("ConfigureAIRunPanel — model selector", () => {
       )!
       .click();
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
-    await Promise.resolve(); // flush getActiveRangeInfo promise
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(services.runBatchAI).toHaveBeenCalledWith(
       expect.objectContaining({ model: "gemini-3.1-pro-preview" }),
       expect.any(String),
