@@ -53,7 +53,7 @@ function buildUserParts(
 }
 
 /**
- * Build a GeminiRequest (without apiKey) from raw prompt inputs.
+ * Build a GeminiRequest from raw prompt inputs.
  *
  * @param promptInputs  Ordered prompt inputs, each carrying a kind ("text" or
  *                      "file") and a raw cell value.

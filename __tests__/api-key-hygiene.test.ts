@@ -14,18 +14,26 @@
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
 
+// Flat, non-recursive by design: a future src/server/<subdir>/*.ts would go
+// unscanned, and the file-count sanity check below would not catch it.
 const SERVER_DIR = join(__dirname, "..", "src", "server");
 
 const SERVER_FILES = readdirSync(SERVER_DIR).filter((f) => f.endsWith(".ts"));
 
-/** Credential names that must never appear as a URL query parameter. */
-const CREDENTIAL_PARAM = "(?:key|api_?key|access_token|token)";
+/**
+ * Credential names that must never appear as a URL query parameter. This is a
+ * fixed name list, not structural detection — a credential passed under a
+ * name not listed here would evade the guard.
+ */
+const CREDENTIAL_PARAM = "(?:key|api_?key|access_token|token|bearer|secret|authorization)";
 
+// Line-scoped: a URL hand-split across two lines could evade these patterns.
+// Acceptable because Prettier does not produce that shape.
 const URL_CREDENTIAL_PATTERNS = [
   // ?key=${apiKey}  — template interpolation
   new RegExp(`[?&]${CREDENTIAL_PARAM}=\\$\\{`, "i"),
-  // "?key=" + apiKey  — string concatenation
-  new RegExp(`[?&]${CREDENTIAL_PARAM}=["']?\\s*\\+`, "i"),
+  // "?key=" + apiKey / `?key=` + apiKey — string or template-literal concatenation
+  new RegExp(`[?&]${CREDENTIAL_PARAM}=["'\`]?\\s*\\+`, "i"),
 ];
 
 function offendingLines(source: string, patterns: RegExp[]): string[] {
@@ -53,6 +61,10 @@ describe("credential hygiene in src/server", () => {
     const namingFiles = SERVER_FILES.filter((file) =>
       readFileSync(join(SERVER_DIR, file), "utf8").includes("GEMINI_API_KEY"),
     );
+    // Exact by intent: enforces single ownership of the key property name.
+    // This will (deliberately) fail on even a benign mention of GEMINI_API_KEY
+    // in another file's comment. The fix is to move the mention, not loosen
+    // this assertion.
     expect(namingFiles).toEqual(["gemini-auth.ts"]);
   });
 });

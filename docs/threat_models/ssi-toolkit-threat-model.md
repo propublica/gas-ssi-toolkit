@@ -5,7 +5,7 @@
 | Project | SSI Toolkit (Google Apps Script add-on for Google Sheets) |
 | Description | ProPublica journalism tool providing Drive file listing, OCR text extraction, reproducible row sampling, and batch Gemini AI inference |
 | Version | 1.2 |
-| Last updated | 2026-07-16 |
+| Last updated | 2026-07-29 |
 
 ---
 

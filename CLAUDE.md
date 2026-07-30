@@ -169,7 +169,7 @@ The Gemini tool system spans three layers. `ToolId` (a string union in `shared/t
 
 Source files use relative imports (e.g. `../shared/types`). The `@server/*` and `@shared/*` aliases are **Jest-only** (mapped in `jest.config.cjs`) and are not available in TypeScript source.
 
-Only `index.ts` should reference Google Apps Script UI services (SpreadsheetApp, HtmlService, PropertiesService). On the client side, only `services.ts` calls `google.script.run` (wrapping each call as a Promise); `sidebar-entry.ts` is a thin init file that creates the Router and calls `router.start()`.
+Only `index.ts` should reference Google Apps Script UI services (SpreadsheetApp, HtmlService). `gemini-auth.ts` is the sanctioned, sole reader of `PropertiesService` for the Gemini API key — no other file should touch it. On the client side, only `services.ts` calls `google.script.run` (wrapping each call as a Promise); `sidebar-entry.ts` is a thin init file that creates the Router and calls `router.start()`.
 
 ### Recipe System
 
