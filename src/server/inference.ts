@@ -2,7 +2,7 @@
  * inference.ts — Unified inference handler for menu-triggered AI calls.
  *
  * runInference normalizes raw cell values into a Gemini request and executes
- * it via invokeGemini. It has no SpreadsheetApp dependency — callers are
+ * it via callGeminiAPI. It has no SpreadsheetApp dependency — callers are
  * responsible for writing the returned value to the sheet.
  *
  * buildInferenceRequest is the pure request-builder. Exported so callers can build
@@ -10,7 +10,7 @@
  * batch path (runBatchAI) in the upcoming parallel pipeline refactor.
  */
 
-import { invokeGemini } from "./api";
+import { callGeminiAPI } from "./api";
 import { prepareDriveAttachments } from "./drive";
 import { flattenArg, isValidDriveLink, extractId } from "./utils";
 import type { GeminiRequest, GeminiResponse, GeminiUserPart, PromptInput } from "./types";
@@ -53,7 +53,7 @@ function buildUserParts(
 }
 
 /**
- * Build a GeminiRequest (without apiKey) from raw prompt inputs.
+ * Build a GeminiRequest from raw prompt inputs.
  *
  * @param promptInputs  Ordered prompt inputs, each carrying a kind ("text" or
  *                      "file") and a raw cell value.
@@ -63,15 +63,15 @@ function buildUserParts(
  * @param fileUriMap    Optional map from Drive file ID to Gemini Files API URI +
  *                      mimeType. When provided, file inputs use the file_data path
  *                      (Files API); when absent, the inline_data path is used instead.
- * @returns The request object (without apiKey), or null if no prompt inputs
- *          produce any content (signals caller to skip the row).
+ * @returns The request object, or null if no prompt inputs produce any
+ *          content (signals caller to skip the row).
  */
 export function buildInferenceRequest(
   promptInputs: PromptInput[],
   systemPrompt?: unknown,
   tools?: ToolId[],
   fileUriMap?: Map<string, { uri: string; mimeType: string }>,
-): Omit<GeminiRequest, "apiKey"> | null {
+): GeminiRequest | null {
   const userParts = buildUserParts(promptInputs, fileUriMap);
   if (userParts.length === 0) return null;
 
@@ -105,7 +105,7 @@ export function runInference(
   try {
     const req = buildInferenceRequest(promptInputs, systemPrompt, tools);
     if (req === null) return null;
-    return invokeGemini(req);
+    return callGeminiAPI(req);
   } catch (e) {
     return { text: "Error: " + (e as Error).message };
   }
