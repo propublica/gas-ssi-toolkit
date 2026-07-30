@@ -1,5 +1,5 @@
 import type { NavigationContext, Panel, TestRunDisplay } from "../types";
-import type { RunConfig, ToolId, ModelId } from "../../shared/types";
+import type { RunConfig, ToolId, ModelId, RunStats } from "../../shared/types";
 import { TagList } from "../components/tag-list";
 import { TokenInput } from "../components/token-input";
 import { PromptColList } from "../components/prompt-col-list";
@@ -17,6 +17,28 @@ export const CHUNK_SIZE = 40;
 // Warn before dispatch when the batch exceeds this many rows, regardless of chunk count.
 // Kept separate from CHUNK_SIZE so small multi-chunk runs don't trigger the dialog.
 export const CHUNK_WARN_THRESHOLD = 200;
+
+/**
+ * Warn before a full run when the projected cost exceeds this many US dollars.
+ *
+ * Replaces the row-count heuristic this constant sits next to: cost is what
+ * T14 is actually about, and unlike time it is linear in row count, so a
+ * measured sample projects reliably to any range size. See the AI-88 spec for
+ * why no time threshold accompanies it.
+ */
+export const COST_WARN_THRESHOLD_USD = 10;
+
+/**
+ * Projects the total USD cost of running `rowCount` rows, from a measured
+ * sample of a smaller (or larger) run of the same configuration.
+ *
+ * `stats.rowCount` is only ever stored when greater than zero — `runBatchAI`
+ * guards the write (`index.ts`) — so no zero-division guard is needed here.
+ */
+export function projectFullRunCost(stats: RunStats, rowCount: number): number {
+  const perRowCost = (stats.totalTokenCost + stats.totalGroundingCost) / stats.rowCount;
+  return perRowCost * rowCount;
+}
 
 export function computeChunks(
   rowRange: { start: number; end: number },

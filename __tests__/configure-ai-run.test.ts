@@ -1,4 +1,5 @@
-import { computeChunks } from "../src/client/panels/configure-ai-run";
+import { computeChunks, projectFullRunCost } from "../src/client/panels/configure-ai-run";
+import type { RunStats } from "../src/shared/types";
 
 describe("computeChunks", () => {
   it("returns a single chunk when row count equals chunk size", () => {
@@ -32,5 +33,45 @@ describe("computeChunks", () => {
 
   it("returns a single chunk for exactly one row", () => {
     expect(computeChunks({ start: 5, end: 5 }, 50)).toEqual([{ start: 5, end: 5 }]);
+  });
+});
+
+const SAMPLE: RunStats = {
+  rowCount: 10,
+  totalTimeMs: 4200,
+  totalInputTokens: 500,
+  totalOutputTokens: 300,
+  totalTokenCost: 0.02,
+  totalGroundingQueries: 0,
+  totalGroundingCost: 0,
+  testedAt: 1234567890,
+  config: {
+    promptCols: [{ col: "col_a", kind: "text" }],
+    systemPromptCol: undefined,
+    tools: [],
+    prefixWithColName: false,
+    model: "gemini-3.1-flash-lite",
+  },
+};
+
+describe("projectFullRunCost", () => {
+  it("scales a token-only sample linearly", () => {
+    // $0.02 over 10 rows = $0.002/row → 1000 rows = $2.00
+    expect(projectFullRunCost(SAMPLE, 1000)).toBeCloseTo(2.0, 10);
+  });
+
+  it("includes grounding cost in the per-row rate", () => {
+    const grounded: RunStats = { ...SAMPLE, totalGroundingCost: 0.14 };
+    // ($0.02 + $0.14) over 10 rows = $0.016/row → 100 rows = $1.60
+    expect(projectFullRunCost(grounded, 100)).toBeCloseTo(1.6, 10);
+  });
+
+  it("returns the sample's own cost when projecting to the sample size", () => {
+    expect(projectFullRunCost(SAMPLE, SAMPLE.rowCount)).toBeCloseTo(0.02, 10);
+  });
+
+  it("handles a single-row sample", () => {
+    const oneRow: RunStats = { ...SAMPLE, rowCount: 1, totalTokenCost: 0.005 };
+    expect(projectFullRunCost(oneRow, 40)).toBeCloseTo(0.2, 10);
   });
 });
