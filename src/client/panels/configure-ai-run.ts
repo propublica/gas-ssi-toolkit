@@ -419,7 +419,13 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     for (let i = 0; i < chunks.length; i++) {
       if (jobStore.isCancelled(jobId)) break;
       jobStore.setProgress(jobId, `Rows ${chunks[i].start}–${chunks[i].end} of ${lastRow}`);
-      await runBatchAI({ ...config, rowRange: chunks[i] }, jobId);
+      const stats = await runBatchAI({ ...config, rowRange: chunks[i] }, jobId);
+      // Every invocation measures itself, so a full run keeps the cost estimate
+      // fresh for a subsequent one — the pre-run nudge then only appears on a
+      // genuinely first run of a configuration. A chunk that measured nothing
+      // (every row errored) leaves the previous value alone rather than
+      // clearing a still-useful measurement.
+      if (stats) this.lastRun = { stats, source: "run" };
     }
   }
 

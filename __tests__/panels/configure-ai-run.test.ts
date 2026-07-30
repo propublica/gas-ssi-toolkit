@@ -12,6 +12,8 @@ jest.mock("../../src/client/services", () => ({
 jest.mock("../../src/client/job-store", () => ({
   jobStore: {
     dispatch: jest.fn().mockImplementation((_id, _label, fn: Promise<void>) => fn),
+    isCancelled: jest.fn().mockReturnValue(false),
+    setProgress: jest.fn(),
   },
 }));
 
@@ -1009,5 +1011,33 @@ describe("ConfigureAIRunPanel — lastRun persistence", () => {
     expect(results.textContent).toContain("Test run:");
     expect(results.textContent).not.toContain("Full run estimate");
     expect(results.textContent).not.toContain("Unusually large files");
+  });
+});
+
+describe("ConfigureAIRunPanel — full-run stat capture", () => {
+  it("captures a chunk's stats into lastRun during a full run", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const { container, panel } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 11 },
+    });
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+    expect(panel.unmount()?.lastRun).toEqual({ stats: TEST_STATS, source: "run" });
+  });
+
+  it("leaves a previously captured lastRun intact when a chunk measures nothing", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container, panel } = await mountAndLoad(undefined, {
+      promptCols: [{ col: "col_a", kind: "text" as const }],
+      systemPromptCol: "",
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 11 },
+      lastRun: MEASURED_TEST,
+    });
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+    expect(panel.unmount()?.lastRun).toEqual(MEASURED_TEST);
   });
 });
