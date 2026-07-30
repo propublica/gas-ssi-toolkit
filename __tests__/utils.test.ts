@@ -16,12 +16,10 @@ import {
   flattenArg,
   resolveColumns,
   writeJobProgress,
-  writeRunStats,
   interpolateTemplate,
   resolveGroundingUris,
 } from "../src/server/utils";
 import type { DriveFileInfo, GeminiResponse } from "../src/server/types";
-import type { RunStats } from "../src/shared/types";
 
 describe("extractId", () => {
   it("extracts ID from a standard Drive file URL", () => {
@@ -324,34 +322,6 @@ describe("writeJobProgress", () => {
       JSON.stringify({ message: "Scanning folder..." }),
       300,
     );
-  });
-});
-
-describe("writeRunStats", () => {
-  it("writes serialized stats to cache keyed by spreadsheet ID with a 6-hour TTL", () => {
-    const mockPut = jest.fn();
-    const mockCache = { put: mockPut } as unknown as GoogleAppsScript.Cache.Cache;
-    const stats: RunStats = {
-      rowCount: 10,
-      totalTimeMs: 4200,
-      totalInputTokens: 500,
-      totalOutputTokens: 300,
-      totalTokenCost: 0.002,
-      totalGroundingQueries: 0,
-      totalGroundingCost: 0,
-      testedAt: 1234567890,
-      config: {
-        promptCols: [{ col: "col_a", kind: "text" }],
-        systemPromptCol: undefined,
-        tools: [],
-        prefixWithColName: false,
-        model: "gemini-3.1-flash-lite",
-      },
-    };
-
-    writeRunStats(mockCache, "sheet-abc", stats);
-
-    expect(mockPut).toHaveBeenCalledWith("runStats:sheet-abc", JSON.stringify(stats), 21600);
   });
 });
 

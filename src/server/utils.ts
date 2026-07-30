@@ -7,7 +7,6 @@
  */
 
 import type { DriveFileInfo, GeminiResponse } from "./types";
-import type { RunStats } from "../shared/types";
 
 /**
  * Extract a Google Drive file/folder ID from a URL or raw ID string.
@@ -117,22 +116,6 @@ export function writeJobProgress(
   state: { message?: string; current?: number; total?: number },
 ): void {
   cache.put(jobId, JSON.stringify(state), 300);
-}
-
-/**
- * Writes run stats to CacheService, keyed per spreadsheet (the UserCache is
- * already scoped to the current user; the spreadsheet ID additionally
- * prevents collisions if the same user has this add-on open in multiple
- * sheets). TTL is 21600s (6 hours — CacheService's max), long enough to
- * survive a reasonable gap between a test run and a later full run in the
- * same working session.
- */
-export function writeRunStats(
-  cache: GoogleAppsScript.Cache.Cache,
-  spreadsheetId: string,
-  stats: RunStats,
-): void {
-  cache.put(`runStats:${spreadsheetId}`, JSON.stringify(stats), 21600);
 }
 
 /**

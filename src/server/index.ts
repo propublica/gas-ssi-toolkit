@@ -31,7 +31,6 @@ import {
   truncateText,
   resolveColumns,
   writeJobProgress,
-  writeRunStats,
   interpolateTemplate,
   flattenArg,
   markAIOutputRange,
@@ -586,7 +585,6 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
       config: buildConfigSnapshot(config),
     };
     if (computed.rowCount > 0) {
-      writeRunStats(cache, ss.getId(), computed);
       stats = computed;
     }
   } catch (_e) {
