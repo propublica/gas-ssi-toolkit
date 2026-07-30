@@ -205,9 +205,11 @@ handleRun():
 
 ## Testing
 
-`projectFullRunCost` — pure: token-only cost, grounding-inclusive cost, scaling to a larger row count, single-row sample.
+The suite already splits this panel by kind: `__tests__/configure-ai-run.test.ts` holds pure helpers (`computeChunks` only, 36 lines), `__tests__/panels/configure-ai-run.test.ts` holds DOM-driven panel behavior (1,039 lines). New tests follow that split.
 
-`configure-ai-run.test.ts`:
+`__tests__/configure-ai-run.test.ts` — `projectFullRunCost`, pure: token-only cost, grounding-inclusive cost, scaling to a larger row count, single-row sample.
+
+`__tests__/panels/configure-ai-run.test.ts`:
 - All three trigger branches: untested + above chunk size → nudge; usable stats + over threshold → cost warning; usable stats + under threshold → no dialog
 - Untested **below** chunk size → no dialog
 - `configsMatch` mismatch at click time → treated as untested even though `lastRun` exists
@@ -228,8 +230,9 @@ handleRun():
 | `src/client/types.ts` | Replace `TestRunDisplay` with `MeasuredRun` |
 | `src/server/index.ts` | Remove the `writeRunStats` call and its import |
 | `src/server/utils.ts` | Delete `writeRunStats` |
-| `__tests__/configure-ai-run.test.ts` | Tests above |
-| `__tests__/utils.test.ts` | Remove `writeRunStats` tests |
+| `__tests__/configure-ai-run.test.ts` | Add `projectFullRunCost` pure tests |
+| `__tests__/panels/configure-ai-run.test.ts` | Trigger-branch and capture tests; rename the `lastTest persistence` block (line 918) to `lastRun` |
+| `__tests__/utils.test.ts` | Remove the `writeRunStats` describe block (lines 330-353) |
 | `docs/threat_models/ssi-toolkit-threat-model.md` | R44 resolved (cost gate only); amend R43's note about caching for R44 |
 
 Net effect is a code reduction: one new constant and one 3-line function, against a deleted constant, a deleted server function, a deleted interface field, and two collapsed dispatch paths. No new RPC endpoint, so no new T8 surface.
