@@ -94,16 +94,20 @@ export interface Panel<P = unknown, S = unknown> {
   unmount(): S | undefined;
 }
 
-// ── Run AI test display ──────────────────────────────────────────
-// Client-only — the server has no concept of an "uncapped" row count, only
-// the capped test range it actually ran. Bundled with its RunStats into one
-// object (rather than two parallel fields on the panel) so the two values
-// can never be set or cleared out of sync with each other.
+// ── Run AI measured-run state ────────────────────────────────────
+// Client-only. Holds the most recent measured RunStats from either a Test
+// click or a chunk of a full run, so the panel can display what the last run
+// actually cost and handleRun can project a full-run cost before dispatching.
+//
+// Deliberately stores no row count. The projection always uses the row range
+// resolved live at click time, because RunStatsConfigSnapshot excludes
+// rowRange — configsMatch therefore cannot detect a widened range, so a count
+// stored here would silently go stale (AI-88).
 
-export interface TestRunDisplay {
+export interface MeasuredRun {
   stats: RunStats;
-  /** The full (uncapped) row count the test's range was resolved from, before capping to 10 rows. */
-  fullRowCount: number;
+  /** Which action produced the measurement — controls the display label only. */
+  source: "test" | "run";
 }
 
 export interface RecipeDefinition {

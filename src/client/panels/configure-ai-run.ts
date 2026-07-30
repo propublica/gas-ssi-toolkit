@@ -1,4 +1,4 @@
-import type { NavigationContext, Panel, TestRunDisplay } from "../types";
+import type { NavigationContext, Panel, MeasuredRun } from "../types";
 import type { RunConfig, ToolId, ModelId, RunStats } from "../../shared/types";
 import { TagList } from "../components/tag-list";
 import { TokenInput } from "../components/token-input";
@@ -63,7 +63,7 @@ export type SavedState = Required<
   > & {
     toolsExpanded?: boolean;
     modelExpanded?: boolean;
-    lastTest?: TestRunDisplay | undefined;
+    lastRun?: MeasuredRun | undefined;
   };
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
@@ -81,7 +81,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private toolsExpanded = false;
   private modelListEl: HTMLElement | null = null;
   private modelExpanded = false;
-  private lastTest: TestRunDisplay | undefined = undefined;
+  private lastRun: MeasuredRun | undefined = undefined;
   private testButton: AsyncActionButton | null = null;
 
   mount(
@@ -93,7 +93,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     this.nav = nav;
     this.promptColList = null; // reset so unmount() guards correctly before load
     this.headersLoaded = false;
-    this.lastTest = savedState?.lastTest;
+    this.lastRun = savedState?.lastRun;
     container.innerHTML = this.template();
     this.wireNavButtons(container);
     this.testButton = new AsyncActionButton(
@@ -266,7 +266,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           this.headersLoaded = true;
         }
 
-        this.checkTestStatsFreshness(container);
+        this.checkLastRunFreshness(container);
       },
       (err: Error) => {
         globalThis.alert("Error loading headers: " + err.message);
@@ -294,7 +294,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       toolsExpanded: this.toolsExpanded,
       model: this.getSelectedModel(),
       modelExpanded: this.modelExpanded,
-      lastTest: this.lastTest,
+      lastRun: this.lastRun,
     };
   }
 
@@ -441,18 +441,17 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         resolveRange.then((range) => {
           const sanitized = range ? this.resolveRowRange(range) : null;
           if (!sanitized) return undefined;
-          const fullRowCount = sanitized.end - sanitized.start + 1;
           const cappedEnd = Math.min(sanitized.start + 9, sanitized.end);
           return runBatchAI(
             { ...config, rowRange: { start: sanitized.start, end: cappedEnd } },
             jobId,
-          ).then((stats) => (stats ? { stats, fullRowCount } : undefined));
+          );
         }),
       )
-      .then((test) => {
-        if (test) {
-          this.lastTest = test;
-          this.renderTestStats(container, test);
+      .then((stats) => {
+        if (stats) {
+          this.lastRun = { stats, source: "test" };
+          this.renderMeasuredRun(container, this.lastRun);
           this.testButton?.setDone();
         } else {
           this.renderTestMessage(
@@ -468,32 +467,20 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       });
   }
 
-  private renderTestStats(container: HTMLElement, test: TestRunDisplay): void {
+  /**
+   * Renders what the last measured run actually cost. Shows only measured
+   * facts, never a projection: a projected figure would need the live row
+   * range, which the panel does not track (see MeasuredRun's comment). The
+   * full-run projection lives in the pre-run dialog instead.
+   */
+  private renderMeasuredRun(container: HTMLElement, run: MeasuredRun): void {
     const el = container.querySelector<HTMLElement>("#test-results")!;
-    const { stats, fullRowCount } = test;
+    const { stats, source } = run;
     const totalCost = stats.totalTokenCost + stats.totalGroundingCost;
-    const avgCost = totalCost / stats.rowCount;
-
-    const parts = [
-      `<p><strong>Test run:</strong> ${stats.rowCount} row${stats.rowCount === 1 ? "" : "s"} · ` +
-        `$${totalCost.toFixed(4)} · ${formatDuration(stats.totalTimeMs)}</p>`,
-    ];
-
-    if (fullRowCount > stats.rowCount) {
-      const fullCost = avgCost * fullRowCount;
-      const chunkCount = Math.ceil(fullRowCount / CHUNK_SIZE);
-      const fullTimeMs = chunkCount * stats.totalTimeMs;
-      parts.push(
-        `<p><strong>Full run estimate:</strong> ${fullRowCount} rows · ` +
-          `~$${fullCost.toFixed(2)} · ~${formatDuration(fullTimeMs)}</p>`,
-      );
-    }
-
-    if (stats.config.promptCols.some((pc) => pc.kind === "file")) {
-      parts.push(`<p>⚠ Unusually large files may throw off cost and time estimates.</p>`);
-    }
-
-    el.innerHTML = parts.join("");
+    const label = source === "test" ? "Test run" : "Last run";
+    el.innerHTML =
+      `<p><strong>${label}:</strong> ${stats.rowCount} row${stats.rowCount === 1 ? "" : "s"} · ` +
+      `$${totalCost.toFixed(4)} · ${formatDuration(stats.totalTimeMs)}</p>`;
     el.hidden = false;
   }
 
@@ -504,24 +491,30 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   }
 
   /**
-   * Re-validates the displayed test results against the live config. Called after
+   * Re-validates the displayed measurement against the live config. Called after
    * every loadHeaders() resolution (initial mount AND refresh), not just the first
    * load — otherwise refreshing after an external sheet edit (e.g. a column
-   * disappearing) could leave a stale "Tested ✓" display unvalidated indefinitely.
+   * disappearing) could leave a stale display unvalidated indefinitely.
    * Skipped while a test is actively running: refresh isn't disabled during a
-   * test, and re-checking against last completion's stats would incorrectly
+   * test, and re-checking against the last completion's stats would incorrectly
    * clobber the in-flight loading state.
    */
-  private checkTestStatsFreshness(container: HTMLElement): void {
-    if (!this.lastTest || this.testButton?.getState() === "loading") return;
+  private checkLastRunFreshness(container: HTMLElement): void {
+    if (!this.lastRun || this.testButton?.getState() === "loading") return;
     const liveSnapshot = buildConfigSnapshot(this.currentPreset());
-    if (configsMatch(liveSnapshot, this.lastTest.stats.config)) {
-      this.renderTestStats(container, this.lastTest);
-      this.testButton?.setDone();
+    if (configsMatch(liveSnapshot, this.lastRun.stats.config)) {
+      this.renderMeasuredRun(container, this.lastRun);
+      // Only a Test click earns the persistent "Tested ✓" state — a completed
+      // full run is a measurement, but it isn't a test.
+      if (this.lastRun.source === "test") {
+        this.testButton?.setDone();
+      } else {
+        this.testButton?.setIdle();
+      }
     } else {
       this.renderTestMessage(
         container,
-        "Configuration changed since last test — click Test to refresh.",
+        "Configuration changed since last run — click Test to refresh.",
       );
       this.testButton?.setIdle();
     }
