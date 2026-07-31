@@ -12,6 +12,10 @@ jest.mock("../../src/client/services", () => ({
 jest.mock("../../src/client/job-store", () => ({
   jobStore: {
     dispatch: jest.fn().mockImplementation((_id, _label, fn: Promise<void>) => fn),
+    // runChunks() calls both of these per chunk. Without them the chunked dispatch
+    // path throws on the first undefined call, which is why it went unexercised.
+    isCancelled: jest.fn().mockReturnValue(false),
+    setProgress: jest.fn(),
   },
 }));
 
@@ -102,6 +106,11 @@ function selectColumn(container: HTMLElement, fieldId: string, value: string): v
 beforeEach(() => {
   jest.clearAllMocks();
   globalThis.alert = jest.fn();
+  globalThis.confirm = jest.fn().mockReturnValue(true);
+  // A small default selection so the Run AI path resolves a usable range.
+  // 10 rows is under CHUNK_SIZE, so it never trips the untested-run warning;
+  // tests that care about the range or its absence override this explicitly.
+  (services.getActiveRangeInfo as jest.Mock).mockResolvedValue({ start: 2, end: 11 });
 });
 
 describe("ConfigureAIRunPanel — mount", () => {
@@ -250,6 +259,131 @@ describe("ConfigureAIRunPanel — Run AI", () => {
       }),
       expect.stringMatching(/^batch-ai-\d+$/),
     );
+  });
+});
+
+describe("ConfigureAIRunPanel — untested-run warning", () => {
+  /** 100 rows — comfortably above CHUNK_SIZE (40). */
+  const LARGE_RANGE = { start: 2, end: 101 };
+
+  /** savedState whose live config snapshot matches TEST_STATS.config exactly. */
+  const MATCHING_STATE = {
+    promptCols: [{ col: "col_a", kind: "text" as const }],
+    systemPromptCol: "",
+    outputCol: "ai_inference",
+    rowRange: LARGE_RANGE,
+  };
+
+  async function clickRun(container: HTMLElement): Promise<void> {
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+  }
+
+  it("does not warn at exactly CHUNK_SIZE rows", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 2, end: 41 }, // exactly 40 rows
+    });
+    await clickRun(container);
+    expect(globalThis.confirm).not.toHaveBeenCalled();
+    expect(services.runBatchAI).toHaveBeenCalled();
+  });
+
+  it("warns for an untested large run in highlighted-rows mode", async () => {
+    // Regression guard: the old confirm() sat inside `if (config.rowRange)`, so the
+    // default input mode — which leaves rowRange undefined — could never warn.
+    (services.getActiveRangeInfo as jest.Mock).mockResolvedValue(LARGE_RANGE);
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+    });
+    await clickRun(container);
+    expect(globalThis.confirm).toHaveBeenCalledWith(expect.stringContaining("100 rows"));
+  });
+
+  it("warns for an untested large run in explicit-range mode", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: LARGE_RANGE,
+    });
+    await clickRun(container);
+    expect(globalThis.confirm).toHaveBeenCalledWith(expect.stringContaining("100 rows"));
+  });
+
+  it("does not warn when a test measurement matches the live config", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad(undefined, {
+      ...MATCHING_STATE,
+      lastTest: TEST_DISPLAY,
+    });
+    await clickRun(container);
+    expect(globalThis.confirm).not.toHaveBeenCalled();
+    expect(services.runBatchAI).toHaveBeenCalled();
+  });
+
+  it("warns when a test measurement exists but the config changed since", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad(undefined, {
+      ...MATCHING_STATE,
+      promptCols: [{ col: "col_b", kind: "text" as const }], // differs from TEST_STATS.config
+      lastTest: TEST_DISPLAY,
+    });
+    await clickRun(container);
+    expect(globalThis.confirm).toHaveBeenCalledWith(expect.stringContaining("100 rows"));
+  });
+
+  it("dispatches nothing when the user cancels the warning", async () => {
+    (globalThis.confirm as jest.Mock).mockReturnValue(false);
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: LARGE_RANGE,
+    });
+    await clickRun(container);
+    expect(services.runBatchAI).not.toHaveBeenCalled();
+  });
+
+  it("alerts and dispatches nothing when there is no active range", async () => {
+    // The dropped fallback used to dispatch runBatchAI with no rowRange, which the
+    // server silently no-ops for the same reason (no active range).
+    (services.getActiveRangeInfo as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+    });
+    await clickRun(container);
+    expect(services.runBatchAI).not.toHaveBeenCalled();
+    expect(globalThis.alert).toHaveBeenCalledWith(expect.stringContaining("Select the rows"));
+  });
+
+  it("alerts and dispatches nothing when the selection is the header row only", async () => {
+    (services.getActiveRangeInfo as jest.Mock).mockResolvedValue({ start: 1, end: 1 });
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+    });
+    await clickRun(container);
+    expect(services.runBatchAI).not.toHaveBeenCalled();
+    expect(globalThis.alert).toHaveBeenCalledWith(
+      expect.stringContaining("Row 1 is the header row"),
+    );
+  });
+
+  it("alerts when resolving the active range fails", async () => {
+    (services.getActiveRangeInfo as jest.Mock).mockRejectedValue(new Error("RPC down"));
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+    });
+    await clickRun(container);
+    expect(services.runBatchAI).not.toHaveBeenCalled();
+    expect(globalThis.alert).toHaveBeenCalledWith("Error: RPC down");
   });
 });
 
