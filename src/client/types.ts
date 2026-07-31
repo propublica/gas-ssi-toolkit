@@ -1,4 +1,4 @@
-import type { PrepColSpec, RunConfig } from "../shared/types";
+import type { PrepColSpec, RunConfig, RunStats } from "../shared/types";
 
 // ── Recipe column types ──────────────────────────────────────────
 
@@ -92,6 +92,18 @@ export interface NavigationContext {
 export interface Panel<P = unknown, S = unknown> {
   mount(container: HTMLElement, nav: NavigationContext, params?: P, savedState?: S): void;
   unmount(): S | undefined;
+}
+
+// ── Run AI test display ──────────────────────────────────────────
+// Client-only — the server has no concept of an "uncapped" row count, only
+// the capped test range it actually ran. Bundled with its RunStats into one
+// object (rather than two parallel fields on the panel) so the two values
+// can never be set or cleared out of sync with each other.
+
+export interface TestRunDisplay {
+  stats: RunStats;
+  /** The full (uncapped) row count the test's range was resolved from, before capping to 10 rows. */
+  fullRowCount: number;
 }
 
 export interface RecipeDefinition {

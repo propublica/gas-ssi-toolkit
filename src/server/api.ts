@@ -2,14 +2,16 @@
  * api.ts — Gemini API interaction via UrlFetchApp.
  *
  * Pure HTTP adapter. All preprocessing (Drive file fetching, base64 encoding,
- * text assembly) is the caller's responsibility.
+ * text assembly) is the caller's responsibility, and the credential comes from
+ * gemini-auth.ts.
  *
  * Requires oauth scope: https://www.googleapis.com/auth/script.external_request
  */
 
 import { CONFIG } from "./config";
+import { geminiAuthHeaders } from "./gemini-auth";
 import { TOOL_REGISTRY } from "./tools";
-import type { GeminiRequest, GeminiResponse, GeminiCodePair } from "./types";
+import type { GeminiRequest, GeminiResponse, GeminiCodePair, GeminiUsageMetadata } from "./types";
 
 /**
  * Assemble the Gemini generateContent request payload from a GeminiRequest.
@@ -54,11 +56,12 @@ export function buildGeminiPayload(req: GeminiRequest): Record<string, unknown> 
  */
 export function callGeminiAPI(req: GeminiRequest): GeminiResponse {
   const modelName = req.modelName ?? CONFIG.DEFAULT_MODEL;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${req.apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
   const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
     method: "post",
     contentType: "application/json",
+    headers: geminiAuthHeaders(),
     payload: JSON.stringify(buildGeminiPayload(req)),
     muteHttpExceptions: true,
   };
@@ -96,8 +99,11 @@ export function callGeminiAPI(req: GeminiRequest): GeminiResponse {
     | GeminiResponse["groundingMetadata"]
     | undefined;
 
+  const usageMetadata = json.usageMetadata as GeminiUsageMetadata | undefined;
+
   return {
     text,
+    usageMetadata,
     ...(groundingMetadata !== undefined && { groundingMetadata }),
     ...(codePairs.length > 0 && { codePairs }),
   };
@@ -111,13 +117,18 @@ export function callGeminiAPI(req: GeminiRequest): GeminiResponse {
 export function callGeminiAPIBatch(reqs: GeminiRequest[]): GeminiResponse[] {
   if (reqs.length === 0) return [];
 
+  // Resolve the credential once — geminiAuthHeaders() reads a script property,
+  // and this map can hold every row in a chunk.
+  const headers = geminiAuthHeaders();
+
   const requests = reqs.map((req) => {
     const modelName = req.modelName ?? CONFIG.DEFAULT_MODEL;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${req.apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
     return {
       url,
       method: "post" as const,
       contentType: "application/json",
+      headers,
       payload: JSON.stringify(buildGeminiPayload(req)),
       muteHttpExceptions: true,
     };
@@ -163,21 +174,13 @@ export function callGeminiAPIBatch(reqs: GeminiRequest[]): GeminiResponse[] {
       | GeminiResponse["groundingMetadata"]
       | undefined;
 
+    const usageMetadata = json.usageMetadata as GeminiUsageMetadata | undefined;
+
     return {
       text,
+      usageMetadata,
       ...(groundingMetadata !== undefined && { groundingMetadata }),
       ...(codePairs.length > 0 && { codePairs }),
     };
   });
-}
-
-/**
- * Resolve the Gemini API key from Script Properties and call callGeminiAPI.
- * This is the preferred entry point for all production Gemini calls.
- * Throws if the API key property is not set.
- */
-export function invokeGemini(params: Omit<GeminiRequest, "apiKey">): GeminiResponse {
-  const apiKey = PropertiesService.getScriptProperties().getProperty(CONFIG.API_KEY_PROPERTY);
-  if (!apiKey) throw new Error(`${CONFIG.API_KEY_PROPERTY} script property not set`);
-  return callGeminiAPI({ apiKey, ...params });
 }

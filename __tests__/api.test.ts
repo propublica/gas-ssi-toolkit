@@ -1,8 +1,9 @@
 /**
  * Tests for src/server/api.ts
  *
- * GAS globals mocked: UrlFetchApp (callGeminiAPI) and PropertiesService
- * (invokeGemini). DriveApp and Utilities are not used in this module.
+ * GAS globals mocked: UrlFetchApp (callGeminiAPI, callGeminiAPIBatch) and
+ * PropertiesService (geminiAuthHeaders, via gemini-auth.ts). DriveApp and
+ * Utilities are not used in this module.
  */
 
 // ── Mock globals BEFORE imports ────────────────────────────────
@@ -20,12 +21,7 @@
 
 // ── Import after mocks ─────────────────────────────────────────
 
-import {
-  buildGeminiPayload,
-  callGeminiAPI,
-  callGeminiAPIBatch,
-  invokeGemini,
-} from "../src/server/api";
+import { buildGeminiPayload, callGeminiAPI, callGeminiAPIBatch } from "../src/server/api";
 import { CONFIG } from "../src/server/config";
 import type { GeminiRequest } from "../src/server/types";
 
@@ -38,7 +34,6 @@ function mockFetchResponse(body: unknown) {
 }
 
 const baseReq: GeminiRequest = {
-  apiKey: "key123",
   systemPrompt: "Be helpful",
   userParts: [{ text: "Summarize this" }],
 };
@@ -96,7 +91,7 @@ describe("buildGeminiPayload", () => {
   });
 
   it("uses default system prompt when systemPrompt is omitted", () => {
-    const req: GeminiRequest = { apiKey: "k", userParts: [{ text: "hi" }] };
+    const req: GeminiRequest = { userParts: [{ text: "hi" }] };
     const payload = buildGeminiPayload(req);
     expect((payload.system_instruction as any).parts[0].text).toBe("You are a helpful assistant.");
   });
@@ -123,7 +118,6 @@ describe("buildGeminiPayload", () => {
   describe("parts-based assembly", () => {
     it("maps a text part to a REST text part", () => {
       const payload = buildGeminiPayload({
-        apiKey: "k",
         userParts: [{ text: "Hello" }],
       });
       const parts = (payload.contents as any)[0].parts;
@@ -133,7 +127,6 @@ describe("buildGeminiPayload", () => {
 
     it("maps an inline_data part to a REST inline_data part", () => {
       const payload = buildGeminiPayload({
-        apiKey: "k",
         userParts: [
           { text: "Describe this" },
           { inline_data: { mime_type: "application/pdf", data: "base64==" } },
@@ -146,7 +139,6 @@ describe("buildGeminiPayload", () => {
 
     it("maps a file_uri part to a REST file_data part", () => {
       const payload = buildGeminiPayload({
-        apiKey: "k",
         userParts: [
           { text: "Describe this" },
           {
@@ -169,7 +161,6 @@ describe("buildGeminiPayload", () => {
 
     it("preserves declared part order in the REST payload", () => {
       const payload = buildGeminiPayload({
-        apiKey: "k",
         userParts: [
           { text: "First" },
           { inline_data: { mime_type: "image/jpeg", data: "img==" } },
@@ -223,7 +214,7 @@ describe("callGeminiAPI", () => {
 
   it("throws on API error response", () => {
     mockFetchResponse({ error: { message: "Invalid API key" } });
-    expect(() => callGeminiAPI({ ...baseReq, apiKey: "bad" })).toThrow("Invalid API key");
+    expect(() => callGeminiAPI(baseReq)).toThrow("Invalid API key");
   });
 
   it("uses modelName from request when provided", () => {
@@ -238,6 +229,20 @@ describe("callGeminiAPI", () => {
     callGeminiAPI(baseReq);
     const url = (UrlFetchApp.fetch as jest.Mock).mock.calls[0][0] as string;
     expect(url).toContain(CONFIG.DEFAULT_MODEL);
+  });
+
+  it("sends the API key as an x-goog-api-key header, never in the URL", () => {
+    mockFetchResponse({ candidates: [{ content: { parts: [{ text: "ok" }] } }] });
+    callGeminiAPI(baseReq);
+    const [url, options] = (UrlFetchApp.fetch as jest.Mock).mock.calls[0];
+    expect(url).not.toContain("test-api-key");
+    expect(url).not.toContain("key=");
+    expect(options.headers).toEqual({ "x-goog-api-key": "test-api-key" });
+  });
+
+  it("throws the missing-key message when the script property is unset", () => {
+    (PropertiesService.getScriptProperties().getProperty as jest.Mock).mockReturnValueOnce(null);
+    expect(() => callGeminiAPI(baseReq)).toThrow(/GEMINI_API_KEY/);
   });
 
   it("assembles text from multiple text parts (code execution interleaving)", () => {
@@ -322,36 +327,49 @@ describe("callGeminiAPI", () => {
     expect(resp.groundingMetadata).toBeUndefined();
     expect(resp.codePairs).toBeUndefined();
   });
-});
 
-// ── invokeGemini tests ─────────────────────────────────────────
-
-describe("invokeGemini", () => {
-  beforeEach(() => jest.clearAllMocks());
-
-  it("returns a GeminiResponse with text from the first candidate", () => {
-    mockFetchResponse({ candidates: [{ content: { parts: [{ text: "result" }] } }] });
-    const result = invokeGemini({ userParts: [{ text: "hello" }] });
-    expect(result.text).toBe("result");
-    const url = (UrlFetchApp.fetch as jest.Mock).mock.calls[0][0] as string;
-    expect(url).toContain("test-api-key");
+  it("populates usageMetadata when present in the response", () => {
+    mockFetchResponse({
+      candidates: [{ content: { parts: [{ text: "ok" }] } }],
+      usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, totalTokenCount: 15 },
+    });
+    const resp = callGeminiAPI(baseReq);
+    expect(resp.usageMetadata).toEqual({
+      promptTokenCount: 10,
+      candidatesTokenCount: 5,
+      totalTokenCount: 15,
+    });
   });
 
-  it("throws when the API key property is not set", () => {
-    (PropertiesService.getScriptProperties().getProperty as jest.Mock).mockReturnValueOnce(null);
-    expect(() => invokeGemini({ userParts: [{ text: "hello" }] })).toThrow(/GEMINI_API_KEY/);
+  it("passes through thoughtsTokenCount when present", () => {
+    mockFetchResponse({
+      candidates: [{ content: { parts: [{ text: "ok" }] } }],
+      usageMetadata: {
+        promptTokenCount: 10,
+        candidatesTokenCount: 5,
+        thoughtsTokenCount: 20,
+        totalTokenCount: 35,
+      },
+    });
+    const resp = callGeminiAPI(baseReq);
+    expect(resp.usageMetadata?.thoughtsTokenCount).toBe(20);
+  });
+
+  it("leaves usageMetadata undefined when not present in the response", () => {
+    mockFetchResponse({ candidates: [{ content: { parts: [{ text: "ok" }] } }] });
+    expect(callGeminiAPI(baseReq).usageMetadata).toBeUndefined();
   });
 
   it("passes systemPrompt through to the payload", () => {
     mockFetchResponse({ candidates: [{ content: { parts: [{ text: "ok" }] } }] });
-    invokeGemini({ systemPrompt: "Be concise", userParts: [{ text: "hello" }] });
+    callGeminiAPI({ systemPrompt: "Be concise", userParts: [{ text: "hello" }] });
     const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
     expect(payload.system_instruction.parts[0].text).toBe("Be concise");
   });
 
   it("passes inlineData through to the payload", () => {
     mockFetchResponse({ candidates: [{ content: { parts: [{ text: "ok" }] } }] });
-    invokeGemini({
+    callGeminiAPI({
       userParts: [
         { text: "describe this" },
         { inline_data: { mime_type: "application/pdf", data: "base64==" } },
@@ -379,8 +397,8 @@ describe("callGeminiAPIBatch", () => {
       { candidates: [{ content: { parts: [{ text: "Result B" }] } }] },
     ]);
     const reqs: GeminiRequest[] = [
-      { apiKey: "key", userParts: [{ text: "Q1" }] },
-      { apiKey: "key", userParts: [{ text: "Q2" }] },
+      { userParts: [{ text: "Q1" }] },
+      { userParts: [{ text: "Q2" }] },
     ];
     const results = callGeminiAPIBatch(reqs);
     expect(results).toHaveLength(2);
@@ -388,9 +406,68 @@ describe("callGeminiAPIBatch", () => {
     expect(results[1].text).toBe("Result B");
   });
 
+  it("populates usageMetadata per response", () => {
+    mockFetchAllResponses([
+      {
+        candidates: [{ content: { parts: [{ text: "A" }] } }],
+        usageMetadata: { promptTokenCount: 8, candidatesTokenCount: 4, totalTokenCount: 12 },
+      },
+      { candidates: [{ content: { parts: [{ text: "B" }] } }] },
+    ]);
+    const reqs: GeminiRequest[] = [
+      { userParts: [{ text: "Q1" }] },
+      { userParts: [{ text: "Q2" }] },
+    ];
+    const results = callGeminiAPIBatch(reqs);
+    expect(results[0].usageMetadata).toEqual({
+      promptTokenCount: 8,
+      candidatesTokenCount: 4,
+      totalTokenCount: 12,
+    });
+    expect(results[1].usageMetadata).toBeUndefined();
+  });
+
   it("returns empty array for empty input", () => {
     expect(callGeminiAPIBatch([])).toEqual([]);
     expect(UrlFetchApp.fetchAll as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  it("sends the API key as a header on every request, never in the URL", () => {
+    mockFetchAllResponses([
+      { candidates: [{ content: { parts: [{ text: "A" }] } }] },
+      { candidates: [{ content: { parts: [{ text: "B" }] } }] },
+    ]);
+    callGeminiAPIBatch([{ userParts: [{ text: "Q1" }] }, { userParts: [{ text: "Q2" }] }]);
+    const requests = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
+    expect(requests).toHaveLength(2);
+    requests.forEach((r: { url: string; headers: Record<string, string> }) => {
+      expect(r.url).not.toContain("test-api-key");
+      expect(r.url).not.toContain("key=");
+      expect(r.headers).toEqual({ "x-goog-api-key": "test-api-key" });
+    });
+  });
+
+  it("resolves the credential once per batch, not once per request", () => {
+    mockFetchAllResponses([
+      { candidates: [{ content: { parts: [{ text: "A" }] } }] },
+      { candidates: [{ content: { parts: [{ text: "B" }] } }] },
+      { candidates: [{ content: { parts: [{ text: "C" }] } }] },
+    ]);
+    const getProperty = PropertiesService.getScriptProperties().getProperty as jest.Mock;
+    getProperty.mockClear();
+    callGeminiAPIBatch([
+      { userParts: [{ text: "Q1" }] },
+      { userParts: [{ text: "Q2" }] },
+      { userParts: [{ text: "Q3" }] },
+    ]);
+    expect(getProperty).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not read the script property for an empty batch", () => {
+    const getProperty = PropertiesService.getScriptProperties().getProperty as jest.Mock;
+    getProperty.mockClear();
+    expect(callGeminiAPIBatch([])).toEqual([]);
+    expect(getProperty).not.toHaveBeenCalled();
   });
 
   it("maps a Gemini error response to an error text result (does not throw)", () => {
@@ -399,8 +476,8 @@ describe("callGeminiAPIBatch", () => {
       { candidates: [{ content: { parts: [{ text: "OK" }] } }] },
     ]);
     const reqs: GeminiRequest[] = [
-      { apiKey: "key", userParts: [{ text: "Q1" }] },
-      { apiKey: "key", userParts: [{ text: "Q2" }] },
+      { userParts: [{ text: "Q1" }] },
+      { userParts: [{ text: "Q2" }] },
     ];
     const results = callGeminiAPIBatch(reqs);
     expect(results[0].text).toMatch(/Error:/);
@@ -419,8 +496,8 @@ describe("callGeminiAPIBatch", () => {
       },
     ]);
     const reqs: GeminiRequest[] = [
-      { apiKey: "key", userParts: [{ text: "Q1" }] },
-      { apiKey: "key", userParts: [{ text: "Q2" }] },
+      { userParts: [{ text: "Q1" }] },
+      { userParts: [{ text: "Q2" }] },
     ];
     const results = callGeminiAPIBatch(reqs);
     expect(results[0].text).toMatch(/Error:.*503/);
@@ -430,7 +507,6 @@ describe("callGeminiAPIBatch", () => {
   it("includes file_data parts in the request payload", () => {
     mockFetchAllResponses([{ candidates: [{ content: { parts: [{ text: "ok" }] } }] }]);
     const req: GeminiRequest = {
-      apiKey: "key",
       userParts: [
         { text: "Describe this file" },
         {
@@ -452,23 +528,21 @@ describe("callGeminiAPIBatch", () => {
 
   it("uses modelName from request when provided", () => {
     mockFetchAllResponses([{ candidates: [{ content: { parts: [{ text: "ok" }] } }] }]);
-    callGeminiAPIBatch([
-      { apiKey: "key", modelName: "gemini-1.5-pro", userParts: [{ text: "Q" }] },
-    ]);
+    callGeminiAPIBatch([{ modelName: "gemini-1.5-pro", userParts: [{ text: "Q" }] }]);
     const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
     expect(calls[0].url).toContain("gemini-1.5-pro");
   });
 
   it("falls back to CONFIG.DEFAULT_MODEL when modelName is omitted", () => {
     mockFetchAllResponses([{ candidates: [{ content: { parts: [{ text: "ok" }] } }] }]);
-    callGeminiAPIBatch([{ apiKey: "key", userParts: [{ text: "Q" }] }]);
+    callGeminiAPIBatch([{ userParts: [{ text: "Q" }] }]);
     const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
     expect(calls[0].url).toContain(CONFIG.DEFAULT_MODEL);
   });
 
   it("returns 'No response.' when candidates are empty", () => {
     mockFetchAllResponses([{ candidates: [] }]);
-    const results = callGeminiAPIBatch([{ apiKey: "key", userParts: [{ text: "Q" }] }]);
+    const results = callGeminiAPIBatch([{ userParts: [{ text: "Q" }] }]);
     expect(results[0].text).toBe("No response.");
   });
 
@@ -487,7 +561,7 @@ describe("callGeminiAPIBatch", () => {
         ],
       },
     ]);
-    const results = callGeminiAPIBatch([{ apiKey: "key", userParts: [{ text: "Q" }] }]);
+    const results = callGeminiAPIBatch([{ userParts: [{ text: "Q" }] }]);
     expect(results[0].codePairs).toHaveLength(1);
     expect(results[0].codePairs![0].code.code).toBe("print(42)");
     expect(results[0].codePairs![0].result.output).toBe("42\n");

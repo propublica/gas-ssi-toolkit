@@ -8,11 +8,10 @@
  * tools array, but with different structures.
  */
 
-import type { PromptColumnSpec, ToolId } from "../shared/types";
+import type { ModelId, PromptColumnSpec, ToolId } from "../shared/types";
 
 export interface AppConfig {
-  API_KEY_PROPERTY: string;
-  DEFAULT_MODEL: string;
+  DEFAULT_MODEL: ModelId;
   /**
    * Inline data size limits for the Gemini REST API.
    * Source: https://ai.google.dev/gemini-api/docs/file-input-methods#method-comparison
@@ -101,12 +100,30 @@ export interface GeminiCodePair {
 }
 
 /**
+ * Token usage for a single generateContent response.
+ * Field relationships (per the Gemini API reference): promptTokenCount is the
+ * complete effective prompt size — cachedContentTokenCount and
+ * toolUsePromptTokenCount are subsets of it, not additional, so neither is
+ * captured here. thoughtsTokenCount IS additional and bills at the output
+ * rate — it is not an edge case for this app, since thinking is on by
+ * default for both models in PRICING_CATALOG.
+ */
+export interface GeminiUsageMetadata {
+  promptTokenCount: number;
+  candidatesTokenCount: number;
+  thoughtsTokenCount?: number;
+  totalTokenCount: number;
+}
+
+/**
  * Structured representation of a Gemini generateContent response.
- * Returned by callGeminiAPI and invokeGemini in place of a bare string.
+ * Returned by callGeminiAPI in place of a bare string.
  */
 export interface GeminiResponse {
   /** Assembled from all text parts in candidates[0].content.parts. */
   text: string;
+  /** Token usage for this response. Present on essentially every successful call. */
+  usageMetadata?: GeminiUsageMetadata;
   /** Present when google_search grounding was active. */
   groundingMetadata?: GeminiGroundingMetadata;
   /** Present when code_execution was active and code blocks were returned. */
@@ -142,7 +159,6 @@ export interface DriveFileInfo {
 }
 
 export interface GeminiRequest {
-  apiKey: string;
   modelName?: string; // defaults to CONFIG.DEFAULT_MODEL if omitted
   systemPrompt?: string;
   /** Ordered user-turn parts assembled by the caller. Maps 1:1 to contents[0].parts in the REST payload. */

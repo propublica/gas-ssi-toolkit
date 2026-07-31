@@ -117,6 +117,75 @@ describe("Router", () => {
     expect(router.canGoBack()).toBe(true);
   });
 
+  it("navigate() with no params restores a panel's last state from an earlier visit via back()", () => {
+    const home = makePanel("home");
+    const ai = makePanel("ai");
+    const router = new Router(
+      container,
+      new Map([
+        ["tool-list", home],
+        ["configure-ai-run", ai],
+      ]),
+    );
+    router.start("tool-list");
+    router.navigate("configure-ai-run");
+    (ai as ReturnType<typeof makePanel>).unmountReturn = { promptCols: ["a"] };
+    router.back(); // leaves "ai" via back() — previously this discarded ai's state entirely
+    router.navigate("configure-ai-run"); // bare navigate — should restore
+
+    const calls = (ai as ReturnType<typeof makePanel>).mountCalls;
+    expect(calls).toHaveLength(2);
+    const secondMount = calls[1] as { savedState: unknown };
+    expect(secondMount.savedState).toEqual({ promptCols: ["a"] });
+  });
+
+  it("restores a panel's state even after visiting an unrelated panel in between", () => {
+    const home = makePanel("home");
+    const ai = makePanel("ai");
+    const importPanel = makePanel("import");
+    const router = new Router(
+      container,
+      new Map([
+        ["tool-list", home],
+        ["configure-ai-run", ai],
+        ["import-drive-links", importPanel],
+      ]),
+    );
+    router.start("tool-list");
+    router.navigate("configure-ai-run");
+    (ai as ReturnType<typeof makePanel>).unmountReturn = { promptCols: ["a"] };
+    router.back(); // -> home
+    router.navigate("import-drive-links"); // unrelated hop
+    router.back(); // -> home
+    router.navigate("configure-ai-run"); // bare navigate, should still restore "ai"'s state
+
+    const calls = (ai as ReturnType<typeof makePanel>).mountCalls;
+    const secondMount = calls[1] as { savedState: unknown };
+    expect(secondMount.savedState).toEqual({ promptCols: ["a"] });
+  });
+
+  it("navigate() with explicit params ignores any cached state for that panel", () => {
+    const home = makePanel("home");
+    const ai = makePanel("ai");
+    const router = new Router(
+      container,
+      new Map([
+        ["tool-list", home],
+        ["configure-ai-run", ai],
+      ]),
+    );
+    router.start("tool-list");
+    router.navigate("configure-ai-run");
+    (ai as ReturnType<typeof makePanel>).unmountReturn = { promptCols: ["a"] };
+    router.back();
+    router.navigate("configure-ai-run", { promptCols: ["fresh"] }); // explicit params
+
+    const calls = (ai as ReturnType<typeof makePanel>).mountCalls;
+    const secondMount = calls[1] as { params: unknown; savedState: unknown };
+    expect(secondMount.params).toEqual({ promptCols: ["fresh"] });
+    expect(secondMount.savedState).toBeUndefined(); // cache bypassed entirely
+  });
+
   it("navigate() provides a NavigationContext whose navigate/back/canGoBack delegate to router", () => {
     const home = makePanel("home");
     const ai = makePanel("ai");

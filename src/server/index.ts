@@ -10,6 +10,8 @@
 
 export { SSI } from "./customFunctions";
 import { callGeminiAPIBatch } from "./api";
+import { computeRunStats } from "./cost-tracking";
+import { buildConfigSnapshot } from "../shared/run-stats";
 import {
   fetchDriveMetadata,
   downloadDriveFiles,
@@ -17,6 +19,7 @@ import {
   extractTextUniversal,
 } from "./drive";
 import { uploadFilesToGemini } from "./files";
+import { hasGeminiApiKey, MISSING_API_KEY_MESSAGE } from "./gemini-auth";
 import { buildInferenceRequest } from "./inference";
 import { parseMarkdown, type RichSpan } from "./markdown-to-rich-text";
 import { injectCitations, groundingToMarkdown } from "./gemini-grounding";
@@ -27,18 +30,25 @@ import {
   sampleRows,
   truncateText,
   resolveColumns,
-  findOrCreateColumn,
-  writeColumn,
   writeJobProgress,
+  writeRunStats,
   interpolateTemplate,
   flattenArg,
   markAIOutputRange,
-  sanitizeForCell,
   resolveGroundingUris,
 } from "./utils";
+import {
+  findOrCreateColumn,
+  writeColumn,
+  writeSafeValue,
+  writeSafeValueGrid,
+  writeSafeRichText,
+  writeSafeRichTextGrid,
+} from "./safe-writes";
 import { CONFIG } from "./config";
 import type {
   RunConfig,
+  RunStats,
   PrepRecipeParams,
   PrepRecipeResult,
   ImportDriveLinksConfig,
@@ -161,7 +171,7 @@ export function extractText(config: ExtractTextConfig, jobId?: string): void {
 
     const fileId = extractId(cellValue);
     const text = truncateText(extractTextUniversal(fileId), 49000);
-    sheet.getRange(rowIdx, outputCol).setValue(text);
+    writeSafeValue(sheet.getRange(rowIdx, outputCol), text);
     SpreadsheetApp.flush();
   }
 }
@@ -218,16 +228,17 @@ export function sampleRowsToEvaluation(_jobId?: string): void {
   if (!targetSheet) {
     targetSheet = ss.insertSheet(targetName);
     const headers = sourceSheet.getRange(1, 1, 1, sourceSheet.getLastColumn()).getValues();
-    targetSheet.getRange(1, 1, 1, headers[0].length).setValues(headers);
+    writeSafeValueGrid(targetSheet.getRange(1, 1, 1, headers[0].length), headers);
   }
 
   const selectedRows = sampleRows(allData, sampleSize, seed);
 
   // Write to target
   const targetRow = targetSheet.getLastRow() + 1;
-  targetSheet
-    .getRange(targetRow, 1, selectedRows.length, selectedRows[0].length)
-    .setValues(selectedRows);
+  writeSafeValueGrid(
+    targetSheet.getRange(targetRow, 1, selectedRows.length, selectedRows[0].length),
+    selectedRows,
+  );
 
   ss.setActiveSheet(targetSheet);
   ui.alert(
@@ -288,7 +299,7 @@ export function formatMarkdownSelection(): void {
       }
     }),
   ) as GoogleAppsScript.Spreadsheet.RichTextValue[][];
-  range.setRichTextValues(grid);
+  writeSafeRichTextGrid(range, grid);
   ui.alert(`Formatted ${count} cell(s).`);
 }
 
@@ -298,7 +309,8 @@ export function formatMarkdownSelection(): void {
 // per sub-batch = init + upload), so 10 keeps each fetchAll well within that limit.
 const FILE_PIPELINE_BATCH_SIZE = 10;
 
-export function runBatchAI(config: RunConfig, jobId?: string): void {
+export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
+  const startTime = Date.now();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getActiveSheet();
   const ui = SpreadsheetApp.getUi();
@@ -306,7 +318,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
   const headers = getSheetHeaders();
   if (headers.length === 0) {
     ui.alert("Error", "The active sheet has no column headers.", ui.ButtonSet.OK);
-    return;
+    return null;
   }
 
   // Validate prompt columns (required — at least one)
@@ -325,7 +337,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
         : "Please select at least one prompt column.",
       ui.ButtonSet.OK,
     );
-    return;
+    return null;
   }
 
   // Validate system prompt column (if selected)
@@ -338,31 +350,19 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
         `Could not find column: ${config.systemPromptCol}`,
         ui.ButtonSet.OK,
       );
-      return;
+      return null;
     }
     systemPromptIdx = idxs[0];
   }
 
   // Resolve output column — create if not found
-  let outputIdx = headers.indexOf(config.outputCol);
-  if (outputIdx === -1) {
-    const newColIdx = sheet.getLastColumn() + 1;
-    sheet.getRange(1, newColIdx).setValue(config.outputCol);
-    outputIdx = newColIdx - 1;
-    headers.push(config.outputCol); // keep in sync, matching grounding column pattern
-  }
+  const outputIdx = findOrCreateColumn(sheet, config.outputCol) - 1;
 
   // Resolve grounding column — create if not found (only when opted in)
   let groundingIdx = -1;
   const groundingColName = config.outputCol + "_grounding";
   if (config.includeGrounding) {
-    groundingIdx = headers.indexOf(groundingColName);
-    if (groundingIdx === -1) {
-      const newColIdx = sheet.getLastColumn() + 1;
-      sheet.getRange(1, newColIdx).setValue(groundingColName);
-      groundingIdx = newColIdx - 1;
-      headers.push(groundingColName); // keep in sync for subsequent rows
-    }
+    groundingIdx = findOrCreateColumn(sheet, groundingColName) - 1;
   }
 
   // Determine row range
@@ -373,17 +373,16 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
     numRows = config.rowRange.end - config.rowRange.start + 1;
   } else {
     const range = sheet.getActiveRange();
-    if (!range) return;
+    if (!range) return null;
     startRow = range.getRow();
     numRows = range.getNumRows();
   }
 
   const dataValues = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues();
 
-  const apiKey = PropertiesService.getScriptProperties().getProperty(CONFIG.API_KEY_PROPERTY);
-  if (!apiKey) {
-    ui.alert("Error", `${CONFIG.API_KEY_PROPERTY} script property not set`, ui.ButtonSet.OK);
-    return;
+  if (!hasGeminiApiKey()) {
+    ui.alert("Error", MISSING_API_KEY_MESSAGE, ui.ButtonSet.OK);
+    return null;
   }
 
   const cache = CacheService.getUserCache();
@@ -469,7 +468,6 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
         const { uploads: batchUploads, errors: batchUploadErrors } = uploadFilesToGemini(
           batchBytes,
           batchMimeTypes,
-          apiKey,
         );
         batchBytes.clear(); // release immediately — only one sub-batch in memory at a time
         for (const [id, info] of batchUploads) fileUriMap.set(id, info);
@@ -514,7 +512,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
       hasFileInputs ? fileUriMap : undefined,
     );
     if (req !== null) {
-      requests.push({ ...req, apiKey, modelName: config.model });
+      requests.push({ ...req, modelName: config.model });
       rowIndices.push(i);
     }
   }
@@ -522,7 +520,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
   if (requests.length === 0 && directWrites.size === 0) {
     SpreadsheetApp.getActive().toast("No rows to process.", "Info", 5);
     SpreadsheetApp.flush();
-    return;
+    return null;
   }
 
   const results = requests.length > 0 ? callGeminiAPIBatch(requests) : [];
@@ -541,28 +539,30 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
 
     if (config.applyMarkdown) {
       try {
-        sheet
-          .getRange(realRowIndex, outputIdx + 1)
-          .setRichTextValue(toCellValue(parseMarkdown(injectCitations(result, resolvedUris))));
+        writeSafeRichText(
+          sheet.getRange(realRowIndex, outputIdx + 1),
+          toCellValue(parseMarkdown(injectCitations(result, resolvedUris))),
+        );
       } catch (_e) {
-        sheet.getRange(realRowIndex, outputIdx + 1).setValue(sanitizeForCell(result.text));
+        writeSafeValue(sheet.getRange(realRowIndex, outputIdx + 1), result.text);
       }
     } else {
-      sheet.getRange(realRowIndex, outputIdx + 1).setValue(sanitizeForCell(result.text));
+      writeSafeValue(sheet.getRange(realRowIndex, outputIdx + 1), result.text);
     }
 
     if (config.includeGrounding && groundingIdx >= 0) {
       const groundingMarkdown = groundingToMarkdown(result, resolvedUris);
       if (groundingMarkdown !== null) {
-        sheet
-          .getRange(realRowIndex, groundingIdx + 1)
-          .setRichTextValue(toCellValue(parseMarkdown(groundingMarkdown)));
+        writeSafeRichText(
+          sheet.getRange(realRowIndex, groundingIdx + 1),
+          toCellValue(parseMarkdown(groundingMarkdown)),
+        );
       }
     }
   }
 
   for (const [i, errorText] of directWrites) {
-    sheet.getRange(startRow + i, outputIdx + 1).setValue(errorText);
+    writeSafeValue(sheet.getRange(startRow + i, outputIdx + 1), errorText);
   }
 
   SpreadsheetApp.flush();
@@ -577,6 +577,24 @@ export function runBatchAI(config: RunConfig, jobId?: string): void {
     "Success",
     5,
   );
+
+  let stats: RunStats | null = null;
+  try {
+    const computed: RunStats = {
+      ...computeRunStats(results, Date.now() - startTime, config.model ?? CONFIG.DEFAULT_MODEL),
+      testedAt: startTime,
+      config: buildConfigSnapshot(config),
+    };
+    if (computed.rowCount > 0) {
+      writeRunStats(cache, ss.getId(), computed);
+      stats = computed;
+    }
+  } catch (_e) {
+    // Stats/cost tracking is best-effort and must never fail the underlying
+    // AI run, which has already fully completed by this point.
+  }
+
+  return stats;
 }
 
 // ==========================================

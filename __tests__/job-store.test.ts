@@ -1,5 +1,5 @@
 jest.mock("../src/client/services", () => ({
-  getJobProgress: jest.fn().mockResolvedValue(null),
+  getJobProgress: jest.fn().mockResolvedValue(undefined),
 }));
 
 import { JobStore } from "../src/client/job-store";
@@ -52,6 +52,11 @@ describe("JobStore", () => {
     const lastCall = calls[calls.length - 1][0] as Array<{ id: string; state: { status: string } }>;
     const job = lastCall.find((j) => j.id === "job-3");
     expect(job?.state.status).toBe("complete");
+  });
+
+  it("resolves with the value the dispatched promise resolves to", async () => {
+    const result = await store.dispatch("job-typed", "Test", Promise.resolve({ rows: 10 }));
+    expect(result).toEqual({ rows: 10 });
   });
 
   it("marks job error when promise rejects", async () => {
@@ -159,7 +164,7 @@ describe("JobStore", () => {
   });
 
   it("stops polling after job completes", async () => {
-    mockGetJobProgress.mockResolvedValue(null);
+    mockGetJobProgress.mockResolvedValue(undefined);
 
     await store.dispatch("job-7", "Test", Promise.resolve());
     mockGetJobProgress.mockClear();

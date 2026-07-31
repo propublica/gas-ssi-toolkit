@@ -1,19 +1,19 @@
-import type { NavigationContext, Panel } from "../types";
+import type { NavigationContext, Panel, TestRunDisplay } from "../types";
 import type { RunConfig, ToolId, ModelId } from "../../shared/types";
 import { TagList } from "../components/tag-list";
 import { TokenInput } from "../components/token-input";
 import { PromptColList } from "../components/prompt-col-list";
-import { RowRange } from "../components/row-range";
+import { RowRange, sanitizeRowRange, type RowRangeValue } from "../components/row-range";
 import { PanelLoader } from "../components/panel-loader";
 import { getSheetHeaders, runBatchAI, getActiveRangeInfo } from "../services";
 import { jobStore } from "../job-store";
 import { TOOL_CATALOG } from "../tools";
 import { MODEL_CATALOG } from "../models";
+import { buildConfigSnapshot, configsMatch } from "../../shared/run-stats";
+import { AsyncActionButton } from "../components/async-action-button";
+import { formatDuration } from "../format";
 
 export const CHUNK_SIZE = 40;
-// Warn before dispatch when the batch exceeds this many rows, regardless of chunk count.
-// Kept separate from CHUNK_SIZE so small multi-chunk runs don't trigger the dialog.
-export const CHUNK_WARN_THRESHOLD = 200;
 
 export function computeChunks(
   rowRange: { start: number; end: number },
@@ -38,6 +38,7 @@ export type SavedState = Required<
   > & {
     toolsExpanded?: boolean;
     modelExpanded?: boolean;
+    lastTest?: TestRunDisplay | undefined;
   };
 
 export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState> {
@@ -55,6 +56,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private toolsExpanded = false;
   private modelListEl: HTMLElement | null = null;
   private modelExpanded = false;
+  private lastTest: TestRunDisplay | undefined = undefined;
+  private testButton: AsyncActionButton | null = null;
 
   mount(
     container: HTMLElement,
@@ -65,8 +68,13 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     this.nav = nav;
     this.promptColList = null; // reset so unmount() guards correctly before load
     this.headersLoaded = false;
+    this.lastTest = savedState?.lastTest;
     container.innerHTML = this.template();
     this.wireNavButtons(container);
+    this.testButton = new AsyncActionButton(
+      container.querySelector<HTMLButtonElement>("#test-btn")!,
+      { idleLabel: "Test", loadingLabel: "Testing...", doneLabel: "Tested ✓" },
+    );
 
     const preset: Partial<RunConfig> = savedState
       ? {
@@ -227,8 +235,13 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           container
             .querySelector<HTMLButtonElement>("#run-btn")!
             .addEventListener("click", () => this.handleRun(container));
+          container
+            .querySelector<HTMLButtonElement>("#test-btn")!
+            .addEventListener("click", () => this.handleTest(container));
           this.headersLoaded = true;
         }
+
+        this.checkTestStatsFreshness(container);
       },
       (err: Error) => {
         globalThis.alert("Error loading headers: " + err.message);
@@ -256,6 +269,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       toolsExpanded: this.toolsExpanded,
       model: this.getSelectedModel(),
       modelExpanded: this.modelExpanded,
+      lastTest: this.lastTest,
     };
   }
 
@@ -309,56 +323,85 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     };
   }
 
+  private resolveRowRange(range: RowRangeValue): RowRangeValue | null {
+    const sanitized = sanitizeRowRange(range);
+    if (!sanitized) {
+      globalThis.alert(
+        "Row 1 is the header row and can't be processed. Please select a data row range.",
+      );
+    }
+    return sanitized;
+  }
+
+  /**
+   * Resolves the row range *before* deciding anything, so both input modes share one
+   * dispatch path. The previous split — an explicit-rowRange branch plus a branch that
+   * resolved the selection inside the dispatch callback — meant the pre-run warning could
+   * only live in the first, and "Use highlighted rows" (the default) never warned at all.
+   */
   private handleRun(_container: HTMLElement): void {
     const config = this.assembleRunConfig();
     if (!config) return;
 
-    const jobId = `batch-ai-${Date.now()}`;
+    const resolveRange: Promise<RowRangeValue | undefined> = config.rowRange
+      ? Promise.resolve(config.rowRange)
+      : getActiveRangeInfo();
 
-    if (config.rowRange) {
-      const rowCount = config.rowRange.end - config.rowRange.start + 1;
-      if (rowCount > CHUNK_WARN_THRESHOLD) {
-        const chunkCount = Math.ceil(rowCount / CHUNK_SIZE);
-        // ~0.5 s/row estimate reflects ~10x speedup from parallel inference.
-        const estimatedMins = Math.ceil((rowCount * 0.5) / 60) || 1;
-        const ok = globalThis.confirm(
-          `You're about to process ${rowCount} rows across ${chunkCount} chunks.\n\n` +
-            `This will take roughly ${estimatedMins} minutes. ` +
-            `The sidebar must remain open throughout — closing it will stop the run after the current chunk finishes.\n\n` +
-            `Continue?`,
-        );
-        if (!ok) return;
-      }
-    }
+    resolveRange
+      .then((range) => {
+        if (!range) {
+          // The old fallback dispatched runBatchAI with no rowRange here, but the server
+          // resolves the active range the same way and returns null when there isn't one —
+          // so that path was a silent no-op. Say so instead.
+          globalThis.alert(
+            "No rows to process. Select the rows you want to run on, or use “Specify range” to enter one.",
+          );
+          return;
+        }
+        const sanitized = this.resolveRowRange(range);
+        if (!sanitized) return;
+        if (!this.confirmUntestedRun(sanitized)) return;
 
-    if (config.rowRange) {
-      const chunks = computeChunks(config.rowRange, CHUNK_SIZE);
-      jobStore
-        .dispatch(jobId, "Batch AI Run", this.runChunks(jobId, config, chunks))
-        .catch((err: Error) => {
-          globalThis.alert("Error: " + err.message);
-        });
-    } else {
-      // No explicit row range — query the active sheet selection from the server,
-      // then chunk identically to the explicit rowRange path.
-      jobStore
-        .dispatch(
-          jobId,
-          "Batch AI Run",
-          getActiveRangeInfo().then((rangeInfo) => {
-            if (rangeInfo) {
-              const chunks = computeChunks(rangeInfo, CHUNK_SIZE);
-              return this.runChunks(jobId, config, chunks);
-            }
-            return runBatchAI(config, jobId);
-          }),
-        )
-        .catch((err: Error) => {
-          globalThis.alert("Error: " + err.message);
-        });
-    }
+        const jobId = `batch-ai-${Date.now()}`;
+        const chunks = computeChunks(sanitized, CHUNK_SIZE);
+        jobStore
+          .dispatch(jobId, "Batch AI Run", this.runChunks(jobId, config, chunks))
+          .catch((err: Error) => {
+            globalThis.alert("Error: " + err.message);
+          });
+      })
+      .catch((err: Error) => {
+        globalThis.alert("Error: " + err.message);
+      });
     // NOTE: loadHeaders() is intentionally NOT called here.
     // Reloading after dispatch caused flicker and re-initialization mid-run.
+  }
+
+  /**
+   * Warns before a run large enough to matter that has no test measurement behind it.
+   * "Has a measurement" reuses the same snapshot comparison as checkTestStatsFreshness(),
+   * so this dialog and the on-panel test results can never disagree about whether an
+   * earlier test still applies — editing the config invalidates both.
+   *
+   * CHUNK_SIZE is the threshold rather than a dedicated constant: it already marks where
+   * a run starts chunking and where the panel tells the user to keep the sidebar open.
+   *
+   * Returns false only when the user explicitly cancels.
+   */
+  private confirmUntestedRun(range: RowRangeValue): boolean {
+    const rowCount = range.end - range.start + 1;
+    if (rowCount <= CHUNK_SIZE) return true;
+    if (
+      this.lastTest &&
+      configsMatch(buildConfigSnapshot(this.currentPreset()), this.lastTest.stats.config)
+    ) {
+      return true;
+    }
+    return globalThis.confirm(
+      `You're about to process ${rowCount} rows without testing first.\n\n` +
+        `A test run on 10 rows checks quality and cost before you commit to the full run.\n\n` +
+        `Run anyway?`,
+    );
   }
 
   private async runChunks(
@@ -374,6 +417,110 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     }
   }
 
+  private handleTest(container: HTMLElement): void {
+    const config = this.assembleRunConfig();
+    if (!config) return;
+
+    const jobId = `test-ai-${Date.now()}`;
+    this.testButton?.setLoading();
+
+    const resolveRange: Promise<{ start: number; end: number } | undefined> = config.rowRange
+      ? Promise.resolve(config.rowRange)
+      : getActiveRangeInfo();
+
+    jobStore
+      .dispatch(
+        jobId,
+        "Test AI Run",
+        resolveRange.then((range) => {
+          const sanitized = range ? this.resolveRowRange(range) : null;
+          if (!sanitized) return undefined;
+          const fullRowCount = sanitized.end - sanitized.start + 1;
+          const cappedEnd = Math.min(sanitized.start + 9, sanitized.end);
+          return runBatchAI(
+            { ...config, rowRange: { start: sanitized.start, end: cappedEnd } },
+            jobId,
+          ).then((stats) => (stats ? { stats, fullRowCount } : undefined));
+        }),
+      )
+      .then((test) => {
+        if (test) {
+          this.lastTest = test;
+          this.renderTestStats(container, test);
+          this.testButton?.setDone();
+        } else {
+          this.renderTestMessage(
+            container,
+            "Test didn't produce measurable results — check the sheet for errors in the tested rows.",
+          );
+          this.testButton?.setIdle();
+        }
+      })
+      .catch((err: Error) => {
+        globalThis.alert("Error: " + err.message);
+        this.testButton?.setIdle();
+      });
+  }
+
+  private renderTestStats(container: HTMLElement, test: TestRunDisplay): void {
+    const el = container.querySelector<HTMLElement>("#test-results")!;
+    const { stats, fullRowCount } = test;
+    const totalCost = stats.totalTokenCost + stats.totalGroundingCost;
+    const avgCost = totalCost / stats.rowCount;
+
+    const parts = [
+      `<p><strong>Test run:</strong> ${stats.rowCount} row${stats.rowCount === 1 ? "" : "s"} · ` +
+        `$${totalCost.toFixed(4)} · ${formatDuration(stats.totalTimeMs)}</p>`,
+    ];
+
+    if (fullRowCount > stats.rowCount) {
+      const fullCost = avgCost * fullRowCount;
+      const chunkCount = Math.ceil(fullRowCount / CHUNK_SIZE);
+      const fullTimeMs = chunkCount * stats.totalTimeMs;
+      parts.push(
+        `<p><strong>Full run estimate:</strong> ${fullRowCount} rows · ` +
+          `~$${fullCost.toFixed(2)} · ~${formatDuration(fullTimeMs)}</p>`,
+      );
+    }
+
+    if (stats.config.promptCols.some((pc) => pc.kind === "file")) {
+      parts.push(`<p>⚠ Unusually large files may throw off cost and time estimates.</p>`);
+    }
+
+    el.innerHTML = parts.join("");
+    el.hidden = false;
+  }
+
+  private renderTestMessage(container: HTMLElement, message: string): void {
+    const el = container.querySelector<HTMLElement>("#test-results")!;
+    el.innerHTML = `<p>${message}</p>`;
+    el.hidden = false;
+  }
+
+  /**
+   * Re-validates the displayed test results against the live config. Called after
+   * every loadHeaders() resolution (initial mount AND refresh), not just the first
+   * load — otherwise refreshing after an external sheet edit (e.g. a column
+   * disappearing) could leave a stale "Tested ✓" display unvalidated indefinitely.
+   * Skipped while a test is actively running: refresh isn't disabled during a
+   * test, and re-checking against last completion's stats would incorrectly
+   * clobber the in-flight loading state.
+   */
+  private checkTestStatsFreshness(container: HTMLElement): void {
+    if (!this.lastTest || this.testButton?.getState() === "loading") return;
+    const liveSnapshot = buildConfigSnapshot(this.currentPreset());
+    if (configsMatch(liveSnapshot, this.lastTest.stats.config)) {
+      this.renderTestStats(container, this.lastTest);
+      this.testButton?.setDone();
+    } else {
+      this.renderTestMessage(
+        container,
+        "Configuration changed since last test — click Test to refresh.",
+      );
+      this.testButton?.setIdle();
+    }
+  }
+
   private assembleRunConfig(): RunConfig | null {
     const promptCols = this.promptColList?.getValue() ?? [];
     if (promptCols.length === 0) {
@@ -386,7 +533,12 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       globalThis.alert("Please select an output column.");
       return null;
     }
-    const rowRange = this.rowRangeComp?.getValue();
+    const rawRowRange = this.rowRangeComp?.getValue();
+    let rowRange: RowRangeValue | undefined;
+    if (rawRowRange) {
+      rowRange = this.resolveRowRange(rawRowRange) ?? undefined;
+      if (!rowRange) return null;
+    }
     const tools = (this.toolsList?.getValue() ?? []) as ToolId[];
     const includeGrounding = this.includeGroundingCb?.checked ?? false;
     const applyMarkdown = this.applyMarkdownCb?.checked ?? false;
@@ -479,8 +631,18 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <span class="field-label">Rows to process</span>
         <div id="row-range-container"></div>
       </div>
-      <div class="panel-buttons">
-        <button id="run-btn" class="btn-run">Run AI</button>
+      <div class="finish-panel">
+        <div class="field-group">
+          <p class="step-title">Test your setup</p>
+          <p class="field-helper">Try it out on the first 10 rows — check quality and cost before committing to a full run.</p>
+          <button id="test-btn" class="btn-outline">Test</button>
+          <div id="test-results" class="test-results" hidden></div>
+        </div>
+        <div class="field-group field-group--joined">
+          <p class="step-title">Run on all rows</p>
+          <p class="field-helper">Run across your entire selection. For large runs above ${CHUNK_SIZE} rows, make sure you keep this sidebar open.</p>
+          <button id="run-btn" class="btn-run">Run AI</button>
+        </div>
       </div>
     </div>
   `;

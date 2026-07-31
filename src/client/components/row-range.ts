@@ -3,6 +3,12 @@ export interface RowRangeValue {
   end: number;
 }
 
+// Never lets a run start on the header row; returns null if nothing valid remains.
+export function sanitizeRowRange(range: RowRangeValue): RowRangeValue | null {
+  const start = Math.max(range.start, 2);
+  return start <= range.end ? { start, end: range.end } : null;
+}
+
 export class RowRange {
   private static instanceCount = 0;
   private readonly container: HTMLElement;
@@ -37,7 +43,7 @@ export class RowRange {
     selRadio.name = groupName;
     selRadio.value = "selection";
     selRadio.checked = !selected;
-    selLabel.append(selRadio, " Use sheet selection");
+    selLabel.append(selRadio, " Use highlighted rows");
 
     const rangeLabel = document.createElement("label");
     const rangeRadio = document.createElement("input");
@@ -45,10 +51,7 @@ export class RowRange {
     rangeRadio.name = groupName;
     rangeRadio.value = "range";
     rangeRadio.checked = !!selected;
-    const rangeHint = document.createElement("span");
-    rangeHint.className = "optional";
-    rangeHint.textContent = " (better for large jobs)";
-    rangeLabel.append(rangeRadio, " Specify range", rangeHint);
+    rangeLabel.append(rangeRadio, " Specify range");
 
     const rangeInputs = document.createElement("div");
     rangeInputs.className = "range-inputs";
