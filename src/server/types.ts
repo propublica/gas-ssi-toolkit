@@ -11,7 +11,6 @@
 import type { ModelId, PromptColumnSpec, ToolId } from "../shared/types";
 
 export interface AppConfig {
-  API_KEY_PROPERTY: string;
   DEFAULT_MODEL: ModelId;
   /**
    * Inline data size limits for the Gemini REST API.
@@ -118,7 +117,7 @@ export interface GeminiUsageMetadata {
 
 /**
  * Structured representation of a Gemini generateContent response.
- * Returned by callGeminiAPI and invokeGemini in place of a bare string.
+ * Returned by callGeminiAPI in place of a bare string.
  */
 export interface GeminiResponse {
   /** Assembled from all text parts in candidates[0].content.parts. */
@@ -160,7 +159,6 @@ export interface DriveFileInfo {
 }
 
 export interface GeminiRequest {
-  apiKey: string;
   modelName?: string; // defaults to CONFIG.DEFAULT_MODEL if omitted
   systemPrompt?: string;
   /** Ordered user-turn parts assembled by the caller. Maps 1:1 to contents[0].parts in the REST payload. */

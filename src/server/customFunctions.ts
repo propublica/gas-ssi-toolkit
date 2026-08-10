@@ -11,7 +11,7 @@
  * - Range arguments arrive as unknown[][], single cells as raw scalars
  */
 
-import { invokeGemini } from "./api";
+import { callGeminiAPI } from "./api";
 import { flattenArg } from "./utils";
 import { TOOL_REGISTRY } from "./tools";
 import type { ToolId } from "../shared/types";
@@ -37,7 +37,7 @@ export function SSI(userTexts: unknown, systemPrompt?: string, toolNames?: unkno
       return name as ToolId;
     });
 
-    return invokeGemini({
+    return callGeminiAPI({
       systemPrompt: systemPrompt || undefined,
       userParts: flattenArg(userTexts).map((text): GeminiUserPart => ({ text })),
       tools: resolvedToolIds.length ? resolvedToolIds : undefined,
