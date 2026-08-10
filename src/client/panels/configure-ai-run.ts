@@ -14,9 +14,6 @@ import { AsyncActionButton } from "../components/async-action-button";
 import { formatDuration } from "../format";
 
 export const CHUNK_SIZE = 40;
-// Warn before dispatch when the batch exceeds this many rows, regardless of chunk count.
-// Kept separate from CHUNK_SIZE so small multi-chunk runs don't trigger the dialog.
-export const CHUNK_WARN_THRESHOLD = 200;
 
 export function computeChunks(
   rowRange: { start: number; end: number },
@@ -336,56 +333,75 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     return sanitized;
   }
 
+  /**
+   * Resolves the row range *before* deciding anything, so both input modes share one
+   * dispatch path. The previous split — an explicit-rowRange branch plus a branch that
+   * resolved the selection inside the dispatch callback — meant the pre-run warning could
+   * only live in the first, and "Use highlighted rows" (the default) never warned at all.
+   */
   private handleRun(_container: HTMLElement): void {
     const config = this.assembleRunConfig();
     if (!config) return;
 
-    const jobId = `batch-ai-${Date.now()}`;
+    const resolveRange: Promise<RowRangeValue | undefined> = config.rowRange
+      ? Promise.resolve(config.rowRange)
+      : getActiveRangeInfo();
 
-    if (config.rowRange) {
-      const rowCount = config.rowRange.end - config.rowRange.start + 1;
-      if (rowCount > CHUNK_WARN_THRESHOLD) {
-        const chunkCount = Math.ceil(rowCount / CHUNK_SIZE);
-        // ~0.5 s/row estimate reflects ~10x speedup from parallel inference.
-        const estimatedMins = Math.ceil((rowCount * 0.5) / 60) || 1;
-        const ok = globalThis.confirm(
-          `You're about to process ${rowCount} rows across ${chunkCount} chunks.\n\n` +
-            `This will take roughly ${estimatedMins} minutes. ` +
-            `The sidebar must remain open throughout — closing it will stop the run after the current chunk finishes.\n\n` +
-            `Continue?`,
-        );
-        if (!ok) return;
-      }
-    }
+    resolveRange
+      .then((range) => {
+        if (!range) {
+          // The old fallback dispatched runBatchAI with no rowRange here, but the server
+          // resolves the active range the same way and returns null when there isn't one —
+          // so that path was a silent no-op. Say so instead.
+          globalThis.alert(
+            "No rows to process. Select the rows you want to run on, or use “Specify range” to enter one.",
+          );
+          return;
+        }
+        const sanitized = this.resolveRowRange(range);
+        if (!sanitized) return;
+        if (!this.confirmUntestedRun(sanitized)) return;
 
-    if (config.rowRange) {
-      const chunks = computeChunks(config.rowRange, CHUNK_SIZE);
-      jobStore
-        .dispatch(jobId, "Batch AI Run", this.runChunks(jobId, config, chunks))
-        .catch((err: Error) => {
-          globalThis.alert("Error: " + err.message);
-        });
-    } else {
-      // No explicit row range — query the active sheet selection from the server,
-      // then chunk identically to the explicit rowRange path.
-      jobStore
-        .dispatch(
-          jobId,
-          "Batch AI Run",
-          getActiveRangeInfo().then((rangeInfo) => {
-            if (!rangeInfo) return runBatchAI(config, jobId).then(() => undefined);
-            const sanitized = this.resolveRowRange(rangeInfo);
-            if (!sanitized) return;
-            const chunks = computeChunks(sanitized, CHUNK_SIZE);
-            return this.runChunks(jobId, config, chunks);
-          }),
-        )
-        .catch((err: Error) => {
-          globalThis.alert("Error: " + err.message);
-        });
-    }
+        const jobId = `batch-ai-${Date.now()}`;
+        const chunks = computeChunks(sanitized, CHUNK_SIZE);
+        jobStore
+          .dispatch(jobId, "Batch AI Run", this.runChunks(jobId, config, chunks))
+          .catch((err: Error) => {
+            globalThis.alert("Error: " + err.message);
+          });
+      })
+      .catch((err: Error) => {
+        globalThis.alert("Error: " + err.message);
+      });
     // NOTE: loadHeaders() is intentionally NOT called here.
     // Reloading after dispatch caused flicker and re-initialization mid-run.
+  }
+
+  /**
+   * Warns before a run large enough to matter that has no test measurement behind it.
+   * "Has a measurement" reuses the same snapshot comparison as checkTestStatsFreshness(),
+   * so this dialog and the on-panel test results can never disagree about whether an
+   * earlier test still applies — editing the config invalidates both.
+   *
+   * CHUNK_SIZE is the threshold rather than a dedicated constant: it already marks where
+   * a run starts chunking and where the panel tells the user to keep the sidebar open.
+   *
+   * Returns false only when the user explicitly cancels.
+   */
+  private confirmUntestedRun(range: RowRangeValue): boolean {
+    const rowCount = range.end - range.start + 1;
+    if (rowCount <= CHUNK_SIZE) return true;
+    if (
+      this.lastTest &&
+      configsMatch(buildConfigSnapshot(this.currentPreset()), this.lastTest.stats.config)
+    ) {
+      return true;
+    }
+    return globalThis.confirm(
+      `You're about to process ${rowCount} rows without testing first.\n\n` +
+        `A test run on 10 rows checks quality and cost before you commit to the full run.\n\n` +
+        `Run anyway?`,
+    );
   }
 
   private async runChunks(

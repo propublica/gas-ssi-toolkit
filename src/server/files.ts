@@ -9,7 +9,12 @@
  * because the Blob payload is passed directly to UrlFetchApp without ever
  * calling getContent() / Array.from(), avoiding the ~8× memory expansion that
  * the Uint8Array → Byte[] conversion causes in the V8 GAS runtime.
+ *
+ * Phase 1 authenticates with the `x-goog-api-key` header (see gemini-auth.ts);
+ * phase 2 needs no credential because the returned session URI is self-authenticating.
  */
+
+import { geminiAuthHeaders } from "./gemini-auth";
 
 /**
  * Upload a batch of Drive file blobs to the Gemini Files API in parallel.
@@ -19,25 +24,26 @@
  *
  * @param files     Map of driveFileId → GAS Blob (from UrlFetchApp response.getBlob())
  * @param mimeTypes Map of driveFileId → MIME type string
- * @param apiKey    Gemini API key
  * @returns { uploads: Map of driveFileId → { uri, mimeType }, errors: Map of driveFileId → error message }
  */
 export function uploadFilesToGemini(
   files: Map<string, GoogleAppsScript.Base.Blob>,
   mimeTypes: Map<string, string>,
-  apiKey: string,
 ): { uploads: Map<string, { uri: string; mimeType: string }>; errors: Map<string, string> } {
   const uploads = new Map<string, { uri: string; mimeType: string }>();
   const errors = new Map<string, string>();
   const fileIds = Array.from(files.keys());
   if (fileIds.length === 0) return { uploads, errors };
 
-  // Phase 1: initiate all resumable uploads in parallel — lightweight JSON requests only
+  // Phase 1: initiate all resumable uploads in parallel — lightweight JSON requests only.
+  // Credential resolved once outside the map (each call reads a script property).
+  const authHeaders = geminiAuthHeaders();
   const initRequests = fileIds.map((fileId) => ({
-    url: `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`,
+    url: "https://generativelanguage.googleapis.com/upload/v1beta/files",
     method: "post" as const,
     contentType: "application/json",
     headers: {
+      ...authHeaders,
       "X-Goog-Upload-Protocol": "resumable",
       "X-Goog-Upload-Command": "start",
       "X-Goog-Upload-Header-Content-Type": mimeTypes.get(fileId) ?? "application/octet-stream",
