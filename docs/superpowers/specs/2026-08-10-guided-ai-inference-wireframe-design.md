@@ -10,9 +10,11 @@ Re-imagine the freeform "Run AI Inference" experience as a guided, step-by-step 
 
 This is a **new, third entry point** alongside what already exists — it does not replace either:
 
+- **Guided AI Inference** (new) — a general-purpose, step-by-step onramp for any AI inference task.
 - **Freeform AI Inference** (currently "Run AI Inference," a rename to this name is being considered separately) — `ConfigureAIRunPanel`, unchanged. Stays for power users who want full control in one form.
 - **Recipes** — named presets (Document Summarization, etc.) via `RecipePanel`. Stays for specific, opinionated use cases.
-- **Guided AI Inference** (new) — a general-purpose, step-by-step onramp for any AI inference task, appearing as a fifth entry in `ToolListPanel`.
+
+In `ToolListPanel`, these three appear first and in this order — **Guided AI Inference, Freeform AI Inference, Recipes** — ahead of the other existing tools (Import Drive Links, Extract Text, Sample Rows).
 
 The name **Guided AI Inference** was chosen to pair with the anticipated "Freeform AI Inference" rename — same noun, different modifier, signaling two paths into the same underlying capability.
 
@@ -28,26 +30,27 @@ Each step's commit action should, wherever the step's content has a natural spre
 Steps display as a checklist: **✓** complete, **●** active/expanded, **○** not yet reached. Completing a step's commit action auto-collapses it and auto-expands the next step. A collapsed, completed step shows its header + an `[Edit]` affordance + a one-line summary of what was chosen, so the user has a reminder without needing to re-expand:
 
 ```
-│ ✓ 1. What are we looking at?    [Edit]│
+│ ✓ 1. Gather your inputs         [Edit]│
 │   NoteCol, DriveLink                  │
 ```
 
 **Editing a completed step never auto-clears or warns about downstream results.** If the user edits Step 1 or 2 after already running Test (which writes real output to the sheet), the stale output is simply left in place until the user hits Test again. No confirmation dialog, no automatic clearing — this keeps the interaction model simple, at the cost of the sheet briefly showing output that doesn't match the current config.
 
-## Step 1 — "What are we looking at?"
+## Step 1 — "Gather your inputs"
 
 Selects the row-varying data that feeds the AI — existing columns, an imported Drive folder, or both.
 
 ```
-│ ● 1. What are we looking at?          │
-│   Pick the columns that feed the AI.  │
+│ ● 1. Gather your inputs               │
+│   The content the AI works on, one    │
+│   row at a time.                      │
 │                                        │
 │   ┌───────────────────────────────┐   │
 │   │ NoteCol ▾                   ✕ │   │
 │   ├───────────────────────────────┤   │
 │   │ [ Drive folder URL______ ]  ✕ │   │
 │   └───────────────────────────────┘   │
-│   [ + Existing column ] [ + Import Drive folder ] │
+│   [ + Existing column ] [ + Import folder ] │
 │                                        │
 │   [ Import & Continue ]               │
 ```
@@ -55,18 +58,19 @@ Selects the row-varying data that feeds the AI — existing columns, an imported
 - Each row is one input source. No kind tag (Text/File) and no reorder controls — both were judged not worth the complexity this flow is trying to remove (reordering matters more in the freeform panel, where inputs are woven into a hand-written prompt; here they're just concatenated).
 - `NoteCol ▾` — the whole pill is clickable and reopens the column picker to swap which existing column this row points to. `✕` removes the row entirely.
 - The Drive-folder row is a plain text input with "Drive folder URL" as placeholder text (no persistent label).
-- Two dedicated buttons make the two input types discoverable up front, rather than hiding the choice behind a single "+ Add" menu: `+ Existing column` (opens the column picker) and `+ Import Drive folder` (adds a folder-URL row).
+- Two dedicated buttons make the two input types discoverable up front, rather than hiding the choice behind a single "+ Add" menu: `+ Existing column` (opens the column picker) and `+ Import folder` (adds a folder-URL row).
 - Order doesn't matter — all selected inputs get concatenated for each row's inference call. (Future consideration, not scoped for implementation yet: wrapping each input in an XML-style tag, e.g. `<NoteCol>...</NoteCol><DriveLink>...</DriveLink>`, to clearly delineate inputs to the model.)
 - Commit button: **Import & Continue** — locks in the column selection and, if a Drive folder was set, fires the import (creating/filling that column) in the same action. Then auto-advances to Step 2.
 
-## Step 2 — "What do we want to do with this?"
+## Step 2 — "Tell the AI what to do"
 
 Authors the system prompt — the single instruction governing the run. There is no separate "row-wise prompt" concept: each row is its own independent inference call, so the system prompt is mechanically copied into every row at run time. The row-varying content is exactly what Step 1 selected.
 
 ```
-│ ● 2. What do we want to do?           │
-│   Configure how the AI should read    │
-│   and process your data.              │
+│ ● 2. Tell the AI what to do           │
+│   Set the AI's role and behavior —    │
+│   what it should do and how it        │
+│   should respond.                     │
 │   Need help writing this? Try our     │
 │   Gemini Gem prompt assistant ↗       │
 │                                        │
@@ -109,7 +113,7 @@ Terminal step — no further "continue." Reuses the existing Test/Run AI mechani
 
 ```
 │ ● 4. Run                              │
-│   Output: written to ai_result        │
+│   Results written to ai_output        │
 │   Rows to process: [___]–[___]        │
 │                                        │
 │   Test your setup                     │
