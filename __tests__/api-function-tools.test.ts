@@ -20,7 +20,6 @@ import type { GeminiRequest } from "../src/server/types";
 import type { ToolId } from "../src/shared/types";
 
 const baseReq: GeminiRequest = {
-  apiKey: "key",
   userParts: [{ text: "hello" }],
 };
 

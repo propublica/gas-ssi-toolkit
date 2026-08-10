@@ -19,6 +19,7 @@ import {
   extractTextUniversal,
 } from "./drive";
 import { uploadFilesToGemini } from "./files";
+import { hasGeminiApiKey, MISSING_API_KEY_MESSAGE } from "./gemini-auth";
 import { buildInferenceRequest } from "./inference";
 import { parseMarkdown, type RichSpan } from "./markdown-to-rich-text";
 import { injectCitations, groundingToMarkdown } from "./gemini-grounding";
@@ -379,9 +380,8 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
 
   const dataValues = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues();
 
-  const apiKey = PropertiesService.getScriptProperties().getProperty(CONFIG.API_KEY_PROPERTY);
-  if (!apiKey) {
-    ui.alert("Error", `${CONFIG.API_KEY_PROPERTY} script property not set`, ui.ButtonSet.OK);
+  if (!hasGeminiApiKey()) {
+    ui.alert("Error", MISSING_API_KEY_MESSAGE, ui.ButtonSet.OK);
     return null;
   }
 
@@ -468,7 +468,6 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
         const { uploads: batchUploads, errors: batchUploadErrors } = uploadFilesToGemini(
           batchBytes,
           batchMimeTypes,
-          apiKey,
         );
         batchBytes.clear(); // release immediately — only one sub-batch in memory at a time
         for (const [id, info] of batchUploads) fileUriMap.set(id, info);
@@ -513,7 +512,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
       hasFileInputs ? fileUriMap : undefined,
     );
     if (req !== null) {
-      requests.push({ ...req, apiKey, modelName: config.model });
+      requests.push({ ...req, modelName: config.model });
       rowIndices.push(i);
     }
   }
