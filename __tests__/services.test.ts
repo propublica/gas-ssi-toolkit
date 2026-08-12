@@ -7,6 +7,7 @@ const mockRun = {
   withFailureHandler: jest.fn().mockReturnThis(),
   getSheetHeaders: jest.fn(),
   getActiveRangeInfo: jest.fn(),
+  getDefaultRowRange: jest.fn(),
   runBatchAI: jest.fn(),
   runTool: jest.fn(),
   prepRecipe: jest.fn(),
@@ -321,6 +322,31 @@ describe("getActiveRangeInfo", () => {
   it("rejects on failure", async () => {
     const handlers = captureHandlers();
     const promise = services.getActiveRangeInfo();
+    handlers.reject(new Error("range error"));
+    await expect(promise).rejects.toThrow("range error");
+  });
+});
+
+describe("getDefaultRowRange", () => {
+  it("calls google.script.run.getDefaultRowRange and resolves with range", async () => {
+    const handlers = captureHandlers();
+    const range = { start: 2, end: 20 };
+    const promise = services.getDefaultRowRange();
+    handlers.resolve(range);
+    await expect(promise).resolves.toEqual(range);
+    expect(mockRun.getDefaultRowRange).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves with undefined when the sheet has no data rows", async () => {
+    const handlers = captureHandlers();
+    const promise = services.getDefaultRowRange();
+    handlers.resolve(null);
+    await expect(promise).resolves.toBeUndefined();
+  });
+
+  it("rejects on failure", async () => {
+    const handlers = captureHandlers();
+    const promise = services.getDefaultRowRange();
     handlers.reject(new Error("range error"));
     await expect(promise).rejects.toThrow("range error");
   });

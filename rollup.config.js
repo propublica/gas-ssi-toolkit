@@ -102,12 +102,10 @@ function SSI(userTexts, systemPrompt, toolNames) { return _GASEntry.SSI(userText
 function prepRecipe(params) { return _GASEntry.prepRecipe(params); }
 function getJobProgress(jobId) { return _GASEntry.getJobProgress(jobId); }
 function getActiveRangeInfo() { return _GASEntry.getActiveRangeInfo(); }
+function getDefaultRowRange() { return _GASEntry.getDefaultRowRange(); }
 `,
     },
-    plugins: [
-      nodeResolve({ preferBuiltins: false }),
-      typescript({ tsconfig: "./tsconfig.json" }),
-    ],
+    plugins: [nodeResolve({ preferBuiltins: false }), typescript({ tsconfig: "./tsconfig.json" })],
   },
 
   // ── Config 2: Client bundle → dist/Sidebar.html ──────────────────────────────
