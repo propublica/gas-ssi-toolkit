@@ -18,7 +18,7 @@ The only genuinely new RPC is a small helper Step 3 needs for its default row ra
 ## Step-by-step RPC mapping
 
 | Step | Server action | RPC |
-|---|---|---|
+| --- | --- | --- |
 | 1 — existing-column rows | none — client-only bookkeeping; the column reference flows straight into `RunConfig.promptCols` | *(no RPC)* |
 | 1 — Drive-folder row(s) | one `PrepColSpec` per folder row, `fillStrategy: {kind: "list-drive-folder", inputId}` | `prepRecipe` (unchanged) |
 | 2 — system prompt | one `PrepColSpec`, `fillStrategy: {kind: "fill-value", value: promptText}` | `prepRecipe` (unchanged) |
@@ -116,6 +116,17 @@ Two changes, both additive to the existing text/file branching:
 1. **Wave-1 file-ID scanning.** The loop that collects Drive file IDs to prefetch currently gates on `input.kind === "file"`. It needs to also fire for `input.kind === "auto"` — the existing `isValidDriveLink` filter inside that branch already discards non-links, so this is widening the gate, not adding new filtering logic.
 2. **Per-row `PromptInput` assembly.** `label` is now set unconditionally to `pc.col` (previously conditional on the now-removed `prefixWithColName`), since it's needed for tag naming whenever `wrapPromptsInTags` is on. `config.wrapPromptsInTags` is read once and passed into `buildInferenceRequest`.
 3. **New `getDefaultRowRange()` export**, as shown above.
+
+## Seam for a future enhancement: AI-suggested MODEL/TOOLS defaults
+
+Session 1 deferred AI-suggested MODEL/TOOLS defaults — an AI call that analyzes the Step 2 system prompt and recommends settings — as a "clearly-scoped future enhancement, not part of this flow." Reconsidered here only far enough to leave a clean seam, not to design it:
+
+- It would need a genuinely new RPC — `suggestRunSettings(systemPrompt: string): { model: ModelId; tools: ToolId[] }` — unlike everything else in this doc, which reuses `prepRecipe`/`runBatchAI` verbatim. Nothing existing returns a structured settings recommendation; every current Gemini call path returns free text or handles tool/grounding payloads, not this shape.
+- It would build on the existing single-call primitives (`callGeminiAPI`, `buildGeminiPayload`), not the batch (`callGeminiAPIBatch`) path Step 3 uses — one call per guided-flow run, not per row.
+- It adds real latency and cost to every guided run (one more Gemini call before Step 3 can render its defaults), which is exactly why Session 1 deferred it rather than defaulting it on.
+- Nothing in this doc's design blocks adding it later: `suggestRunSettings` would be called from wherever Step 2's commit or Step 3's mount ends up living client-side, and its result would simply pre-populate the same `model`/`tools` fields on `RunConfig` that Step 3 already sets from static defaults today.
+
+Not designed further here — prompt construction, output schema/parsing, error/fallback behavior when the suggestion call fails, and the cost/latency tradeoff are reserved for a dedicated future session if this gets picked up.
 
 ## What this deliberately does not solve here
 
