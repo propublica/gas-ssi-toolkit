@@ -6,8 +6,8 @@
  * responsible for writing the returned value to the sheet.
  *
  * buildInferenceRequest is the pure request-builder. Exported so callers can build
- * a request without executing it — used by runInference; also available for the
- * batch path (runBatchAI) in the upcoming parallel pipeline refactor.
+ * a request without executing it — used by runInference and by the batch path
+ * (runBatchAI).
  */
 
 import { callGeminiAPI } from "./api";

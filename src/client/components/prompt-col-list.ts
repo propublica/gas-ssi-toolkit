@@ -1,7 +1,7 @@
 import type { PromptColumnSpec } from "../../shared/types";
 import { TokenInput } from "./token-input";
 
-const PROMPT_KINDS: Array<"text" | "file"> = ["text", "file"];
+const PROMPT_KINDS: Array<Exclude<PromptColumnSpec["kind"], "auto">> = ["text", "file"];
 
 interface PromptRow {
   kind: "text" | "file";
@@ -31,6 +31,9 @@ export class PromptColList {
     container.appendChild(this.addBtn);
 
     for (const spec of initialValue ?? []) {
+      // "auto" is never user-selectable here; a config routed through this panel
+      // with an "auto"-kind column (e.g. from a future guided-flow client) loses
+      // its auto-detection and is treated as plain text.
       this.addRow(spec.kind === "file" ? "file" : "text", spec.col);
     }
   }

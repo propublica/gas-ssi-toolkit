@@ -51,7 +51,7 @@ const TEST_STATS: import("../../src/shared/types").RunStats = {
     promptCols: [{ col: "col_a", kind: "text" }],
     systemPromptCol: undefined,
     tools: [],
-    wrapPromptsInTags: false,
+    wrapPromptsInTags: true,
     model: "gemini-3.1-flash-lite",
   },
 };
@@ -272,7 +272,6 @@ describe("ConfigureAIRunPanel — untested-run warning", () => {
     systemPromptCol: "",
     outputCol: "ai_inference",
     rowRange: LARGE_RANGE,
-    wrapPromptsInTags: false,
   };
 
   async function clickRun(container: HTMLElement): Promise<void> {
@@ -427,7 +426,6 @@ describe("ConfigureAIRunPanel — refresh", () => {
       promptCols: [{ col: "col_a", kind: "text" }],
       outputCol: "ai_inference",
       rowRange: { start: 2, end: 11 },
-      wrapPromptsInTags: false,
     });
     container.querySelector<HTMLButtonElement>("#test-btn")!.click();
     for (let i = 0; i < 5; i++) await Promise.resolve();
@@ -1080,7 +1078,6 @@ describe("ConfigureAIRunPanel — lastTest persistence", () => {
       promptCols: [{ col: "col_a", kind: "text" as const }],
       systemPromptCol: "",
       outputCol: "ai_inference",
-      wrapPromptsInTags: false,
       lastTest: TEST_DISPLAY,
     });
     const results = container.querySelector<HTMLElement>("#test-results")!;
