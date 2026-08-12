@@ -13,6 +13,7 @@ import {
   getAllFilesRecursive,
   sampleRows,
   truncateText,
+  sanitizeTagName,
   flattenArg,
   resolveColumns,
   writeJobProgress,
@@ -145,6 +146,33 @@ describe("truncateText", () => {
     const text = "a".repeat(101);
     const result = truncateText(text, 100);
     expect(result).toBe("a".repeat(100) + "... [TRUNCATED]");
+  });
+});
+
+describe("sanitizeTagName", () => {
+  it("returns the title unchanged when already a valid identifier", () => {
+    expect(sanitizeTagName("case_notes", 0)).toBe("case_notes");
+  });
+
+  it("replaces spaces with underscores", () => {
+    expect(sanitizeTagName("Drive Link", 0)).toBe("Drive_Link");
+  });
+
+  it("collapses a run of invalid characters into a single underscore", () => {
+    expect(sanitizeTagName("Case #2/Notes", 0)).toBe("Case_2_Notes");
+  });
+
+  it("prefixes a leading digit with an underscore", () => {
+    expect(sanitizeTagName("2024_report", 0)).toBe("_2024_report");
+  });
+
+  it("trims leading and trailing underscores produced by stripped characters", () => {
+    expect(sanitizeTagName("  Notes  ", 0)).toBe("Notes");
+  });
+
+  it("falls back to input_<index> when the title sanitizes to empty", () => {
+    expect(sanitizeTagName("###", 3)).toBe("input_3");
+    expect(sanitizeTagName("", 2)).toBe("input_2");
   });
 });
 
