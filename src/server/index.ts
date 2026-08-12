@@ -386,7 +386,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
   }
 
   const cache = CacheService.getUserCache();
-  const hasFileInputs = config.promptCols.some((pc) => pc.kind === "file");
+  const hasFileInputs = config.promptCols.some((pc) => pc.kind === "file" || pc.kind === "auto");
 
   // Build all prompt input arrays (one per row) — pure, no I/O
   const allPromptInputs: PromptInput[][] = dataValues.map((row) =>
@@ -408,7 +408,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
     const allFileIds = new Set<string>();
     for (const inputs of allPromptInputs) {
       for (const input of inputs) {
-        if (input.kind === "file") {
+        if (input.kind === "file" || input.kind === "auto") {
           flattenArg(input.value)
             .filter(isValidDriveLink)
             .map(extractId)
@@ -495,7 +495,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
     // error string for the post-batch write loop and skip inference.
     if (fileErrors.size > 0) {
       const failedIds = allPromptInputs[i]
-        .filter((inp) => inp.kind === "file")
+        .filter((inp) => inp.kind === "file" || inp.kind === "auto")
         .flatMap((inp) => flattenArg(inp.value).filter(isValidDriveLink).map(extractId))
         .filter((id) => fileErrors.has(id));
       if (failedIds.length > 0) {
@@ -687,4 +687,11 @@ export function getActiveRangeInfo(): { start: number; end: number } | null {
   const range = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getActiveRange();
   if (!range) return null;
   return { start: range.getRow(), end: range.getRow() + range.getNumRows() - 1 };
+}
+
+export function getDefaultRowRange(): { start: number; end: number } | null {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+  return { start: 2, end: lastRow };
 }

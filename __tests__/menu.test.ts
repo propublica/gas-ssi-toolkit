@@ -68,7 +68,13 @@ const mockHtmlService = {
 
 // ── Import after mocks ─────────────────────────────────────────
 
-import { onOpen, showSidebar, runTool, importDriveLinks } from "../src/server/index";
+import {
+  onOpen,
+  showSidebar,
+  runTool,
+  importDriveLinks,
+  getDefaultRowRange,
+} from "../src/server/index";
 
 // ── Tests ──────────────────────────────────────────────────────
 
@@ -166,5 +172,26 @@ describe("importDriveLinks", () => {
     });
 
     expect(mockSetValues).toHaveBeenCalledWith([["https://drive.google.com/file/1"]]);
+  });
+});
+
+describe("getDefaultRowRange", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("returns row 2 through the sheet's last row", () => {
+    mockActiveSheet.getLastRow.mockReturnValue(11);
+    expect(getDefaultRowRange()).toEqual({ start: 2, end: 11 });
+  });
+
+  it("returns null when the sheet has only a header row", () => {
+    mockActiveSheet.getLastRow.mockReturnValue(1);
+    expect(getDefaultRowRange()).toBeNull();
+  });
+
+  it("returns null for a completely empty sheet", () => {
+    mockActiveSheet.getLastRow.mockReturnValue(0);
+    expect(getDefaultRowRange()).toBeNull();
   });
 });
