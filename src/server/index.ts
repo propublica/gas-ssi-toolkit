@@ -509,6 +509,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
       allPromptInputs[i],
       systemPrompt,
       config.tools,
+      config.wrapPromptsInTags ?? true,
       hasFileInputs ? fileUriMap : undefined,
     );
     if (req !== null) {
