@@ -344,7 +344,7 @@ describe("writeRunStats", () => {
         promptCols: [{ col: "col_a", kind: "text" }],
         systemPromptCol: undefined,
         tools: [],
-        prefixWithColName: false,
+        wrapPromptsInTags: false,
         model: "gemini-3.1-flash-lite",
       },
     };

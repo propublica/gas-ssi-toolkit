@@ -137,7 +137,7 @@ describe("runBatchAI", () => {
       config: {
         promptCols: [{ col: "col_a", kind: "text" }],
         tools: [],
-        prefixWithColName: false,
+        wrapPromptsInTags: false,
       },
     };
     const promise = services.runBatchAI(config as import("../src/shared/types").RunConfig);
@@ -170,7 +170,7 @@ describe("runBatchAI", () => {
         promptCols: [{ col: "col_a", kind: "text" }],
         systemPromptCol: null, // as google.script.run's bridge may deliver an omitted value
         tools: [],
-        prefixWithColName: false,
+        wrapPromptsInTags: false,
         model: null,
       },
     });

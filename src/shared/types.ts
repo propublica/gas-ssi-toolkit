@@ -31,7 +31,7 @@ export type ModelId = "gemini-3.1-flash-lite" | "gemini-3.1-pro-preview";
  */
 export interface PromptColumnSpec {
   col: string;
-  kind: "text" | "file";
+  kind: "text" | "file" | "auto";
 }
 
 // ── Configuration ───────────────────────────────────────────────
@@ -54,8 +54,12 @@ export interface RunConfig {
    * through buildRunConfig() without any server echo.
    */
   applyMarkdown?: boolean;
-  /** When true, each text prompt part is prefixed with its source column name as "<col>: <value>". */
-  prefixWithColName?: boolean;
+  /**
+   * When true (default), each prompt part is wrapped in an XML-style tag named
+   * after its source column, e.g. <case_notes>...</case_notes>. Absent is
+   * treated as true — set explicitly to false to disable tag wrapping.
+   */
+  wrapPromptsInTags?: boolean;
   /** Model ID to use for this run. When omitted, defaults to CONFIG.DEFAULT_MODEL. */
   model?: ModelId;
 }
@@ -112,7 +116,7 @@ export interface ExtractTextConfig {
  */
 export type RunStatsConfigSnapshot = Pick<
   RunConfig,
-  "promptCols" | "systemPromptCol" | "tools" | "prefixWithColName" | "model"
+  "promptCols" | "systemPromptCol" | "tools" | "wrapPromptsInTags" | "model"
 >;
 
 /**

@@ -51,7 +51,7 @@ const TEST_STATS: import("../../src/shared/types").RunStats = {
     promptCols: [{ col: "col_a", kind: "text" }],
     systemPromptCol: undefined,
     tools: [],
-    prefixWithColName: false,
+    wrapPromptsInTags: false,
     model: "gemini-3.1-flash-lite",
   },
 };
@@ -272,6 +272,7 @@ describe("ConfigureAIRunPanel — untested-run warning", () => {
     systemPromptCol: "",
     outputCol: "ai_inference",
     rowRange: LARGE_RANGE,
+    wrapPromptsInTags: false,
   };
 
   async function clickRun(container: HTMLElement): Promise<void> {
@@ -426,6 +427,7 @@ describe("ConfigureAIRunPanel — refresh", () => {
       promptCols: [{ col: "col_a", kind: "text" }],
       outputCol: "ai_inference",
       rowRange: { start: 2, end: 11 },
+      wrapPromptsInTags: false,
     });
     container.querySelector<HTMLButtonElement>("#test-btn")!.click();
     for (let i = 0; i < 5; i++) await Promise.resolve();
@@ -730,54 +732,57 @@ describe("ConfigureAIRunPanel — collapsible Tools section", () => {
   });
 });
 
-describe("prefixWithColName checkbox", () => {
-  it("renders the prefix-col-name checkbox", async () => {
+describe("wrapPromptsInTags checkbox", () => {
+  it("renders the wrap-prompts-in-tags checkbox, checked by default", async () => {
     const { container } = await mountAndLoad();
-    expect(container.querySelector("#prefix-col-name-cb")).not.toBeNull();
+    expect(container.querySelector<HTMLInputElement>("#wrap-prompts-in-tags-cb")!.checked).toBe(
+      true,
+    );
   });
 
-  it("assembleRunConfig includes prefixWithColName: true when checkbox is checked", async () => {
+  it("assembleRunConfig omits wrapPromptsInTags when checkbox is checked (the default)", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
     const { container } = await mountAndLoad({
       promptCols: [{ col: "col_a", kind: "text" }],
       outputCol: "ai_inference",
     });
-    container.querySelector<HTMLInputElement>("#prefix-col-name-cb")!.checked = true;
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     await Promise.resolve();
     const config = (services.runBatchAI as jest.Mock).mock.calls[0]?.[0] as RunConfig | undefined;
-    expect(config?.prefixWithColName).toBe(true);
+    expect(config?.wrapPromptsInTags).toBeUndefined();
   });
 
-  it("assembleRunConfig omits prefixWithColName when checkbox is unchecked", async () => {
+  it("assembleRunConfig sends wrapPromptsInTags: false when checkbox is unchecked", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
     const { container } = await mountAndLoad({
       promptCols: [{ col: "col_a", kind: "text" }],
       outputCol: "ai_inference",
     });
-    container.querySelector<HTMLInputElement>("#prefix-col-name-cb")!.checked = false;
+    container.querySelector<HTMLInputElement>("#wrap-prompts-in-tags-cb")!.checked = false;
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     await Promise.resolve();
     const config = (services.runBatchAI as jest.Mock).mock.calls[0]?.[0] as RunConfig | undefined;
-    expect(config?.prefixWithColName).toBeUndefined();
+    expect(config?.wrapPromptsInTags).toBe(false);
   });
 
-  it("unmount saves prefixWithColName state", async () => {
+  it("unmount saves wrapPromptsInTags: false after unchecking", async () => {
     const { container, panel } = await mountAndLoad();
-    container.querySelector<HTMLInputElement>("#prefix-col-name-cb")!.checked = true;
+    container.querySelector<HTMLInputElement>("#wrap-prompts-in-tags-cb")!.checked = false;
     addPromptCol(container, "col_a");
     const saved = panel.unmount();
-    expect(saved?.prefixWithColName).toBe(true);
+    expect(saved?.wrapPromptsInTags).toBe(false);
   });
 
-  it("restores prefixWithColName from savedState", async () => {
+  it("restores wrapPromptsInTags: false from savedState", async () => {
     const { container } = await mountAndLoad(undefined, {
       promptCols: [{ col: "col_a", kind: "text" as const }],
       systemPromptCol: "",
       outputCol: "ai_inference",
-      prefixWithColName: true,
+      wrapPromptsInTags: false,
     });
-    expect(container.querySelector<HTMLInputElement>("#prefix-col-name-cb")!.checked).toBe(true);
+    expect(container.querySelector<HTMLInputElement>("#wrap-prompts-in-tags-cb")!.checked).toBe(
+      false,
+    );
   });
 });
 
@@ -1075,6 +1080,7 @@ describe("ConfigureAIRunPanel — lastTest persistence", () => {
       promptCols: [{ col: "col_a", kind: "text" as const }],
       systemPromptCol: "",
       outputCol: "ai_inference",
+      wrapPromptsInTags: false,
       lastTest: TEST_DISPLAY,
     });
     const results = container.querySelector<HTMLElement>("#test-results")!;

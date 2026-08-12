@@ -393,7 +393,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
     config.promptCols.map((pc, colIdx) => ({
       kind: pc.kind,
       value: row[promptIdxs[colIdx]],
-      ...(config.prefixWithColName ? { label: pc.col } : {}),
+      label: pc.col,
     })),
   );
 

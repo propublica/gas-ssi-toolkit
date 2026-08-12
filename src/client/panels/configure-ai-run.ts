@@ -29,12 +29,12 @@ export function computeChunks(
 export type SavedState = Required<
   Omit<
     RunConfig,
-    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "prefixWithColName" | "model"
+    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "wrapPromptsInTags" | "model"
   >
 > &
   Pick<
     RunConfig,
-    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "prefixWithColName" | "model"
+    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "wrapPromptsInTags" | "model"
   > & {
     toolsExpanded?: boolean;
     modelExpanded?: boolean;
@@ -49,7 +49,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private toolsList: TagList | null = null;
   private includeGroundingCb: HTMLInputElement | null = null;
   private applyMarkdownCb: HTMLInputElement | null = null;
-  private prefixWithColNameCb: HTMLInputElement | null = null;
+  private wrapPromptsInTagsCb: HTMLInputElement | null = null;
   private outputColObserver: MutationObserver | null = null;
   private nav: NavigationContext | null = null;
   private headersLoaded = false;
@@ -85,7 +85,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           tools: savedState.tools,
           includeGrounding: savedState.includeGrounding,
           applyMarkdown: savedState.applyMarkdown,
-          prefixWithColName: savedState.prefixWithColName,
+          wrapPromptsInTags: savedState.wrapPromptsInTags,
           model: savedState.model,
         }
       : (params ?? {});
@@ -106,9 +106,11 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       this.applyMarkdownCb.checked = true;
     }
 
-    this.prefixWithColNameCb = container.querySelector<HTMLInputElement>("#prefix-col-name-cb");
-    if (this.prefixWithColNameCb && preset.prefixWithColName) {
-      this.prefixWithColNameCb.checked = true;
+    this.wrapPromptsInTagsCb = container.querySelector<HTMLInputElement>(
+      "#wrap-prompts-in-tags-cb",
+    );
+    if (this.wrapPromptsInTagsCb) {
+      this.wrapPromptsInTagsCb.checked = preset.wrapPromptsInTags ?? true;
     }
 
     const updateGroundingVisibility = (): void => {
@@ -265,7 +267,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       tools: (this.toolsList?.getValue() ?? []) as ToolId[],
       includeGrounding: this.includeGroundingCb?.checked ?? false,
       applyMarkdown: this.applyMarkdownCb?.checked ?? false,
-      prefixWithColName: this.prefixWithColNameCb?.checked ?? false,
+      wrapPromptsInTags: this.wrapPromptsInTagsCb?.checked ?? true,
       toolsExpanded: this.toolsExpanded,
       model: this.getSelectedModel(),
       modelExpanded: this.modelExpanded,
@@ -318,7 +320,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       tools: (this.toolsList?.getValue() ?? []) as ToolId[],
       includeGrounding: this.includeGroundingCb?.checked,
       applyMarkdown: this.applyMarkdownCb?.checked,
-      prefixWithColName: this.prefixWithColNameCb?.checked,
+      wrapPromptsInTags: this.wrapPromptsInTagsCb?.checked,
       model: this.getSelectedModel(),
     };
   }
@@ -542,7 +544,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     const tools = (this.toolsList?.getValue() ?? []) as ToolId[];
     const includeGrounding = this.includeGroundingCb?.checked ?? false;
     const applyMarkdown = this.applyMarkdownCb?.checked ?? false;
-    const prefixWithColName = this.prefixWithColNameCb?.checked ?? false;
+    const wrapPromptsInTags = this.wrapPromptsInTagsCb?.checked ?? true;
     const model = this.getSelectedModel();
     return {
       promptCols,
@@ -552,7 +554,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       tools: tools.length > 0 ? tools : undefined,
       includeGrounding: includeGrounding || undefined,
       applyMarkdown: applyMarkdown || undefined,
-      prefixWithColName: prefixWithColName || undefined,
+      wrapPromptsInTags: wrapPromptsInTags ? undefined : false,
       model,
     };
   }
@@ -585,8 +587,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <p class="field-helper">The content the AI acts on — what it reads, summarizes, classifies, or answers, one row at a time.</p>
         <div id="prompt-col-list"></div>
         <label class="checkbox-option">
-          <input type="checkbox" id="prefix-col-name-cb" />
-          <span>Prefix with column name</span>
+          <input type="checkbox" id="wrap-prompts-in-tags-cb" checked />
+          <span>Wrap prompts in tags</span>
         </label>
       </div>
       <div class="field-group">

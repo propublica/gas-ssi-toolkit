@@ -1,7 +1,7 @@
 import type { PromptColumnSpec } from "../../shared/types";
 import { TokenInput } from "./token-input";
 
-const PROMPT_KINDS: PromptColumnSpec["kind"][] = ["text", "file"];
+const PROMPT_KINDS: Array<"text" | "file"> = ["text", "file"];
 
 interface PromptRow {
   kind: "text" | "file";
@@ -31,7 +31,7 @@ export class PromptColList {
     container.appendChild(this.addBtn);
 
     for (const spec of initialValue ?? []) {
-      this.addRow(spec.kind, spec.col);
+      this.addRow(spec.kind === "file" ? "file" : "text", spec.col);
     }
   }
 

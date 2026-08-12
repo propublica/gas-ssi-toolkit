@@ -45,7 +45,7 @@ export interface Job {
  */
 export type RecipeSettings = Pick<
   RunConfig,
-  "tools" | "applyMarkdown" | "includeGrounding" | "prefixWithColName" | "model"
+  "tools" | "applyMarkdown" | "includeGrounding" | "wrapPromptsInTags" | "model"
 >;
 
 export interface RecipeInput {
