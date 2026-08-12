@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  Guided AI Inference — interactive design prototype
+  ============================================================================
+
+  Paired spec: docs/superpowers/specs/2026-08-10-guided-ai-inference-wireframe-design.md
+  Built:       2026-08-11 (Session 1 of the 3-session arc)
+
+  WHAT THIS IS
+    A clickable, self-contained mock of the Guided AI Inference sidebar panel,
+    framed inside a fake Google Sheets window. Open it in any browser and click
+    through Steps 1-3; each step's commit performs a visible "write" to the mock
+    sheet, which is the core design principle the spec is built around.
+    Used to collect stakeholder feedback before any code was written.
+
+  WHAT THIS IS NOT
+    Not shipping code, and not a starting point to copy from. All behavior is
+    faked client-side with setTimeout — there are no RPCs, no google.script.run,
+    no real Drive or Gemini calls. The sample data (federal court dockets,
+    173 files, cost/time figures) is fictional and hand-tuned to look plausible.
+
+  THE CSS WILL DRIFT
+    The design tokens and component classes here were copied out of
+    src/client/sidebar.css as of the build date above so the mock would render
+    at real fidelity. They are a SNAPSHOT, not an import. sidebar.css remains
+    the only source of truth — if the two disagree, sidebar.css is right and
+    this file is stale.
+
+  TWO THINGS THIS ENCODES THAT THE SPEC DOES NOT
+    Both came out of building it, and both are proposals rather than decisions:
+      1. A fourth step state, "reached" — a step you have opened and left but
+         not committed. Without it the terminal Run step becomes unreachable
+         after you go back to edit Step 1 or 2, since it never earns a check.
+      2. The terminal Run step turning green on a completed FULL run (a Test
+         alone does not), so the progress rail can reach the bottom.
+    Decide these deliberately in Session 2 rather than inheriting them.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guided AI Inference — SSI Toolkit prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wdth,wght@6..144,75..125,100..700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   Design tokens — lifted verbatim from src/client/sidebar.css
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+    --primary-blue: #1a73e8;
+    /* Sampled out of the Document Summarization (V3) screenshots in the
+       SSI Toolkit Development doc — the progress rail and its ✓ badges. */
+    --google-green: #34a853;
+    --hover-blue: #f1f3f4;
+    --border-color: #dadce0;
+    --text-main: rgb(31, 31, 31);
+    --text-secondary: rgb(57, 57, 57);
+
+    --font-family: "Google Sans Flex", Roboto, sans-serif;
+
+    --font-size-100: 11px;
+    --font-size-200: 12px;
+    --font-size-300: 14px;
+    --font-size-400: 16px;
+    --font-size-500: 18px;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+    font-family: var(--font-family);
+    background: #e8eaed;
+    color: var(--text-main);
+    font-optical-sizing: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Prototype chrome (not product UI)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.proto-bar {
+    width: 100%;
+    max-width: 1340px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 0 2px;
+}
+.proto-bar h1 {
+    font-size: var(--font-size-300);
+    font-weight: 500;
+    margin: 0;
+    color: #3c4043;
+}
+.proto-bar .proto-sub {
+    font-size: var(--font-size-200);
+    color: #5f6368;
+}
+.proto-reset {
+    margin-left: auto;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: #5f6368;
+    font-family: var(--font-family);
+    font-size: var(--font-size-200);
+    padding: 5px 10px;
+    cursor: pointer;
+}
+.proto-reset:hover { border-color: var(--primary-blue); color: var(--primary-blue); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Mock Google Sheets shell
+   ═══════════════════════════════════════════════════════════════════════════ */
+.sheets-window {
+    width: 100%;
+    max-width: 1340px;
+    height: 820px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(60,64,67,.3), 0 4px 12px rgba(60,64,67,.15);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+.sheets-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px 4px;
+    border-bottom: 1px solid #f1f3f4;
+    flex-shrink: 0;
+}
+.sheets-logo {
+    width: 26px; height: 26px;
+    background: #0f9d58;
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 13px; font-weight: 700;
+    flex-shrink: 0;
+}
+.sheets-doc-title { font-size: var(--font-size-400); color: #3c4043; }
+.sheets-menu {
+    display: flex; gap: 14px;
+    font-size: var(--font-size-200); color: #3c4043;
+    margin-left: 36px;
+}
+.sheets-menu span { cursor: default; }
+.sheets-share {
+    margin-left: auto;
+    background: #c2e7ff;
+    color: #001d35;
+    border: none; border-radius: 16px;
+    padding: 6px 14px;
+    font-family: var(--font-family);
+    font-size: var(--font-size-200);
+    font-weight: 500;
+}
+
+.sheets-toolbar {
+    display: flex; align-items: center; gap: 2px;
+    padding: 5px 12px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+.tb-btn {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: var(--font-size-200);
+    color: #444746;
+}
+.tb-sep { width: 1px; height: 18px; background: var(--border-color); margin: 0 6px; }
+
+.sheets-body { flex: 1; display: flex; min-height: 0; }
+
+/* ── Grid ─────────────────────────────────────────────────────────────────── */
+.grid-wrap { flex: 1; min-width: 0; overflow: hidden; position: relative; background: white; }
+.grid-scroll { height: 100%; overflow: auto; }
+
+table.grid {
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: var(--font-size-100);
+    color: #202124;
+}
+table.grid th, table.grid td {
+    border: 1px solid #e0e0e0;
+    height: 22px;
+    padding: 0 5px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: 0;
+    vertical-align: middle;
+}
+th.colhead {
+    background: #f8f9fa;
+    color: #444746;
+    font-weight: 400;
+    font-size: 10px;
+    text-align: center;
+    position: sticky; top: 0; z-index: 3;
+    height: 20px;
+}
+td.rowhead, th.corner {
+    background: #f8f9fa;
+    color: #444746;
+    font-weight: 400;
+    font-size: 10px;
+    text-align: center;
+    width: 34px;
+    position: sticky; left: 0; z-index: 2;
+}
+th.corner { z-index: 4; }
+tr.headerrow td { font-weight: 600; background: #fff; }
+td.cell-link { color: #1155cc; text-decoration: underline; }
+td.cell-empty { color: transparent; }
+td.cell-flash { animation: cellflash 0.9s ease-out; }
+@keyframes cellflash {
+    0%   { background: #ceead6; }
+    100% { background: transparent; }
+}
+td.cell-writing { color: #80868b; font-style: italic; }
+.col-hl { box-shadow: inset 0 -2px 0 #0f9d58; }
+
+.sheets-tabs {
+    display: flex; align-items: center; gap: 4px;
+    border-top: 1px solid var(--border-color);
+    padding: 5px 10px;
+    font-size: var(--font-size-200);
+    color: #444746;
+    flex-shrink: 0;
+    background: #f8f9fa;
+}
+.sheet-tab { padding: 4px 10px; border-radius: 4px; }
+.sheet-tab.active { background: #e6f4ea; color: #0d652d; font-weight: 500; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SSI Sidebar — 300px, real Apps Script sidebar width
+   ═══════════════════════════════════════════════════════════════════════════ */
+.ssi-sidebar {
+    width: 300px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--border-color);
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    font-family: var(--font-family);
+    color: var(--text-main);
+    min-height: 0;
+}
+.ssi-chrome {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #f1f3f4;
+    flex-shrink: 0;
+}
+.ssi-chrome-title { font-size: var(--font-size-300); color: #3c4043; }
+.ssi-chrome-close { margin-left: auto; color: #5f6368; font-size: var(--font-size-300); }
+
+#app { flex: 1; overflow-y: auto; padding-bottom: 16px; }
+.container { padding: 16px; }
+
+/* ── sidebar.css: tool list ─────────────────────────────────────────────── */
+.ssi-sidebar .section { margin-bottom: 28px; }
+.ssi-sidebar h3 {
+    font-size: var(--font-size-100);
+    font-style: italic;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin: 0 0 12px 4px;
+}
+.tool-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    border-radius: 24px;
+    border: 1px solid var(--border-color);
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: var(--font-family);
+    font-size: var(--font-size-300);
+    font-weight: 500;
+    color: var(--text-main);
+    text-align: left;
+}
+.tool-btn:hover { background-color: var(--hover-blue); border-color: transparent; color: var(--primary-blue); }
+.tool-btn:active { background-color: #e8eaed; transform: scale(0.98); }
+.icon { margin-right: 12px; font-size: var(--font-size-500); width: 24px; text-align: center; flex-shrink: 0; }
+.tool-btn-text { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.tool-btn-sub { font-size: var(--font-size-200); color: var(--text-secondary); font-weight: 400; line-height: 1.3; }
+.tool-btn:hover .tool-btn-sub { color: var(--primary-blue); opacity: 0.8; }
+.status-footer {
+    margin-top: 40px; padding: 16px;
+    border-top: 1px solid #eee;
+    font-size: var(--font-size-100);
+    font-style: italic; color: var(--text-secondary);
+    text-align: center; line-height: 1.5;
+}
+
+/* ── sidebar.css: panel chrome ──────────────────────────────────────────── */
+.panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+.back-btn {
+    background: none; border: none; color: var(--primary-blue);
+    cursor: pointer; font-size: var(--font-size-300);
+    font-family: var(--font-family); padding: 0;
+}
+.panel-title { font-weight: 500; font-size: var(--font-size-400); }
+.refresh-btn {
+    background: none; border: none; color: var(--text-secondary);
+    cursor: pointer; font-size: var(--font-size-400);
+    padding: 0; margin-left: auto; line-height: 1;
+}
+.refresh-btn:hover { color: var(--primary-blue); }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.field-label {
+    display: block; font-size: var(--font-size-300); font-weight: 500;
+    color: var(--text-main); margin-bottom: 6px;
+}
+.optional { color: var(--text-secondary); font-weight: 400; text-transform: none; letter-spacing: 0; font-size: var(--font-size-200); }
+.field-helper { font-size: var(--font-size-200); color: var(--text-secondary); margin: 2px 0 8px 0; line-height: 1.4; }
+.step-title { margin: 0 0 4px 0; font-weight: 500; font-size: var(--font-size-300); color: var(--text-main); }
+
+.text-input {
+    width: 100%; padding: 7px 8px;
+    border: 1px solid var(--border-color); border-radius: 4px;
+    font-family: var(--font-family); font-size: var(--font-size-300);
+    margin-top: 6px;
+}
+.tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag {
+    padding: 5px 10px; border-radius: 12px;
+    border: 1px solid var(--border-color); background: white;
+    color: var(--text-main); font-family: var(--font-family);
+    font-size: var(--font-size-200); cursor: pointer;
+    transition: all 0.15s; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tag:hover { border-color: var(--primary-blue); background: var(--hover-blue); }
+.tag.selected { background: #e8f0fe; border-color: var(--primary-blue); color: var(--primary-blue); font-weight: 500; }
+
+.btn-run {
+    flex: 1; padding: 10px; background: var(--primary-blue); color: white;
+    border: none; border-radius: 4px; font-family: var(--font-family);
+    font-weight: 500; font-size: var(--font-size-300); cursor: pointer;
+}
+.btn-run:hover { background: #1557b0; }
+.btn-run:disabled { background: #9aa0a6; cursor: default; }
+.btn-outline {
+    flex: 1; padding: 10px; background: white; color: var(--primary-blue);
+    border: 1px solid var(--primary-blue); border-radius: 4px;
+    font-family: var(--font-family); font-weight: 500;
+    font-size: var(--font-size-300); cursor: pointer;
+}
+.btn-outline:hover { background: #e8f0fe; }
+.btn-outline:disabled { color: #9aa0a6; border-color: #9aa0a6; cursor: default; }
+.btn-cancel {
+    padding: 10px 16px; background: white; color: var(--text-main);
+    border: 1px solid var(--border-color); border-radius: 4px;
+    font-family: var(--font-family); font-size: var(--font-size-300); cursor: pointer;
+}
+.btn-block { display: block; width: 100%; margin-top: 8px; }
+
+.finish-panel { margin-top: 4px; padding: 16px; border-radius: 8px; background: rgba(26, 115, 232, 0.06); }
+.field-group { margin-bottom: 16px; }
+.field-group:last-child { margin-bottom: 0; }
+.field-group--joined { padding-top: 8px; }
+.output-note { margin: 8px 0 0 0; text-align: center; }
+
+.test-results {
+    margin-top: 8px; padding: 8px 12px; background: white;
+    border: 1px solid var(--border-color); border-radius: 4px;
+    font-size: var(--font-size-200); color: var(--text-secondary);
+}
+.test-results p { margin: 0 0 4px 0; }
+.test-results p:last-child { margin-bottom: 0; }
+
+.range-inputs { display: flex; gap: 8px; margin-top: 6px; align-items: center; }
+.range-inputs input {
+    width: 68px; padding: 6px 8px;
+    border: 1px solid var(--border-color); border-radius: 4px;
+    font-size: var(--font-size-300); font-family: var(--font-family);
+}
+.range-dash { color: var(--text-secondary); font-size: var(--font-size-300); }
+
+/* ── sidebar.css: model / tools collapsibles ────────────────────────────── */
+.collapsible-header {
+    display: flex; align-items: center; width: 100%;
+    background: none; border: none; padding: 0; cursor: pointer;
+    text-align: left; gap: 6px; margin-bottom: 0;
+}
+.collapsible-header:hover .collapsible-label { color: var(--primary-blue); }
+.collapsible-label {
+    font-size: var(--font-size-100); font-style: italic; font-weight: 500;
+    color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.8px;
+    white-space: nowrap;
+}
+.collapsible-summary {
+    flex: 1; min-width: 0; font-size: var(--font-size-100);
+    color: var(--text-secondary); font-style: italic;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right;
+}
+.collapsible-chevron { font-size: var(--font-size-100); color: var(--text-secondary); transition: transform 0.15s ease; flex-shrink: 0; }
+.collapsible-header[aria-expanded="true"] .collapsible-chevron { transform: rotate(90deg); }
+.collapsible-content { padding-top: 8px; }
+.collapsible-content[hidden] { display: none; }
+
+.model-option-list {
+    display: flex; flex-direction: column;
+    border: 1px solid var(--border-color); border-radius: 6px;
+    overflow: hidden; margin-top: 4px;
+}
+.model-option {
+    display: flex; flex-direction: column; align-items: flex-start;
+    padding: 8px 10px; border: none; border-bottom: 1px solid var(--border-color);
+    background: none; cursor: pointer; text-align: left;
+    font-family: var(--font-family); width: 100%; transition: background 0.1s;
+}
+.model-option:last-child { border-bottom: none; }
+.model-option:hover { background: #f8f9fa; }
+.model-option.selected { background: rgba(26, 115, 232, 0.06); border-left: 3px solid var(--primary-blue); padding-left: 7px; }
+.model-option-name { font-size: var(--font-size-300); font-weight: 500; color: var(--text-main); }
+.model-option.selected .model-option-name { color: var(--primary-blue); }
+.model-option-desc { font-size: var(--font-size-100); color: var(--text-secondary); margin-top: 2px; line-height: 1.4; }
+
+.checkbox-option {
+    display: flex; align-items: center; gap: 6px;
+    font-size: var(--font-size-100); font-style: italic;
+    color: var(--text-secondary); margin-top: 10px; cursor: pointer; user-select: none;
+}
+.grounding-col-badge {
+    display: inline-block; font-family: "SFMono-Regular", "Consolas", monospace;
+    font-size: var(--font-size-100); background: #f1f3f4;
+    border: 1px solid var(--border-color); border-radius: 3px;
+    padding: 1px 5px; color: var(--text-main); white-space: nowrap;
+}
+
+/* ── sidebar.css: token dropdown (column picker) ────────────────────────── */
+.token-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: #fff; border: 1px solid #dadce0; border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    max-height: 220px; overflow-y: auto; z-index: 100;
+}
+.token-search {
+    display: block; width: 100%; border: none; outline: none;
+    border-bottom: 1px solid #dadce0; padding: 6px 10px;
+    font-size: var(--font-size-300); color: #202124; background: transparent;
+    font-family: var(--font-family);
+}
+.token-search::placeholder { color: #9aa0a6; }
+.token-option { padding: 7px 12px; font-size: var(--font-size-300); cursor: pointer; color: #202124; }
+.token-option:hover { background: #f1f3f4; }
+.token-no-match { padding: 7px 12px; font-size: var(--font-size-300); color: #9aa0a6; font-style: italic; }
+
+/* ── sidebar.css: add buttons / remove buttons ──────────────────────────── */
+.pcol-add-btn {
+    flex: 1; margin-top: 4px; background: none;
+    border: 1px solid var(--border-color); border-radius: 4px;
+    color: var(--text-secondary); font-size: var(--font-size-200);
+    padding: 6px 8px; cursor: pointer; font-family: var(--font-family);
+    white-space: nowrap;
+}
+.pcol-add-btn:hover { border-color: var(--primary-blue); color: var(--primary-blue); }
+.pcol-btn-remove {
+    flex-shrink: 0; background: none; border: none; cursor: pointer;
+    color: var(--text-secondary); font-size: var(--font-size-300);
+    padding: 2px 4px; line-height: 1;
+}
+.pcol-btn-remove:hover { color: #d93025; }
+
+.unlock-btn {
+    flex: 0 0 auto; background: none; border: 1px solid var(--border-color);
+    border-radius: 4px; color: var(--text-secondary);
+    font-size: var(--font-size-100); font-style: italic; cursor: pointer;
+    padding: 3px 6px; white-space: nowrap;
+    font-family: var(--font-family); line-height: 1.4;
+}
+.unlock-btn:hover { border-color: var(--primary-blue); color: var(--primary-blue); }
+
+/* ── sidebar.css: job strip ─────────────────────────────────────────────── */
+.job-strip {
+    background: #f1f3f4; border-top: 1px solid #dadce0;
+    padding: 6px 12px; display: flex; flex-direction: column; gap: 4px;
+    flex-shrink: 0;
+}
+.job-strip[hidden] { display: none; }
+.job-strip__item { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-100); color: #5f6368; }
+.job-strip__spinner, .btn-spinner {
+    display: inline-block; border-style: solid; border-radius: 50%;
+    animation: spin 0.8s linear infinite; flex-shrink: 0;
+}
+.job-strip__spinner { width: 10px; height: 10px; border-width: 2px; border-color: #dadce0; border-top-color: #1a73e8; }
+.btn-spinner {
+    width: 12px; height: 12px; border-width: 2px;
+    border-color: rgba(255,255,255,.4); border-top-color: white;
+    vertical-align: middle; margin-right: 5px;
+}
+.btn-spinner--blue { border-color: rgba(26,115,232,.3); border-top-color: var(--primary-blue); }
+.job-strip__label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job-strip__cancel {
+    background: none; border: none; color: inherit; cursor: pointer;
+    font-size: var(--font-size-100); line-height: 1; opacity: .6; padding: 0 2px;
+    margin-left: auto;
+}
+.job-strip__cancel:hover { opacity: 1; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NEW — Guided step checklist
+   ═══════════════════════════════════════════════════════════════════════════ */
+.gflow-intro { font-size: var(--font-size-200); color: var(--text-secondary); line-height: 1.5; margin: 0 0 16px 0; }
+.gflow-intro a { color: var(--primary-blue); text-decoration: none; }
+.gflow-intro a:hover { text-decoration: underline; }
+
+.gstep { border-top: 1px solid var(--border-color); padding: 14px 0; position: relative; }
+.gstep--first { border-top: none; padding-top: 0; }
+.gstep--last { border-bottom: 1px solid var(--border-color); }
+
+/* ── The advancing progress rail ──────────────────────────────────────────
+   Each step draws the segment from its OWN badge down into the next step's
+   badge (hence the negative bottom, which reaches 23px past the divider).
+   The segment turns green once that step is committed, so the green line
+   grows downward as the user works — the behavior from the V3 recipe. */
+.gstep::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    width: 2px;
+    top: 23px;          /* 14px step padding + 9px to the badge's center */
+    bottom: -23px;      /* down into the next step's badge center */
+    background: var(--border-color);
+    border-radius: 1px;
+}
+.gstep--first::after { top: 9px; }   /* no top padding on the first step */
+.gstep--last::after { display: none; }
+.gstep--done::after { background: var(--google-green); }
+
+.gstep-header {
+    display: flex; align-items: flex-start; gap: 8px; width: 100%;
+    background: none; border: none; padding: 0; cursor: pointer;
+    text-align: left; font-family: var(--font-family);
+    position: relative; z-index: 1;   /* badges sit on top of the rail */
+}
+.gstep--pending .gstep-header { cursor: default; }
+
+.gstep-marker {
+    flex: 0 0 18px; width: 18px; height: 18px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600; line-height: 1;
+    border: 1px solid var(--border-color); background: white;
+    color: #9aa0a6;
+}
+.gstep--done .gstep-marker {
+    background: var(--google-green); border-color: var(--google-green);
+    color: white; font-size: 11px; font-weight: 700;
+}
+.gstep--active .gstep-marker {
+    background: var(--primary-blue); border-color: var(--primary-blue); color: white;
+}
+/* Reached-but-not-committed — Step 4 before its run finishes. Outlined rather
+   than filled, so it still reads as navigable. */
+.gstep--reached .gstep-marker { border-color: var(--primary-blue); color: var(--primary-blue); }
+
+/* Committed = this step has written to the sheet. Declared after the
+   active/reached rules so a step that is BOTH committed and expanded (Step 4
+   once its full run finishes) still shows the green ✓ and completes the rail. */
+.gstep--committed .gstep-marker {
+    background: var(--google-green); border-color: var(--google-green);
+    color: white; font-size: 11px; font-weight: 700;
+}
+.gstep--committed::after { background: var(--google-green); }
+
+.gstep-title { font-size: var(--font-size-300); font-weight: 500; color: var(--text-main); line-height: 18px; }
+.gstep--pending .gstep-title { color: #9aa0a6; font-weight: 400; }
+.gstep--done .gstep-title,
+.gstep--reached .gstep-title { color: var(--text-secondary); }
+.gstep-header:hover .gstep-title { color: var(--primary-blue); }
+.gstep--pending .gstep-header:hover .gstep-title { color: #9aa0a6; }
+
+.gstep-edit { margin-left: auto; }
+.gstep-summary {
+    font-size: var(--font-size-100); font-style: italic; color: var(--text-secondary);
+    margin: 4px 0 0 26px; line-height: 1.4;
+    overflow: hidden; text-overflow: ellipsis;
+}
+.gstep-body { padding: 10px 0 0 26px; }
+.gstep-body[hidden] { display: none; }
+.gstep-desc { font-size: var(--font-size-200); color: var(--text-secondary); line-height: 1.45; margin: 0 0 10px 0; }
+
+.gem-link {
+    display: block; font-size: var(--font-size-200); color: var(--primary-blue);
+    text-decoration: none; line-height: 1.45; margin: -4px 0 12px 0;
+}
+.gem-link:hover { text-decoration: underline; }
+
+/* Input-source list (Step 1) */
+.gsrc-list {
+    display: flex; flex-direction: column;
+    border: 1px solid var(--border-color); border-radius: 6px; overflow: visible;
+}
+.gsrc-list:empty { display: none; }
+.gsrc-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 8px; border-bottom: 1px solid var(--border-color);
+    position: relative;
+}
+.gsrc-row:last-child { border-bottom: none; }
+.gsrc-row .tag { flex: 1 1 auto; min-width: 0; text-align: left; }
+.gsrc-row .text-input { flex: 1 1 auto; min-width: 0; margin-top: 0; font-size: var(--font-size-200); padding: 5px 8px; }
+.gsrc-empty {
+    font-size: var(--font-size-200); font-style: italic; color: #9aa0a6;
+    padding: 8px 2px 0;
+}
+.gsrc-add-row { display: flex; gap: 6px; margin-top: 8px; }
+.gsrc-picker-anchor { position: relative; }
+
+/* Prompt textarea (Step 2) */
+.prompt-area {
+    width: 100%; border: 1px solid var(--border-color); border-radius: 4px;
+    font-family: var(--font-family); font-size: var(--font-size-200);
+    padding: 7px 8px; line-height: 1.45; resize: vertical;
+    color: var(--text-main);
+    /* 3 clean lines — the spec's short default height, so long prompts get
+       the modal rather than swallowing the panel. */
+    height: 70px;
+}
+.prompt-area:focus { outline: none; border-color: var(--primary-blue); }
+.expand-row { display: flex; margin-top: 6px; }
+
+/* Commit button row */
+.gstep-commit { margin-top: 16px; }
+
+/* Modal — Apps Script dialogs are centered over the whole spreadsheet */
+.modal-scrim {
+    position: absolute; inset: 0; background: rgba(32,33,36,.5);
+    display: flex; align-items: center; justify-content: center; z-index: 500;
+}
+.modal-scrim[hidden] { display: none; }
+.modal-box {
+    width: 620px; max-width: 90%; background: white; border-radius: 8px;
+    box-shadow: 0 24px 38px rgba(0,0,0,.14), 0 9px 46px rgba(0,0,0,.12);
+    display: flex; flex-direction: column; overflow: hidden;
+}
+.modal-head {
+    display: flex; align-items: center; padding: 14px 18px;
+    border-bottom: 1px solid var(--border-color);
+}
+.modal-head h2 { margin: 0; font-size: var(--font-size-400); font-weight: 500; color: var(--text-main); }
+.modal-head .btn-cancel { margin-left: auto; padding: 6px 16px; }
+.modal-body { padding: 16px 18px; }
+.modal-body .prompt-area { min-height: 300px; height: auto; font-size: var(--font-size-300); }
+/* The modal autosaves, so there is no footer and no Save action — the Gem
+   link-out lives here instead, where someone mid-composition wants it. */
+.modal-body .gem-link { margin: 0 0 12px 0; font-size: var(--font-size-300); }
+.modal-autosave {
+    font-size: var(--font-size-100); font-style: italic;
+    color: var(--text-secondary); padding: 0 18px 16px;
+}
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <h1>Guided AI Inference</h1>
+  <span class="proto-sub">high-fidelity prototype &middot; SSI Toolkit &middot; built on the shipping sidebar stylesheet</span>
+  <button class="proto-reset" id="proto-reset">&#8634; Reset prototype</button>
+</div>
+
+<div class="sheets-window">
+
+  <div class="sheets-titlebar">
+    <div class="sheets-logo">&#9636;</div>
+    <div>
+      <div class="sheets-doc-title">Federal dockets &mdash; children in custody</div>
+      <div class="sheets-menu">
+        <span>File</span><span>Edit</span><span>View</span><span>Insert</span>
+        <span>Format</span><span>Data</span><span>Tools</span><span>Gemini</span><span>Extensions</span><span>Help</span>
+      </div>
+    </div>
+    <button class="sheets-share">&#128100;&#43; Share</button>
+  </div>
+
+  <div class="sheets-toolbar">
+    <div class="tb-btn">&#8634;</div><div class="tb-btn">&#8635;</div><div class="tb-btn">&#128424;</div>
+    <div class="tb-sep"></div>
+    <div class="tb-btn">100%</div>
+    <div class="tb-sep"></div>
+    <div class="tb-btn">$</div><div class="tb-btn">%</div><div class="tb-btn">.0</div>
+    <div class="tb-sep"></div>
+    <div class="tb-btn"><b>B</b></div><div class="tb-btn"><i>I</i></div><div class="tb-btn">A</div>
+    <div class="tb-sep"></div>
+    <div class="tb-btn">&#9636;</div><div class="tb-btn">&#8801;</div>
+  </div>
+
+  <div class="sheets-body">
+    <div class="grid-wrap">
+      <div class="grid-scroll">
+        <table class="grid" id="grid"></table>
+      </div>
+    </div>
+
+    <div class="ssi-sidebar">
+      <div class="ssi-chrome">
+        <span class="ssi-chrome-title">SSI Toolkit</span>
+        <span class="ssi-chrome-close">&#10005;</span>
+      </div>
+      <div id="app" class="container"></div>
+      <div id="job-strip" class="job-strip" hidden></div>
+    </div>
+  </div>
+
+  <div class="sheets-tabs">
+    <span class="tb-btn">&#43;</span>
+    <span class="tb-btn">&#8801;</span>
+    <span class="sheet-tab active">dockets_2026 &#9662;</span>
+    <span class="sheet-tab">Documents &#9662;</span>
+    <span class="sheet-tab">Spreadsheet &#9662;</span>
+    <span class="sheet-tab">citing_ipcc &#9662;</span>
+  </div>
+
+  <!-- Expand-prompt modal (Apps Script dialogs center over the sheet) -->
+  <div class="modal-scrim" id="prompt-modal" hidden>
+    <div class="modal-box">
+      <div class="modal-head">
+        <h2>System prompt</h2>
+        <button class="btn-cancel" id="modal-close">Close</button>
+      </div>
+      <div class="modal-body">
+        <a class="gem-link" href="#" data-noop>Need help? Try our Gemini Gem prompt assistant &#8599;</a>
+        <textarea class="prompt-area" id="modal-prompt"></textarea>
+      </div>
+      <p class="modal-autosave">Changes save as you type.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Sample data — court-docket summarization
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+var DATA_ROWS = 173;                 // 173 dockets in the Drive folder
+var FIRST_DATA_ROW = 2;              // row 1 is always the header
+var LAST_DATA_ROW = FIRST_DATA_ROW + DATA_ROWS - 1;   // 174
+var CHUNK_SIZE = 40;                 // matches configure-ai-run.ts
+var VISIBLE_ROWS = 32;
+
+var SYSTEM_PROMPT_DEFAULT =
+  "Role: You are a specialized Briefing Assistant for an investigative newsroom.\n\n" +
+  "For each court docket you receive, write a 3-sentence summary for a reporter who has not read it. " +
+  "Name the parties, the relief sought, and the current posture of the case.\n\n" +
+  "Prioritize anything involving children — custody, foster placement, detention of minors, " +
+  "or a guardian ad litem. If children are not involved, say so in the first sentence.\n\n" +
+  "Do not speculate beyond the document. If a filing is illegible or is not a docket, " +
+  "write UNREADABLE and nothing else.";
+
+var DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1br5B4YBUI_DtOX3Ok1RtkuCdca4";
+
+var SAMPLE_NOTES = [
+  "flagged by tipster, 3rd filing this month",
+  "follow-up to Nov. records request",
+  "same plaintiffs' firm as Marion Cty case",
+  "may be sealed in part — check PACER",
+  "reporter: Vega. do not publish yet",
+  "duplicate of row 41? verify",
+  "amicus from state child advocates",
+  "consolidated w/ 2:26-cv-00918",
+  "hearing continued twice",
+  "pro se filing, hard to read"
+];
+var SAMPLE_COURTS = ["S.D.N.Y.", "N.D. Cal.", "E.D. Tex.", "D. Md.", "W.D. Wash.", "N.D. Ill.", "M.D. Fla.", "D. Ariz."];
+var SAMPLE_DATES  = ["2026-01-08","2026-01-14","2026-02-02","2026-02-19","2026-03-05","2026-03-27","2026-04-11","2026-05-06"];
+var SAMPLE_DOC_IDS = [
+  "1QCO6qr2K1MFOWc","1h7x4uNA_dRilKD","1FN9AVjSX3CehB","1IqozFqPeK_PeV",
+  "1cx_BWm9DyL9iHl","1961Pv1cKg9dR58","1akgEWfDSxA8lp","1HCN0R-PKho93W",
+  "1bZ2M_SrSO-eOKv","14Kwb7AihDaMZA","1Lo3_ha0FsG16qw","1oEqm2ssQXdpa7",
+  "1sELItBsudx5DlR","1Rbsvj2dqZAR0n","1zuSQYXiWLoSUcl","1bXbzC1Y9FlHneQ"
+];
+var SAMPLE_OUTPUT = [
+  "Two minor children in state foster placement are the subject of a Section 1983 suit against the county child-welfare agency; plaintiffs seek injunctive relief and damages. The agency has moved to dismiss on qualified-immunity grounds. Motion is fully briefed and pending before the magistrate.",
+  "No children are involved. A contractor sues the federal agency over a terminated services award, seeking bid-protest review and costs. Case is at summary judgment.",
+  "A guardian ad litem petitions for release of a 14-year-old held in an out-of-state residential facility, alleging the placement violates the consent decree. The state concedes the facility is out of network but disputes the remedy. An evidentiary hearing is set.",
+  "Parents of three minors challenge the district's removal process as lacking pre-deprivation notice; they seek class certification. The county answered and opposes certification. Discovery is stayed pending the certification ruling.",
+  "No children are involved. Two insurers dispute coverage allocation for an environmental cleanup and seek declaratory judgment. Cross-motions are pending.",
+  "UNREADABLE",
+  "An immigrant minor detained after a border encounter seeks release to a sponsor under the Flores settlement; the government argues the sponsor vetting is incomplete. The court ordered expedited briefing. A ruling is expected within two weeks.",
+  "A school district and the state education agency dispute who must fund a disabled student's private placement. The family intervened seeking immediate services. The matter is consolidated with a parallel case.",
+  "Plaintiff, a former foster youth now an adult, alleges the agency failed to provide required transition services while she was a minor. The agency raises the statute of limitations. Briefing on the limitations question is underway.",
+  "No children are involved. A shareholder derivative action alleges board oversight failures. A special litigation committee has been appointed and the case is stayed."
+];
+
+/* Column layout — the sheet starts with three reporter-entered columns.
+   Step 1's Drive import appends "Drive Link"; Step 2 writes "System Prompt";
+   Step 4 writes "ai_output". */
+var COLUMNS = [
+  { key: "case_notes",    letter: "A", width: 190, exists: true  },
+  { key: "court",         letter: "B", width: 90,  exists: true  },
+  { key: "filed_date",    letter: "C", width: 95,  exists: true  },
+  { key: "Drive Link",    letter: "D", width: 210, exists: false },
+  { key: "System Prompt", letter: "E", width: 250, exists: false },
+  { key: "ai_output",     letter: "F", width: 330, exists: false }
+];
+
+var OUTPUT_COL = "ai_output";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Prototype state
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function initialState() {
+  return {
+    view: "guided",                  // "guided" | "tools"
+    activeStep: 1,                   // 1..4
+    doneSteps: {},                   // { 1:true, ... } — commit fired
+    reachedSteps: { 1: true },       // ever been opened; stays navigable afterwards
+    sources: [
+      { kind: "column", value: "case_notes" },
+      { kind: "folder", value: DRIVE_FOLDER_URL }
+    ],
+    driveImported: false,
+    prompt: SYSTEM_PROMPT_DEFAULT,
+    promptWritten: false,
+    model: "gemini-3.1-flash-lite",
+    tools: [],
+    includeGrounding: false,
+    modelExpanded: false,
+    toolsExpanded: false,
+    rangeStart: FIRST_DATA_ROW,
+    rangeEnd: LAST_DATA_ROW,
+    testState: "idle",               // idle | loading | done
+    testResultsHtml: "",
+    outputRowsWritten: 0,
+    running: false,
+    pickerOpenFor: null,             // source index whose column picker is open
+    job: null                        // { label, detail }
+  };
+}
+var S = initialState();
+
+var MODEL_CATALOG = [
+  { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite",
+    description: "Good for almost all tasks — summarizing documents, pulling out key facts, translation, and categorizing records in bulk." },
+  { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview",
+    description: "Best for tasks that require real reasoning — weighing competing claims, navigating ambiguous sources, or thinking through complex documents rather than just extracting from them." }
+];
+var TOOL_CATALOG = [
+  { id: "google_search",  name: "Google Search" },
+  { id: "url_context",    name: "URL Context" },
+  { id: "code_execution", name: "Code Execution" }
+];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Helpers
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function pick(arr, i) { return arr[i % arr.length]; }
+function existingHeaders() {
+  return COLUMNS.filter(function (c) { return c.exists; }).map(function (c) { return c.key; });
+}
+function colExists(key) {
+  for (var i = 0; i < COLUMNS.length; i++) if (COLUMNS[i].key === key) return COLUMNS[i].exists;
+  return false;
+}
+function setColExists(key, v) {
+  for (var i = 0; i < COLUMNS.length; i++) if (COLUMNS[i].key === key) COLUMNS[i].exists = v;
+}
+function formatDuration(ms) {
+  var s = ms / 1000;
+  if (s < 60) return (s < 10 ? s.toFixed(1) : Math.round(s)) + "s";
+  var m = Math.floor(s / 60);
+  var rem = Math.round(s - m * 60);
+  return m + "m " + rem + "s";
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Grid rendering — the sheet is the point, so each commit shows up here
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function cellValue(colKey, row) {
+  var i = row - FIRST_DATA_ROW;
+  if (!colExists(colKey)) return null;
+  switch (colKey) {
+    case "case_notes":    return pick(SAMPLE_NOTES, i);
+    case "court":         return pick(SAMPLE_COURTS, i);
+    case "filed_date":    return pick(SAMPLE_DATES, i);
+    case "Drive Link":    return "https://docs.google.com/document/d/" + pick(SAMPLE_DOC_IDS, i) + "/edit";
+    case "System Prompt": return S.promptWritten ? S.prompt.replace(/\n+/g, " ") : null;
+    case "ai_output":
+      if (row < S.rangeStart) return null;
+      var offset = row - S.rangeStart;
+      return offset < S.outputRowsWritten ? pick(SAMPLE_OUTPUT, i) : null;
+  }
+  return null;
+}
+
+function renderGrid(flashCols) {
+  flashCols = flashCols || [];
+  var html = "<colgroup><col style=\"width:34px\">";
+  COLUMNS.forEach(function (c) { html += "<col style=\"width:" + c.width + "px\">"; });
+  html += "</colgroup><thead><tr><th class=\"corner\"></th>";
+  COLUMNS.forEach(function (c) {
+    var hl = flashCols.indexOf(c.key) !== -1 ? " col-hl" : "";
+    html += "<th class=\"colhead" + hl + "\">" + c.letter + "</th>";
+  });
+  html += "</tr></thead><tbody>";
+
+  // Header row (row 1)
+  html += "<tr class=\"headerrow\"><td class=\"rowhead\">1</td>";
+  COLUMNS.forEach(function (c) {
+    var flash = flashCols.indexOf(c.key) !== -1 ? " cell-flash" : "";
+    html += "<td class=\"" + (c.exists ? "" : "cell-empty") + flash + "\">" + (c.exists ? esc(c.key) : "") + "</td>";
+  });
+  html += "</tr>";
+
+  for (var r = FIRST_DATA_ROW; r < FIRST_DATA_ROW + VISIBLE_ROWS; r++) {
+    html += "<tr><td class=\"rowhead\">" + r + "</td>";
+    for (var ci = 0; ci < COLUMNS.length; ci++) {
+      var c = COLUMNS[ci];
+      var v = cellValue(c.key, r);
+      var cls = [];
+      if (v === null) cls.push("cell-empty");
+      if (c.key === "Drive Link" && v) cls.push("cell-link");
+      if (flashCols.indexOf(c.key) !== -1 && v) cls.push("cell-flash");
+      html += "<td class=\"" + cls.join(" ") + "\" title=\"" + esc(v || "") + "\">" + esc(v || "") + "</td>";
+    }
+    html += "</tr>";
+  }
+  html += "</tbody>";
+  document.getElementById("grid").innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Job strip
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function renderJobStrip() {
+  var el = document.getElementById("job-strip");
+  if (!S.job) { el.hidden = true; el.innerHTML = ""; return; }
+  el.hidden = false;
+  el.innerHTML =
+    "<div class=\"job-strip__item\">" +
+      "<span class=\"job-strip__spinner\"></span>" +
+      "<span class=\"job-strip__label\">" + esc(S.job.label) +
+        (S.job.detail ? " — " + esc(S.job.detail) : "") + "</span>" +
+      "<button class=\"job-strip__cancel\" title=\"Cancel\">✕</button>" +
+    "</div>";
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Sidebar — tool list (shows the new third entry point in context)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function toolListTemplate() {
+  return "" +
+  "<div class=\"section\">" +
+    "<h3>Main Tools</h3>" +
+    "<button class=\"tool-btn\" data-act=\"open-guided\">" +
+      "<span class=\"icon\">🧭</span>" +
+      "<span class=\"tool-btn-text\"><span>Guided AI Inference</span>" +
+      "<span class=\"tool-btn-sub\">Step-by-step, one decision at a time</span></span>" +
+    "</button>" +
+    "<button class=\"tool-btn\">" +
+      "<span class=\"icon\">▶️</span>" +
+      "<span class=\"tool-btn-text\"><span>Freeform AI Inference</span>" +
+      "<span class=\"tool-btn-sub\">Full control in a single form</span></span>" +
+    "</button>" +
+    "<button class=\"tool-btn\">" +
+      "<span class=\"icon\">🥞</span>" +
+      "<span class=\"tool-btn-text\"><span>Recipes</span>" +
+      "<span class=\"tool-btn-sub\">Presets for specific tasks</span></span>" +
+    "</button>" +
+  "</div>" +
+  "<div class=\"section\">" +
+    "<h3>Extras</h3>" +
+    "<button class=\"tool-btn\"><span class=\"icon\">📂</span> Import Drive Links</button>" +
+    "<button class=\"tool-btn\"><span class=\"icon\">🎲</span> Sample Rows</button>" +
+    "<button class=\"tool-btn\"><span class=\"icon\">📜</span> Extract Text</button>" +
+    "<button class=\"tool-btn\"><span class=\"icon\">📝</span> Format Markdown</button>" +
+  "</div>" +
+  "<div class=\"status-footer\"><strong>SSI Tools v2.1</strong><br>Powered by Gemini 3.1 Flash Lite<br>Evaluation Unrestricted Mode</div>";
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Sidebar — guided panel
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Three steps, not four: "Configure AI" folded into "Run" — it never performed a
+   sheet write of its own, so every remaining step either writes to the sheet or
+   IS the run action. */
+var STEPS = [
+  { n: 1, title: "Gather your inputs" },
+  { n: 2, title: "Tell the AI what to do" },
+  { n: 3, title: "Run" }
+];
+
+/* "reached" covers Step 4, which is terminal and never gets a ✓ — without it,
+   leaving Step 4 to edit an earlier step would strand the user with no way back. */
+function stepStatus(n) {
+  if (S.activeStep === n) return "active";
+  if (S.doneSteps[n]) return "done";
+  if (S.reachedSteps[n]) return "reached";
+  return "pending";
+}
+
+function sourceLabel(src) {
+  if (src.kind === "column") return src.value;
+  return "Drive Link";
+}
+
+function step1Summary() {
+  if (!S.sources.length) return "No inputs selected";
+  return S.sources.map(sourceLabel).join(", ");
+}
+function step2Summary() {
+  var oneLine = S.prompt.replace(/\s+/g, " ").trim();
+  return oneLine.length > 64 ? oneLine.slice(0, 64) + "…" : oneLine;
+}
+function step3Summary() {
+  var m = MODEL_CATALOG.filter(function (x) { return x.id === S.model; })[0];
+  var toolTxt = S.tools.length
+    ? S.tools.map(function (id) {
+        return TOOL_CATALOG.filter(function (t) { return t.id === id; })[0].name;
+      }).join(", ")
+    : "No tools";
+  return (m ? m.name : "") + " · " + toolTxt;
+}
+function summaryFor(n) {
+  if (n === 1) return step1Summary();
+  if (n === 2) return step2Summary();
+  return step3Summary();
+}
+
+/* ── Step bodies ─────────────────────────────────────────────────────────── */
+
+function step1Body() {
+  var rows = S.sources.map(function (src, i) {
+    if (src.kind === "column") {
+      var picker = "";
+      if (S.pickerOpenFor === i) {
+        var opts = existingHeaders().map(function (h) {
+          return "<div class=\"token-option\" data-act=\"pick-col\" data-i=\"" + i + "\" data-col=\"" + esc(h) + "\">" + esc(h) + "</div>";
+        }).join("");
+        picker =
+          "<div class=\"token-dropdown\">" +
+            "<input class=\"token-search\" placeholder=\"Search columns…\" readonly>" +
+            (opts || "<div class=\"token-no-match\">No columns yet</div>") +
+          "</div>";
+      }
+      return "<div class=\"gsrc-row gsrc-picker-anchor\">" +
+        "<button class=\"tag selected\" data-act=\"open-picker\" data-i=\"" + i + "\">" + esc(src.value) + " ▾</button>" +
+        "<button class=\"pcol-btn-remove\" data-act=\"remove-src\" data-i=\"" + i + "\" title=\"Remove\">✕</button>" +
+        picker +
+      "</div>";
+    }
+    return "<div class=\"gsrc-row\">" +
+      "<input class=\"text-input\" data-act=\"folder-url\" data-i=\"" + i + "\" placeholder=\"Drive folder URL\" value=\"" + esc(src.value) + "\">" +
+      "<button class=\"pcol-btn-remove\" data-act=\"remove-src\" data-i=\"" + i + "\" title=\"Remove\">✕</button>" +
+    "</div>";
+  }).join("");
+
+  var hasFolder = S.sources.some(function (s) { return s.kind === "folder"; });
+  var commitLabel = hasFolder ? "Import &amp; Continue" : "Continue";
+
+  return "" +
+    "<p class=\"gstep-desc\">The content the AI works on, one row at a time.</p>" +
+    (rows ? "<div class=\"gsrc-list\">" + rows + "</div>"
+          : "<p class=\"gsrc-empty\">Nothing selected yet — add a column or a Drive folder below.</p>") +
+    "<div class=\"gsrc-add-row\">" +
+      "<button class=\"pcol-add-btn\" data-act=\"add-col\">＋ Column</button>" +
+      "<button class=\"pcol-add-btn\" data-act=\"add-folder\">＋ Drive folder</button>" +
+    "</div>" +
+    "<div class=\"gstep-commit\">" +
+      "<button class=\"btn-run btn-block\" data-act=\"commit-1\">" + commitLabel + "</button>" +
+    "</div>";
+}
+
+function step2Body() {
+  return "" +
+    "<p class=\"gstep-desc\">Set the AI’s role and behavior — what it should do and how it should respond.</p>" +
+    "<a class=\"gem-link\" href=\"#\" data-act=\"noop\">Need help writing this? Try our Gemini Gem prompt assistant ↗</a>" +
+    /* No "System prompt" label — the step header already establishes context. */
+    "<textarea class=\"prompt-area\" id=\"prompt-input\" rows=\"3\">" + esc(S.prompt) + "</textarea>" +
+    "<div class=\"expand-row\"><button class=\"unlock-btn\" data-act=\"expand-prompt\">Expand ⤡</button></div>" +
+    "<div class=\"gstep-commit\">" +
+      "<button class=\"btn-run btn-block\" data-act=\"commit-2\">Import &amp; Continue</button>" +
+    "</div>";
+}
+
+function step3Body() {
+  var modelName = MODEL_CATALOG.filter(function (m) { return m.id === S.model; })[0].name;
+  var toolSummary = S.tools.length
+    ? S.tools.map(function (id) { return TOOL_CATALOG.filter(function (t) { return t.id === id; })[0].name; }).join(", ")
+    : "No tools selected";
+
+  var modelOptions = MODEL_CATALOG.map(function (m) {
+    return "<button type=\"button\" class=\"model-option" + (m.id === S.model ? " selected" : "") + "\" data-act=\"pick-model\" data-model=\"" + m.id + "\">" +
+      "<span class=\"model-option-name\">" + esc(m.name) + "</span>" +
+      "<span class=\"model-option-desc\">" + esc(m.description) + "</span></button>";
+  }).join("");
+
+  var toolTags = TOOL_CATALOG.map(function (t) {
+    var on = S.tools.indexOf(t.id) !== -1;
+    return "<button class=\"tag" + (on ? " selected" : "") + "\" data-act=\"toggle-tool\" data-tool=\"" + t.id + "\">" + esc(t.name) + "</button>";
+  }).join("");
+
+  var testLabel = S.testState === "loading"
+      ? "<span class=\"btn-spinner btn-spinner--blue\"></span>Testing…"
+      : (S.testState === "done" ? "Tested ✓" : "Test");
+
+  return "" +
+    "<div class=\"field-group\">" +
+      "<button type=\"button\" class=\"collapsible-header\" data-act=\"toggle-model\" aria-expanded=\"" + S.modelExpanded + "\">" +
+        "<span class=\"collapsible-label\">MODEL</span>" +
+        "<span class=\"collapsible-summary\">" + esc(modelName) + "</span>" +
+        "<span class=\"collapsible-chevron\">▶</span>" +
+      "</button>" +
+      "<div class=\"collapsible-content\"" + (S.modelExpanded ? "" : " hidden") + ">" +
+        "<div class=\"model-option-list\">" + modelOptions + "</div>" +
+      "</div>" +
+    "</div>" +
+    "<div class=\"field-group\">" +
+      "<button type=\"button\" class=\"collapsible-header\" data-act=\"toggle-tools\" aria-expanded=\"" + S.toolsExpanded + "\">" +
+        /* No "(optional)" — the "No tools selected" summary already says it. */
+        "<span class=\"collapsible-label\">TOOLS</span>" +
+        "<span class=\"collapsible-summary\">" + esc(toolSummary) + "</span>" +
+        "<span class=\"collapsible-chevron\">▶</span>" +
+      "</button>" +
+      "<div class=\"collapsible-content\"" + (S.toolsExpanded ? "" : " hidden") + ">" +
+        "<p class=\"field-helper\">Give the AI extra capabilities. Google Search lets it look up current information; URL Context lets it read web pages you provide; Code Execution lets it run and verify calculations.</p>" +
+        "<div class=\"tag-list\">" + toolTags + "</div>" +
+        (S.tools.length
+          ? "<label class=\"checkbox-option\"><input type=\"checkbox\" data-act=\"toggle-grounding\"" + (S.includeGrounding ? " checked" : "") + ">" +
+            "<span>Include grounding column <span class=\"grounding-col-badge\">" + OUTPUT_COL + "_grounding</span></span></label>"
+          : "") +
+      "</div>" +
+    "</div>" +
+    /* No commit button. MODEL/TOOLS stay live, editable run settings — Test and
+       Run AI below are this step's only writes, and the step is terminal. */
+    "<span class=\"field-label\">Rows to process</span>" +
+    "<div class=\"range-inputs\">" +
+      "<input type=\"number\" data-act=\"range-start\" value=\"" + S.rangeStart + "\">" +
+      "<span class=\"range-dash\">–</span>" +
+      "<input type=\"number\" data-act=\"range-end\" value=\"" + S.rangeEnd + "\">" +
+    "</div>" +
+    "<div class=\"finish-panel\" style=\"margin-top:16px\">" +
+      "<div class=\"field-group\">" +
+        "<p class=\"step-title\">Test your setup</p>" +
+        "<p class=\"field-helper\">Try it out on the first 10 rows — check quality and cost before committing to a full run.</p>" +
+        "<button class=\"btn-outline btn-block\" data-act=\"test\"" + (S.testState === "loading" || S.running ? " disabled" : "") + ">" + testLabel + "</button>" +
+        (S.testResultsHtml ? "<div class=\"test-results\">" + S.testResultsHtml + "</div>" : "") +
+      "</div>" +
+      "<div class=\"field-group field-group--joined\">" +
+        "<p class=\"step-title\">Run on all rows</p>" +
+        "<p class=\"field-helper\">Run across your entire selection. For large runs above " + CHUNK_SIZE + " rows, make sure you keep this sidebar open.</p>" +
+        "<button class=\"btn-run btn-block\" data-act=\"run\"" + (S.running || S.testState === "loading" ? " disabled" : "") + ">" +
+          (S.running ? "<span class=\"btn-spinner\"></span>Running…" : "Run AI") + "</button>" +
+        /* Demoted to the bottom of the step, next to the button that produces
+           the output, rather than competing for attention at the top. */
+        "<p class=\"field-helper output-note\">Results are written to <span class=\"grounding-col-badge\">" + OUTPUT_COL + "</span>.</p>" +
+      "</div>" +
+    "</div>";
+}
+
+function stepBody(n) {
+  if (n === 1) return step1Body();
+  if (n === 2) return step2Body();
+  return step3Body();
+}
+
+function guidedTemplate() {
+  var steps = STEPS.map(function (st, idx) {
+    var status = stepStatus(st.n);
+    var showSummary = status === "done";
+    var showBody = status === "active";
+    /* The badge carries the step number, so the title doesn't repeat it. */
+    var committed = !!S.doneSteps[st.n];
+    var marker = committed ? "✓" : String(st.n);
+    var edge = (idx === 0 ? " gstep--first" : "") + (idx === STEPS.length - 1 ? " gstep--last" : "");
+    if (committed) edge += " gstep--committed";
+
+    return "<div class=\"gstep gstep--" + status + edge + "\" data-stepno=\"" + st.n + "\">" +
+      "<button class=\"gstep-header\" data-act=\"focus-step\" data-step=\"" + st.n + "\"" + (status === "pending" ? " disabled" : "") + ">" +
+        "<span class=\"gstep-marker\">" + marker + "</span>" +
+        "<span class=\"gstep-title\">" + esc(st.title) + "</span>" +
+        (showSummary ? "<span class=\"gstep-edit unlock-btn\">Edit</span>" : "") +
+      "</button>" +
+      (showSummary ? "<div class=\"gstep-summary\">" + esc(summaryFor(st.n)) + "</div>" : "") +
+      "<div class=\"gstep-body\"" + (showBody ? "" : " hidden") + ">" + (showBody ? stepBody(st.n) : "") + "</div>" +
+    "</div>";
+  }).join("");
+
+  return "" +
+    "<div class=\"panel-header\">" +
+      "<button class=\"back-btn\" data-act=\"back\">← Back</button>" +
+      "<span class=\"panel-title\">🧭 Guided AI Inference</span>" +
+      "<button class=\"refresh-btn\" title=\"Refresh columns\">↻</button>" +
+    "</div>" +
+    /* Always visible — framing for the whole flow, not part of Step 1. */
+    "<p class=\"gflow-intro\">Walk through each stage of Spreadsheet Inference. " +
+      "New here? <a href=\"#\" data-act=\"noop\">See examples ↗</a></p>" +
+    steps;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Render
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function render(flashCols) {
+  document.getElementById("app").innerHTML =
+    S.view === "tools" ? toolListTemplate() : guidedTemplate();
+  renderJobStrip();
+  renderGrid(flashCols);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Behavior
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function readPromptFromDom() {
+  var ta = document.getElementById("prompt-input");
+  if (ta) S.prompt = ta.value;
+}
+
+function advanceTo(n) {
+  S.activeStep = n;
+  S.reachedSteps[n] = true;
+  render();
+  var body = document.querySelector(".gstep--active .gstep-body");
+  if (body) body.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+/* Step 1 commit — locks columns and fires the Drive import in the same action */
+function commitStep1() {
+  var hasFolder = S.sources.some(function (s) { return s.kind === "folder" && s.value.trim(); });
+  S.doneSteps[1] = true;
+
+  if (hasFolder && !S.driveImported) {
+    S.job = { label: "Import Drive Links", detail: "Reading folder…" };
+    render();
+    setTimeout(function () {
+      S.job = { label: "Import Drive Links", detail: "173 files found" };
+      renderJobStrip();
+    }, 700);
+    setTimeout(function () {
+      S.driveImported = true;
+      setColExists("Drive Link", true);
+      S.job = null;
+      advanceTo(2);
+      renderGrid(["Drive Link"]);
+    }, 1400);
+  } else {
+    advanceTo(2);
+  }
+}
+
+/* Step 2 commit — writes the system prompt into every row in scope */
+function commitStep2() {
+  readPromptFromDom();
+  S.doneSteps[2] = true;
+  S.job = { label: "Write system prompt", detail: "Filling 173 rows…" };
+  render();
+  setTimeout(function () {
+    S.promptWritten = true;
+    setColExists("System Prompt", true);
+    S.job = null;
+    advanceTo(3);
+    renderGrid(["System Prompt"]);
+  }, 900);
+}
+
+/* Test — 10 rows, real writes, cost/time stats + full-run estimate */
+function runTest() {
+  S.testState = "loading";
+  S.testResultsHtml = "";
+  S.job = { label: "Test AI Run", detail: "Rows " + S.rangeStart + "–" + Math.min(S.rangeStart + 9, S.rangeEnd) };
+  setColExists(OUTPUT_COL, true);
+  render();
+
+  var written = 0;
+  var target = Math.min(10, S.rangeEnd - S.rangeStart + 1);
+  var tick = setInterval(function () {
+    written++;
+    S.outputRowsWritten = Math.max(S.outputRowsWritten, written);
+    renderGrid([OUTPUT_COL]);
+    if (written >= target) {
+      clearInterval(tick);
+      finishTest(target);
+    }
+  }, 260);
+}
+
+function finishTest(rowCount) {
+  var totalCost = 0.0182;
+  var totalTimeMs = 14600;
+  var fullRowCount = S.rangeEnd - S.rangeStart + 1;
+  var avgCost = totalCost / rowCount;
+
+  var parts = ["<p><strong>Test run:</strong> " + rowCount + " row" + (rowCount === 1 ? "" : "s") +
+    " · $" + totalCost.toFixed(4) + " · " + formatDuration(totalTimeMs) + "</p>"];
+
+  if (fullRowCount > rowCount) {
+    var fullCost = avgCost * fullRowCount;
+    var chunkCount = Math.ceil(fullRowCount / CHUNK_SIZE);
+    var fullTimeMs = chunkCount * totalTimeMs;
+    parts.push("<p><strong>Full run estimate:</strong> " + fullRowCount + " rows · ~$" +
+      fullCost.toFixed(2) + " · ~" + formatDuration(fullTimeMs) + "</p>");
+  }
+  parts.push("<p>⚠ Unusually large files may throw off cost and time estimates.</p>");
+
+  S.testResultsHtml = parts.join("");
+  S.testState = "done";
+  S.job = null;
+  render([OUTPUT_COL]);
+}
+
+/* Run AI — chunked, always re-processes the whole range */
+function runFull() {
+  S.running = true;
+  S.outputRowsWritten = 0;
+  setColExists(OUTPUT_COL, true);
+
+  var total = S.rangeEnd - S.rangeStart + 1;
+  var chunks = [];
+  for (var start = S.rangeStart; start <= S.rangeEnd; start += CHUNK_SIZE) {
+    chunks.push({ start: start, end: Math.min(start + CHUNK_SIZE - 1, S.rangeEnd) });
+  }
+  var ci = 0;
+  S.job = { label: "Batch AI Run", detail: "Rows " + chunks[0].start + "–" + chunks[0].end + " of " + S.rangeEnd };
+  render();
+
+  var step = setInterval(function () {
+    ci++;
+    if (ci >= chunks.length) {
+      clearInterval(step);
+      S.outputRowsWritten = total;
+      S.running = false;
+      S.job = null;
+      /* A finished full run is the only thing that completes the terminal step,
+         so the green rail reaches the bottom. Test alone doesn't — it's a
+         trial, not the deliverable. */
+      S.doneSteps[3] = true;
+      render([OUTPUT_COL]);
+      return;
+    }
+    S.outputRowsWritten = Math.min(total, chunks[ci].start - S.rangeStart);
+    S.job = { label: "Batch AI Run", detail: "Rows " + chunks[ci].start + "–" + chunks[ci].end + " of " + S.rangeEnd };
+    renderJobStrip();
+    renderGrid([OUTPUT_COL]);
+  }, 900);
+}
+
+/* ── Event delegation ───────────────────────────────────────────────────── */
+
+document.getElementById("app").addEventListener("click", function (e) {
+  var t = e.target.closest("[data-act]");
+  if (!t) {
+    if (S.pickerOpenFor !== null) { S.pickerOpenFor = null; render(); }
+    return;
+  }
+  var act = t.getAttribute("data-act");
+  var i = parseInt(t.getAttribute("data-i"), 10);
+
+  switch (act) {
+    case "noop": e.preventDefault(); return;
+
+    case "back": S.view = "tools"; render(); return;
+    case "open-guided": S.view = "guided"; render(); return;
+
+    case "focus-step": {
+      var n = parseInt(t.getAttribute("data-step"), 10);
+      if (S.activeStep === n) return;
+      if (S.activeStep === 2) readPromptFromDom();
+      S.pickerOpenFor = null;
+      advanceTo(n);
+      return;
+    }
+
+    case "add-col":
+      S.sources.push({ kind: "column", value: existingHeaders()[0] });
+      S.pickerOpenFor = S.sources.length - 1;
+      render();
+      return;
+
+    case "add-folder":
+      S.sources.push({ kind: "folder", value: "" });
+      render();
+      return;
+
+    case "open-picker":
+      S.pickerOpenFor = (S.pickerOpenFor === i) ? null : i;
+      render();
+      return;
+
+    case "pick-col":
+      S.sources[i].value = t.getAttribute("data-col");
+      S.pickerOpenFor = null;
+      render();
+      return;
+
+    case "remove-src":
+      S.sources.splice(i, 1);
+      S.pickerOpenFor = null;
+      render();
+      return;
+
+    case "commit-1": commitStep1(); return;
+    case "commit-2": commitStep2(); return;
+
+    case "expand-prompt":
+      readPromptFromDom();
+      document.getElementById("modal-prompt").value = S.prompt;
+      document.getElementById("prompt-modal").hidden = false;
+      document.getElementById("modal-prompt").focus();
+      return;
+
+    case "toggle-model": S.modelExpanded = !S.modelExpanded; readPromptFromDom(); render(); return;
+    case "toggle-tools": S.toolsExpanded = !S.toolsExpanded; render(); return;
+
+    case "pick-model": S.model = t.getAttribute("data-model"); render(); return;
+
+    case "toggle-tool": {
+      var id = t.getAttribute("data-tool");
+      var at = S.tools.indexOf(id);
+      if (at === -1) S.tools.push(id); else S.tools.splice(at, 1);
+      if (!S.tools.length) S.includeGrounding = false;
+      render();
+      return;
+    }
+
+    case "toggle-grounding": S.includeGrounding = !S.includeGrounding; render(); return;
+
+    case "test": runTest(); return;
+    case "run": runFull(); return;
+  }
+});
+
+document.getElementById("app").addEventListener("input", function (e) {
+  var t = e.target.closest("[data-act]");
+  if (!t) return;
+  var act = t.getAttribute("data-act");
+  if (act === "folder-url") {
+    S.sources[parseInt(t.getAttribute("data-i"), 10)].value = t.value;
+  } else if (act === "range-start") {
+    S.rangeStart = Math.max(FIRST_DATA_ROW, parseInt(t.value, 10) || FIRST_DATA_ROW);
+  } else if (act === "range-end") {
+    S.rangeEnd = parseInt(t.value, 10) || LAST_DATA_ROW;
+  }
+});
+
+/* Modal — autosaves. Edits flow straight back into state and into the inline
+   textarea, so Close is a pure dismiss and nothing can be lost by closing. */
+function closeModal() { document.getElementById("prompt-modal").hidden = true; }
+document.getElementById("modal-close").addEventListener("click", closeModal);
+document.getElementById("modal-prompt").addEventListener("input", function (e) {
+  S.prompt = e.target.value;
+  var inline = document.getElementById("prompt-input");
+  if (inline) inline.value = S.prompt;   // live, without re-rendering the modal away
+});
+
+/* Reset */
+document.getElementById("proto-reset").addEventListener("click", function () {
+  S = initialState();
+  closeModal();
+  setColExists("Drive Link", false);
+  setColExists("System Prompt", false);
+  setColExists(OUTPUT_COL, false);
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
