@@ -62,7 +62,9 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
         ? { start: savedState.startRow, end: savedState.endRow }
         : undefined;
 
-    this.rowRange = new RowRange(container.querySelector("#row-range")!, savedRowRange);
+    this.rowRange = new RowRange(container.querySelector("#row-range")!, {
+      selected: savedRowRange,
+    });
 
     container
       .querySelector<HTMLButtonElement>("#extract-btn")!

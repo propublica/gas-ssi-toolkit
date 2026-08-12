@@ -214,10 +214,9 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           newDefault: "ai_",
           selected: preset.outputCol ? [preset.outputCol] : [],
         });
-        this.rowRangeComp = new RowRange(
-          container.querySelector("#row-range-container")!,
-          preset.rowRange,
-        );
+        this.rowRangeComp = new RowRange(container.querySelector("#row-range-container")!, {
+          selected: preset.rowRange,
+        });
 
         const updateGroundingLabel = (): void => {
           const val = this.outputColList?.getValue()[0] ?? "";
