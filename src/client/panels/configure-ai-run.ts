@@ -588,7 +588,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <div id="prompt-col-list"></div>
         <label class="checkbox-option">
           <input type="checkbox" id="wrap-prompts-in-tags-cb" checked />
-          <span>Wrap prompts in tags</span>
+          <span>Tag each input with its column name</span>
         </label>
       </div>
       <div class="field-group">
