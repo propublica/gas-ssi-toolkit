@@ -7,6 +7,7 @@ jest.mock("../../src/client/services", () => ({
   runBatchAI: jest.fn(),
   getActiveRangeInfo: jest.fn().mockResolvedValue(undefined),
   getJobProgress: jest.fn().mockResolvedValue(undefined),
+  getDefaultRowRange: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("../../src/client/job-store", () => ({
@@ -70,7 +71,9 @@ async function mountAndLoad(
   const container = makeContainer();
   const panel = new ConfigureAIRunPanel();
   panel.mount(container, mockNav, params, savedState as SavedState);
-  await Promise.resolve(); // flush the getSheetHeaders promise
+  // loadHeaders() now awaits Promise.all([getSheetHeaders(), getDefaultRowRange()]),
+  // which needs more microtask ticks to settle than a single promise chain did.
+  for (let i = 0; i < 5; i++) await Promise.resolve();
   return { container, panel };
 }
 
@@ -129,7 +132,7 @@ describe("ConfigureAIRunPanel — mount", () => {
     const container = makeContainer();
     const panel = new ConfigureAIRunPanel();
     panel.mount(container, mockNav);
-    await Promise.resolve();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(container.querySelector<HTMLElement>("#no-headers-msg")!.style.display).toBe("block");
     expect(container.querySelector<HTMLElement>("#config-form")!.style.display).not.toBe("block");
   });
@@ -139,7 +142,7 @@ describe("ConfigureAIRunPanel — mount", () => {
     const container = makeContainer();
     const panel = new ConfigureAIRunPanel();
     panel.mount(container, mockNav);
-    await Promise.resolve();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(globalThis.alert).toHaveBeenCalledWith(expect.stringContaining("Network error"));
     expect(mockNav.back).toHaveBeenCalled();
   });
@@ -192,8 +195,7 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     expect(container.querySelector<HTMLElement>("#panel-loader")!.hidden).toBe(false);
     // After headers resolve, the panel-loader should be hidden
     resolveHeaders(DEFAULT_HEADERS);
-    await Promise.resolve();
-    await Promise.resolve(); // flush finally()
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(container.querySelector<HTMLElement>("#panel-loader")!.hidden).toBe(true);
   });
 
@@ -399,7 +401,7 @@ describe("ConfigureAIRunPanel — back", () => {
     const container = makeContainer();
     const panel = new ConfigureAIRunPanel();
     panel.mount(container, mockNav);
-    await Promise.resolve();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     container.querySelector<HTMLAnchorElement>("#browse-recipes-link")!.click();
     expect(mockNav.navigate).toHaveBeenCalledWith("recipes-list");
   });
@@ -414,7 +416,7 @@ describe("ConfigureAIRunPanel — refresh", () => {
     });
     expect(services.getSheetHeaders).toHaveBeenCalledTimes(1);
     container.querySelector<HTMLButtonElement>("#refresh-btn")!.click();
-    await Promise.resolve();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(services.getSheetHeaders).toHaveBeenCalledTimes(2);
     // selections preserved after refresh
     expect(getPromptColValues(container)).toContain("col_a");
@@ -455,8 +457,7 @@ describe("ConfigureAIRunPanel — refresh", () => {
     addPromptCol(container, "col_b"); // config changed after the test completed
 
     container.querySelector<HTMLButtonElement>("#refresh-btn")!.click();
-    await Promise.resolve();
-    await Promise.resolve();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
 
     const results = container.querySelector<HTMLElement>("#test-results")!;
     expect(results.textContent).toContain("Configuration changed since last test");
@@ -1172,5 +1173,35 @@ describe("ConfigureAIRunPanel — lastTest persistence", () => {
     for (let i = 0; i < 5; i++) await Promise.resolve();
     const results = container.querySelector<HTMLElement>("#test-results")!;
     expect(results.textContent).not.toContain("Unusually large files");
+  });
+});
+
+describe("row range default fill", () => {
+  it("pre-fills the Specify-range inputs from getDefaultRowRange when no rowRange preset is given", async () => {
+    (services.getDefaultRowRange as jest.Mock).mockResolvedValue({ start: 2, end: 50 });
+    const { container } = await mountAndLoad();
+    const rangeRadio = container.querySelector<HTMLInputElement>("input[value='range']")!;
+    rangeRadio.click();
+    const numbers = container.querySelectorAll<HTMLInputElement>(".range-inputs input");
+    expect(numbers[0].value).toBe("2");
+    expect(numbers[1].value).toBe("50");
+  });
+
+  it("does not use the fallback when a rowRange preset is already given", async () => {
+    (services.getDefaultRowRange as jest.Mock).mockResolvedValue({ start: 2, end: 999 });
+    const { container } = await mountAndLoad({
+      promptCols: [{ col: "col_a", kind: "text" }],
+      outputCol: "ai_inference",
+      rowRange: { start: 5, end: 8 },
+    });
+    const numbers = container.querySelectorAll<HTMLInputElement>(".range-inputs input");
+    expect(numbers[0].value).toBe("5");
+    expect(numbers[1].value).toBe("8");
+  });
+
+  it("still loads the panel normally when getDefaultRowRange rejects", async () => {
+    (services.getDefaultRowRange as jest.Mock).mockRejectedValue(new Error("range error"));
+    const { container } = await mountAndLoad();
+    expect(container.querySelector<HTMLElement>("#config-form")!.style.display).toBe("block");
   });
 });

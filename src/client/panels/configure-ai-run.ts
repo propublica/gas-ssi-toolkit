@@ -5,7 +5,7 @@ import { TokenInput } from "../components/token-input";
 import { PromptColList } from "../components/prompt-col-list";
 import { RowRange, sanitizeRowRange, type RowRangeValue } from "../components/row-range";
 import { PanelLoader } from "../components/panel-loader";
-import { getSheetHeaders, runBatchAI, getActiveRangeInfo } from "../services";
+import { getSheetHeaders, runBatchAI, getActiveRangeInfo, getDefaultRowRange } from "../services";
 import { jobStore } from "../job-store";
 import { TOOL_CATALOG } from "../tools";
 import { MODEL_CATALOG } from "../models";
@@ -188,8 +188,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     this.promptColList = null;
     this.systemPromptList?.destroy();
     this.outputColList?.destroy();
-    return getSheetHeaders().then(
-      (headers) => {
+    return Promise.all([getSheetHeaders(), getDefaultRowRange().catch(() => undefined)]).then(
+      ([headers, defaultRowRange]) => {
         if (headers.length === 0) {
           container.querySelector<HTMLElement>("#no-headers-msg")!.style.display = "block";
           container.querySelector<HTMLElement>("#config-form")!.style.display = "none";
@@ -216,6 +216,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         });
         this.rowRangeComp = new RowRange(container.querySelector("#row-range-container")!, {
           selected: preset.rowRange,
+          fallback: defaultRowRange,
         });
 
         const updateGroundingLabel = (): void => {
