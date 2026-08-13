@@ -1,9 +1,9 @@
 import type { NavigationContext, Panel } from "../types";
 import type { ExtractTextConfig } from "../../shared/types";
 import { TokenInput } from "../components/token-input";
-import { RowRange } from "../components/row-range";
+import { RowRange, type RowRangeValue } from "../components/row-range";
 import { PanelLoader } from "../components/panel-loader";
-import { getSheetHeaders, extractText } from "../services";
+import { getSheetHeaders, extractText, getDefaultRowRange } from "../services";
 import { jobStore } from "../job-store";
 
 type SavedState = {
@@ -62,9 +62,13 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
         ? { start: savedState.startRow, end: savedState.endRow }
         : undefined;
 
-    this.rowRange = new RowRange(container.querySelector("#row-range")!, {
-      selected: savedRowRange,
-    });
+    const buildRowRange = (defaultRowRange?: RowRangeValue): void => {
+      this.rowRange = new RowRange(container.querySelector("#row-range")!, {
+        selected: savedRowRange,
+        fallback: defaultRowRange,
+      });
+    };
+    getDefaultRowRange().then(buildRowRange, () => buildRowRange(undefined));
 
     container
       .querySelector<HTMLButtonElement>("#extract-btn")!

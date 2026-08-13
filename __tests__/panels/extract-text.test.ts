@@ -5,6 +5,7 @@
 jest.mock("../../src/client/services", () => ({
   getSheetHeaders: jest.fn(),
   extractText: jest.fn(),
+  getDefaultRowRange: jest.fn(),
 }));
 
 jest.mock("../../src/client/job-store", () => ({
@@ -38,6 +39,7 @@ function selectColumn(container: HTMLElement, fieldId: string, value: string): v
 beforeEach(() => {
   jest.clearAllMocks();
   (jobStoreModule.jobStore.dispatch as jest.Mock).mockResolvedValue(undefined);
+  (services.getDefaultRowRange as jest.Mock).mockResolvedValue(undefined);
 });
 
 describe("ExtractTextPanel", () => {
@@ -202,5 +204,42 @@ describe("ExtractTextPanel", () => {
     c.querySelector<HTMLButtonElement>("#refresh-btn")!.click();
     await Promise.resolve();
     expect(services.getSheetHeaders).toHaveBeenCalledTimes(2);
+  });
+
+  it("pre-fills the Specify-range inputs from getDefaultRowRange when no saved range is given", async () => {
+    (services.getSheetHeaders as jest.Mock).mockResolvedValue(["source_drive", "extracted_text"]);
+    (services.getDefaultRowRange as jest.Mock).mockResolvedValue({ start: 2, end: 40 });
+    const c = mountPanel();
+    await Promise.resolve();
+
+    const rangeRadio = c.querySelector<HTMLInputElement>("input[value='range']")!;
+    rangeRadio.click();
+    const rangeInputs = c.querySelectorAll<HTMLInputElement>(".range-inputs input");
+    expect(rangeInputs[0].value).toBe("2");
+    expect(rangeInputs[1].value).toBe("40");
+  });
+
+  it("does not use the fallback when a saved row range is already present", async () => {
+    (services.getSheetHeaders as jest.Mock).mockResolvedValue(["source_drive", "extracted_text"]);
+    (services.getDefaultRowRange as jest.Mock).mockResolvedValue({ start: 2, end: 999 });
+    const c = mountPanel({
+      sourceCol: "source_drive",
+      outputCol: "extracted_text",
+      startRow: 3,
+      endRow: 9,
+    });
+    await Promise.resolve();
+
+    const rangeInputs = c.querySelectorAll<HTMLInputElement>(".range-inputs input");
+    expect(rangeInputs[0].value).toBe("3");
+    expect(rangeInputs[1].value).toBe("9");
+  });
+
+  it("still renders the row range control when getDefaultRowRange rejects", async () => {
+    (services.getSheetHeaders as jest.Mock).mockResolvedValue(["source_drive"]);
+    (services.getDefaultRowRange as jest.Mock).mockRejectedValue(new Error("range error"));
+    const c = mountPanel();
+    await Promise.resolve();
+    expect(c.querySelector(".row-range-options")).toBeTruthy();
   });
 });
