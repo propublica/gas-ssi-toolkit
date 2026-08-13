@@ -154,8 +154,12 @@ describe("ExtractTextPanel", () => {
     await Promise.resolve();
     const state = panel.unmount();
     expect(state).toBeDefined();
-    expect(typeof state?.startRow).toBe("number");
-    expect(typeof state?.endRow).toBe("number");
+    // Default mode is "Use highlighted rows" (no explicit range selected), so the
+    // saved range is undefined rather than coerced to a number — see Fix 1: this lets
+    // the next mount's fallback (from getDefaultRowRange()) apply again instead of
+    // permanently locking the panel into "Specify range" mode after the first visit.
+    expect(state?.startRow).toBeUndefined();
+    expect(state?.endRow).toBeUndefined();
   });
 
   it("restores saved state on remount", async () => {

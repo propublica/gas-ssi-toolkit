@@ -188,6 +188,9 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     this.promptColList = null;
     this.systemPromptList?.destroy();
     this.outputColList?.destroy();
+    // #config-form now waits on both round trips, not just headers — getDefaultRowRange()
+    // rejecting is caught above and never blocks the panel, but a slow (not failed) response
+    // does add to render latency. Accepted: the server side is a single cheap getLastRow() call.
     return Promise.all([getSheetHeaders(), getDefaultRowRange().catch(() => undefined)]).then(
       ([headers, defaultRowRange]) => {
         if (headers.length === 0) {

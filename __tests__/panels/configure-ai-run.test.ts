@@ -1203,5 +1203,7 @@ describe("row range default fill", () => {
     (services.getDefaultRowRange as jest.Mock).mockRejectedValue(new Error("range error"));
     const { container } = await mountAndLoad();
     expect(container.querySelector<HTMLElement>("#config-form")!.style.display).toBe("block");
+    expect(globalThis.alert).not.toHaveBeenCalled();
+    expect(mockNav.back).not.toHaveBeenCalled();
   });
 });

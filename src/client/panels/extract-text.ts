@@ -9,8 +9,8 @@ import { jobStore } from "../job-store";
 type SavedState = {
   sourceCol: string;
   outputCol: string;
-  startRow: number;
-  endRow: number;
+  startRow?: number;
+  endRow?: number;
 };
 
 export class ExtractTextPanel implements Panel<undefined, SavedState> {
@@ -63,7 +63,9 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
         : undefined;
 
     const buildRowRange = (defaultRowRange?: RowRangeValue): void => {
-      this.rowRange = new RowRange(container.querySelector("#row-range")!, {
+      const el = container.querySelector<HTMLElement>("#row-range");
+      if (!el) return;
+      this.rowRange = new RowRange(el, {
         selected: savedRowRange,
         fallback: defaultRowRange,
       });
@@ -98,8 +100,8 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
     return {
       sourceCol,
       outputCol,
-      startRow: range?.start ?? 2,
-      endRow: range?.end ?? 2,
+      startRow: range?.start,
+      endRow: range?.end,
     };
   }
 

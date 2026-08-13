@@ -34,18 +34,16 @@ constructor(container: HTMLElement, options?: RowRangeOptions)
 
 ### `src/client/panels/configure-ai-run.ts`
 
-- `loadHeaders()`'s `getSheetHeaders()` call becomes `Promise.all([getSheetHeaders(), getDefaultRowRange().catch(() => undefined)])` — a failure fetching the default must never block the panel from loading, since it's a convenience, not a requirement.
-- New field: `private defaultRowRange: RowRangeValue | undefined`.
-- Construction: `new RowRange(container.querySelector("#row-range-container")!, { selected: preset.rowRange, fallback: this.defaultRowRange })`.
+- `loadHeaders()`'s `getSheetHeaders()` call becomes `Promise.all([getSheetHeaders(), getDefaultRowRange().catch(() => undefined)])` — a failure fetching the default must never block the panel from loading, since it's a convenience, not a requirement. The resolved value is destructured directly from the `Promise.all` result (`([headers, defaultRowRange]) => ...`) rather than stored on a field, since it's only ever needed at the point `RowRange` is constructed, in the same callback.
+- Construction: `new RowRange(container.querySelector("#row-range-container")!, { selected: preset.rowRange, fallback: defaultRowRange })`.
 - Refresh already re-runs `loadHeaders()`, so the fallback refetches naturally on every refresh — no caching needed, the cost is one cheap `sheet.getLastRow()` call server-side.
 
 ### `src/client/panels/extract-text.ts`
 
-Same pattern, applied to its own `loadHeaders()`:
+Deliberately different from `ConfigureAIRunPanel`: this panel constructs `RowRange` once, outside its `loadHeaders()`/header-loading chain entirely, so `getDefaultRowRange()` is fetched as its own fully independent promise — never combined with `getSheetHeaders()` via `Promise.all`. (`Promise.all` would work here too, but combining two promises this way costs extra JavaScript microtask ticks before the combined result is ready, which would have required loosening several existing tests' timing assumptions in this panel's test suite for no benefit, since nothing here needs the two values together.)
 
-- `Promise.all([getSheetHeaders(), getDefaultRowRange().catch(() => undefined)])`.
-- New field: `private defaultRowRange: RowRangeValue | undefined`.
-- Construction: `new RowRange(container.querySelector("#row-range")!, { selected: savedRowRange, fallback: this.defaultRowRange })`.
+- `getDefaultRowRange().then(buildRowRange, () => buildRowRange(undefined))`, where `buildRowRange(defaultRowRange?: RowRangeValue)` constructs `RowRange` with `{ selected: savedRowRange, fallback: defaultRowRange }`. Using a single `.then()` with both handlers (rather than a chained `.catch().then()`) keeps this to the same one-microtask-tick timing as the panel's existing `getSheetHeaders()` chain.
+- Construction: `new RowRange(container.querySelector("#row-range")!, { selected: savedRowRange, fallback: defaultRowRange })`.
 
 ### `src/client/services.ts`
 
