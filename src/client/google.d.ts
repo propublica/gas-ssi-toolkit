@@ -19,6 +19,7 @@ declare global {
     prepRecipe(params: PrepRecipeParams): PrepRecipeResult;
     getJobProgress(jobId: string): void;
     getActiveRangeInfo(): void;
+    getDefaultRowRange(): void;
     formatMarkdownSelection(): void;
   }
 

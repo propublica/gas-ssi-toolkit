@@ -88,6 +88,17 @@ export function truncateText(text: string, maxLength: number): string {
 }
 
 /**
+ * Deterministic column-title → XML-tag-name mapping. Column headers are not
+ * valid tag names (spaces, #, /, leading digits, or empty titles are all
+ * legal headers) — this is the single place that rule is applied.
+ */
+export function sanitizeTagName(title: string, fallbackIndex: number): string {
+  const stripped = title.replace(/[^A-Za-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+  if (stripped === "") return `input_${fallbackIndex}`;
+  return /^[0-9]/.test(stripped) ? `_${stripped}` : stripped;
+}
+
+/**
  * Normalize a custom function argument to a flat array of non-empty strings.
  * GAS passes single-cell references as raw scalars and ranges as 2D arrays.
  */

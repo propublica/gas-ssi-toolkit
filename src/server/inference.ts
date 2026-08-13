@@ -6,48 +6,79 @@
  * responsible for writing the returned value to the sheet.
  *
  * buildInferenceRequest is the pure request-builder. Exported so callers can build
- * a request without executing it — used by runInference; also available for the
- * batch path (runBatchAI) in the upcoming parallel pipeline refactor.
+ * a request without executing it — used by runInference and by the batch path
+ * (runBatchAI).
  */
 
 import { callGeminiAPI } from "./api";
 import { prepareDriveAttachments } from "./drive";
-import { flattenArg, isValidDriveLink, extractId } from "./utils";
+import { flattenArg, isValidDriveLink, extractId, sanitizeTagName } from "./utils";
 import type { GeminiRequest, GeminiResponse, GeminiUserPart, PromptInput } from "./types";
 import type { ToolId } from "../shared/types";
 
+function resolveFileParts(
+  fileIds: string[],
+  fileUriMap?: Map<string, { uri: string; mimeType: string }>,
+): GeminiUserPart[] {
+  if (fileIds.length === 0) return [];
+  if (fileUriMap) {
+    const parts: GeminiUserPart[] = [];
+    for (const fileId of fileIds) {
+      const fileInfo = fileUriMap.get(fileId);
+      if (fileInfo) {
+        parts.push({ file_data: { file_uri: fileInfo.uri, mime_type: fileInfo.mimeType } });
+      }
+    }
+    return parts;
+  }
+  return prepareDriveAttachments(fileIds).map((inline_data) => ({ inline_data }));
+}
+
+function buildInputParts(
+  input: PromptInput,
+  fileUriMap?: Map<string, { uri: string; mimeType: string }>,
+): GeminiUserPart[] {
+  if (input.kind === "text") {
+    return flattenArg(input.value).map((text) => ({ text }));
+  }
+
+  if (input.kind === "file") {
+    const fileIds = flattenArg(input.value).filter(isValidDriveLink).map(extractId);
+    return resolveFileParts(fileIds, fileUriMap);
+  }
+
+  // "auto" — classify each flattened value individually; a column can mix
+  // plain text and Drive links across rows, so the decision is per-value,
+  // not per-column.
+  const parts: GeminiUserPart[] = [];
+  for (const raw of flattenArg(input.value)) {
+    if (isValidDriveLink(raw)) {
+      parts.push(...resolveFileParts([extractId(raw)], fileUriMap));
+    } else {
+      parts.push({ text: raw });
+    }
+  }
+  return parts;
+}
+
 function buildUserParts(
   promptInputs: PromptInput[],
+  wrapPromptsInTags: boolean,
   fileUriMap?: Map<string, { uri: string; mimeType: string }>,
 ): GeminiUserPart[] {
   const userParts: GeminiUserPart[] = [];
 
-  for (const input of promptInputs) {
-    if (input.kind === "text") {
-      const texts = flattenArg(input.value);
-      const parts = input.label
-        ? texts.map((text) => ({ text: `${input.label}: ${text}` }))
-        : texts.map((text) => ({ text }));
-      userParts.push(...parts);
-    } else {
-      const fileIds = flattenArg(input.value).filter(isValidDriveLink).map(extractId);
-      if (fileIds.length === 0) continue;
+  promptInputs.forEach((input, index) => {
+    const parts = buildInputParts(input, fileUriMap);
+    if (parts.length === 0) return;
 
-      if (fileUriMap) {
-        for (const fileId of fileIds) {
-          const fileInfo = fileUriMap.get(fileId);
-          if (fileInfo) {
-            userParts.push({
-              file_data: { file_uri: fileInfo.uri, mime_type: fileInfo.mimeType },
-            });
-          }
-        }
-      } else {
-        const attachments = prepareDriveAttachments(fileIds);
-        userParts.push(...attachments.map((inline_data) => ({ inline_data })));
-      }
+    if (wrapPromptsInTags && input.label) {
+      const tag = sanitizeTagName(input.label, index);
+      userParts.push({ text: `<${tag}>` }, ...parts, { text: `</${tag}>` });
+    } else {
+      userParts.push(...parts);
     }
-  }
+  });
 
   return userParts;
 }
@@ -55,11 +86,13 @@ function buildUserParts(
 /**
  * Build a GeminiRequest from raw prompt inputs.
  *
- * @param promptInputs  Ordered prompt inputs, each carrying a kind ("text" or
- *                      "file") and a raw cell value.
+ * @param promptInputs  Ordered prompt inputs, each carrying a kind ("text", "file", or
+ *                      "auto") and a raw cell value.
  * @param systemPrompt  Cell value for the system instruction. First non-empty
  *                      string is used. Omit or pass `undefined` to use the model default.
  * @param tools         Tool IDs to enable for this inference call.
+ * @param wrapPromptsInTags  When true (default), each labeled input's parts are wrapped
+ *                      in an XML tag pair named after its (sanitized) label.
  * @param fileUriMap    Optional map from Drive file ID to Gemini Files API URI +
  *                      mimeType. When provided, file inputs use the file_data path
  *                      (Files API); when absent, the inline_data path is used instead.
@@ -70,9 +103,10 @@ export function buildInferenceRequest(
   promptInputs: PromptInput[],
   systemPrompt?: unknown,
   tools?: ToolId[],
+  wrapPromptsInTags: boolean = true,
   fileUriMap?: Map<string, { uri: string; mimeType: string }>,
 ): GeminiRequest | null {
-  const userParts = buildUserParts(promptInputs, fileUriMap);
+  const userParts = buildUserParts(promptInputs, wrapPromptsInTags, fileUriMap);
   if (userParts.length === 0) return null;
 
   return {
@@ -85,8 +119,8 @@ export function buildInferenceRequest(
 /**
  * Execute a single Gemini inference from raw cell values.
  *
- * @param promptInputs Ordered prompt inputs, each carrying a kind ("text" or
- *                     "file") and a raw cell value. Iterated in declaration
+ * @param promptInputs Ordered prompt inputs, each carrying a kind ("text", "file", or
+ *                     "auto") and a raw cell value. Iterated in declaration
  *                     order to preserve the caller's intended part sequence.
  *                     Text values are flattened via flattenArg; file values are
  *                     resolved via prepareDriveAttachments after filtering for

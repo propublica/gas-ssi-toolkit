@@ -5,7 +5,7 @@ import { TokenInput } from "../components/token-input";
 import { PromptColList } from "../components/prompt-col-list";
 import { RowRange, sanitizeRowRange, type RowRangeValue } from "../components/row-range";
 import { PanelLoader } from "../components/panel-loader";
-import { getSheetHeaders, runBatchAI, getActiveRangeInfo } from "../services";
+import { getSheetHeaders, runBatchAI, getActiveRangeInfo, getDefaultRowRange } from "../services";
 import { jobStore } from "../job-store";
 import { TOOL_CATALOG } from "../tools";
 import { MODEL_CATALOG } from "../models";
@@ -29,12 +29,12 @@ export function computeChunks(
 export type SavedState = Required<
   Omit<
     RunConfig,
-    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "prefixWithColName" | "model"
+    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "wrapPromptsInTags" | "model"
   >
 > &
   Pick<
     RunConfig,
-    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "prefixWithColName" | "model"
+    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "wrapPromptsInTags" | "model"
   > & {
     toolsExpanded?: boolean;
     modelExpanded?: boolean;
@@ -49,7 +49,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private toolsList: TagList | null = null;
   private includeGroundingCb: HTMLInputElement | null = null;
   private applyMarkdownCb: HTMLInputElement | null = null;
-  private prefixWithColNameCb: HTMLInputElement | null = null;
+  private wrapPromptsInTagsCb: HTMLInputElement | null = null;
   private outputColObserver: MutationObserver | null = null;
   private nav: NavigationContext | null = null;
   private headersLoaded = false;
@@ -85,7 +85,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           tools: savedState.tools,
           includeGrounding: savedState.includeGrounding,
           applyMarkdown: savedState.applyMarkdown,
-          prefixWithColName: savedState.prefixWithColName,
+          wrapPromptsInTags: savedState.wrapPromptsInTags,
           model: savedState.model,
         }
       : (params ?? {});
@@ -106,9 +106,11 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       this.applyMarkdownCb.checked = true;
     }
 
-    this.prefixWithColNameCb = container.querySelector<HTMLInputElement>("#prefix-col-name-cb");
-    if (this.prefixWithColNameCb && preset.prefixWithColName) {
-      this.prefixWithColNameCb.checked = true;
+    this.wrapPromptsInTagsCb = container.querySelector<HTMLInputElement>(
+      "#wrap-prompts-in-tags-cb",
+    );
+    if (this.wrapPromptsInTagsCb) {
+      this.wrapPromptsInTagsCb.checked = preset.wrapPromptsInTags ?? true;
     }
 
     const updateGroundingVisibility = (): void => {
@@ -186,8 +188,11 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     this.promptColList = null;
     this.systemPromptList?.destroy();
     this.outputColList?.destroy();
-    return getSheetHeaders().then(
-      (headers) => {
+    // #config-form now waits on both round trips, not just headers — getDefaultRowRange()
+    // rejecting is caught above and never blocks the panel, but a slow (not failed) response
+    // does add to render latency. Accepted: the server side is a single cheap getLastRow() call.
+    return Promise.all([getSheetHeaders(), getDefaultRowRange().catch(() => undefined)]).then(
+      ([headers, defaultRowRange]) => {
         if (headers.length === 0) {
           container.querySelector<HTMLElement>("#no-headers-msg")!.style.display = "block";
           container.querySelector<HTMLElement>("#config-form")!.style.display = "none";
@@ -212,10 +217,10 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           newDefault: "ai_",
           selected: preset.outputCol ? [preset.outputCol] : [],
         });
-        this.rowRangeComp = new RowRange(
-          container.querySelector("#row-range-container")!,
-          preset.rowRange,
-        );
+        this.rowRangeComp = new RowRange(container.querySelector("#row-range-container")!, {
+          selected: preset.rowRange,
+          fallback: defaultRowRange,
+        });
 
         const updateGroundingLabel = (): void => {
           const val = this.outputColList?.getValue()[0] ?? "";
@@ -265,7 +270,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       tools: (this.toolsList?.getValue() ?? []) as ToolId[],
       includeGrounding: this.includeGroundingCb?.checked ?? false,
       applyMarkdown: this.applyMarkdownCb?.checked ?? false,
-      prefixWithColName: this.prefixWithColNameCb?.checked ?? false,
+      wrapPromptsInTags: this.wrapPromptsInTagsCb?.checked ?? true,
       toolsExpanded: this.toolsExpanded,
       model: this.getSelectedModel(),
       modelExpanded: this.modelExpanded,
@@ -318,7 +323,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       tools: (this.toolsList?.getValue() ?? []) as ToolId[],
       includeGrounding: this.includeGroundingCb?.checked,
       applyMarkdown: this.applyMarkdownCb?.checked,
-      prefixWithColName: this.prefixWithColNameCb?.checked,
+      wrapPromptsInTags: this.wrapPromptsInTagsCb?.checked,
       model: this.getSelectedModel(),
     };
   }
@@ -542,7 +547,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     const tools = (this.toolsList?.getValue() ?? []) as ToolId[];
     const includeGrounding = this.includeGroundingCb?.checked ?? false;
     const applyMarkdown = this.applyMarkdownCb?.checked ?? false;
-    const prefixWithColName = this.prefixWithColNameCb?.checked ?? false;
+    const wrapPromptsInTags = this.wrapPromptsInTagsCb?.checked ?? true;
     const model = this.getSelectedModel();
     return {
       promptCols,
@@ -552,7 +557,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       tools: tools.length > 0 ? tools : undefined,
       includeGrounding: includeGrounding || undefined,
       applyMarkdown: applyMarkdown || undefined,
-      prefixWithColName: prefixWithColName || undefined,
+      wrapPromptsInTags: wrapPromptsInTags ? undefined : false,
       model,
     };
   }
@@ -585,8 +590,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <p class="field-helper">The content the AI acts on — what it reads, summarizes, classifies, or answers, one row at a time.</p>
         <div id="prompt-col-list"></div>
         <label class="checkbox-option">
-          <input type="checkbox" id="prefix-col-name-cb" />
-          <span>Prefix with column name</span>
+          <input type="checkbox" id="wrap-prompts-in-tags-cb" checked />
+          <span>Tag each input with its column name</span>
         </label>
       </div>
       <div class="field-group">

@@ -96,6 +96,17 @@ export function getActiveRangeInfo(): Promise<{ start: number; end: number } | u
   });
 }
 
+export function getDefaultRowRange(): Promise<{ start: number; end: number } | undefined> {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler((result: unknown) =>
+        resolve(normalizeNulls(result) as { start: number; end: number } | undefined),
+      )
+      .withFailureHandler((err: Error) => reject(err))
+      .getDefaultRowRange();
+  });
+}
+
 export function getJobProgress(
   jobId: string,
 ): Promise<{ message?: string; current?: number; total?: number } | undefined> {

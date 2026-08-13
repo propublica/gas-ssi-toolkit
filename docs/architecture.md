@@ -53,9 +53,9 @@ The Gemini tool system spans three layers, linked by `ToolId` (a string union in
 
 `RunConfig` (in `src/shared/types.ts`) is the central data type for an AI run. It crosses the `google.script.run` boundary when the client calls `runBatchAI`, and it's the output both `ConfigureAIRunPanel` and `RecipePanel` produce.
 
-The key field is `promptCols: PromptColumnSpec[]` — an **ordered** list of `{ col: string; kind: "text" | "file" }` entries. Order matters: parts are assembled into the Gemini request in the sequence they appear, allowing a recipe or user to interleave text and file columns arbitrarily (e.g. file first, then a text instruction column). Each entry's `kind` determines whether the column value is sent as inline text or fetched and base64-encoded as a Drive file.
+The key field is `promptCols: PromptColumnSpec[]` — an **ordered** list of `{ col: string; kind: "text" | "file" | "auto" }` entries. Order matters: parts are assembled into the Gemini request in the sequence they appear, allowing a recipe or user to interleave text and file columns arbitrarily (e.g. file first, then a text instruction column). `"text"` sends the column value as inline text; `"file"` fetches and encodes it as a Drive file. `"auto"` inspects each cell's content at request-build time and classifies it individually — a Drive link is treated as a file, anything else as text — used by flows that don't ask the user to declare a column's kind up front.
 
-Other fields: `systemPromptCol` (optional system instruction column), `outputCol` (where results are written), `tools?: ToolId[]`, `includeGrounding`, `applyMarkdown`, `prefixWithColName` (prepends `"<col>: "` to each text part), and `rowRange`.
+Other fields: `systemPromptCol` (optional system instruction column), `outputCol` (where results are written), `tools?: ToolId[]`, `includeGrounding`, `applyMarkdown`, `wrapPromptsInTags` (default `true`; wraps each prompt column's contributed parts in an XML-style tag named after the column, e.g. `<case_notes>...</case_notes>`), and `rowRange`.
 
 ## Panel / Router System
 

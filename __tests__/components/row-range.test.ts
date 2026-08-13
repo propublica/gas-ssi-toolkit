@@ -20,7 +20,7 @@ describe("RowRange", () => {
 
   it("when initialized with a rowRange, 'range' is checked and inputs are pre-filled", () => {
     const c = makeContainer();
-    new RowRange(c, { start: 3, end: 9 });
+    new RowRange(c, { selected: { start: 3, end: 9 } });
     const rangeRadio = c.querySelector<HTMLInputElement>('input[value="range"]');
     const numbers = c.querySelectorAll<HTMLInputElement>('input[type="number"]');
     expect(rangeRadio?.checked).toBe(true);
@@ -45,13 +45,13 @@ describe("RowRange", () => {
 
   it("getValue() returns { start, end } when 'range' is checked and inputs are valid", () => {
     const c = makeContainer();
-    const r = new RowRange(c, { start: 2, end: 10 });
+    const r = new RowRange(c, { selected: { start: 2, end: 10 } });
     expect(r.getValue()).toEqual({ start: 2, end: 10 });
   });
 
   it("selecting 'selection' radio hides range inputs", () => {
     const c = makeContainer();
-    new RowRange(c, { start: 2, end: 5 }); // starts with range checked
+    new RowRange(c, { selected: { start: 2, end: 5 } }); // starts with range checked
     const selRadio = c.querySelector<HTMLInputElement>('input[value="selection"]')!;
     selRadio.checked = true;
     selRadio.dispatchEvent(new Event("change"));
@@ -66,5 +66,23 @@ describe("RowRange", () => {
     rangeRadio.dispatchEvent(new Event("change"));
     // inputs left empty — parseInt("", 10) is NaN
     expect(r.getValue()).toBeUndefined();
+  });
+
+  it("pre-fills range inputs from fallback when selected is absent, without checking 'range'", () => {
+    const c = makeContainer();
+    new RowRange(c, { fallback: { start: 2, end: 15 } });
+    const selRadio = c.querySelector<HTMLInputElement>('input[value="selection"]');
+    const numbers = c.querySelectorAll<HTMLInputElement>('input[type="number"]');
+    expect(selRadio?.checked).toBe(true);
+    expect(numbers[0].value).toBe("2");
+    expect(numbers[1].value).toBe("15");
+  });
+
+  it("ignores fallback when selected is present", () => {
+    const c = makeContainer();
+    new RowRange(c, { selected: { start: 3, end: 9 }, fallback: { start: 2, end: 100 } });
+    const numbers = c.querySelectorAll<HTMLInputElement>('input[type="number"]');
+    expect(numbers[0].value).toBe("3");
+    expect(numbers[1].value).toBe("9");
   });
 });
