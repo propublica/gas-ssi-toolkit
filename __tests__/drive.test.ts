@@ -37,6 +37,7 @@ const mockUi = {
   GOOGLE_DOCS: "application/vnd.google-apps.document",
   GOOGLE_SHEETS: "application/vnd.google-apps.spreadsheet",
   PDF: "application/pdf",
+  PLAIN_TEXT: "text/plain",
 };
 
 (globalThis as any).UrlFetchApp = {
@@ -127,6 +128,15 @@ describe("extractTextUniversal", () => {
     });
 
     expect(extractTextUniversal("zipId123")).toBe("[Skipped: Unsupported Type]");
+  });
+
+  it("reads text directly from a plain text file", () => {
+    (DriveApp.getFileById as jest.Mock).mockReturnValue({
+      getMimeType: () => "text/plain",
+      getBlob: () => ({ getDataAsString: () => "plain text body" }),
+    });
+
+    expect(extractTextUniversal("txtId123")).toBe("plain text body");
   });
 
   it("returns error string when an exception is thrown", () => {
@@ -554,6 +564,17 @@ describe("downloadDriveFiles", () => {
     downloadDriveFiles(["sheetId"], metadata, "token");
     const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
     expect(calls[0].url).toContain("export?mimeType=text/csv");
+  });
+
+  it("uses alt=media for plain text files (Run AI attaches .txt as-is; Gemini accepts text/plain natively)", () => {
+    const mockBlob = {};
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      { getResponseCode: () => 200, getBlob: () => mockBlob },
+    ]);
+    const metadata = new Map([["txtId", { mimeType: "text/plain", size: 0 }]]);
+    downloadDriveFiles(["txtId"], metadata, "token");
+    const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
+    expect(calls[0].url).toContain("?alt=media");
   });
 
   it("uses alt=media for binary files", () => {
