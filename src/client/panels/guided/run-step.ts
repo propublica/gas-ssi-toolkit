@@ -24,7 +24,6 @@ export class RunStep implements Step<RunStepSavedState> {
   readonly flavorText = "";
 
   private runControls: RunControls | null = null;
-  ready: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly getPromptFields: () => Pick<RunConfig, "promptCols" | "systemPromptCol">,
@@ -46,7 +45,6 @@ export class RunStep implements Step<RunStepSavedState> {
       onRunSucceeded: () => ctx.onComplete(),
       savedState: savedState?.runControls,
     });
-    this.ready = this.runControls.ready;
     // RunControls no longer checks test-result freshness on its own (Task 1
     // fix removed that internal auto-call to close a mount-time ordering
     // race) — the host must call it explicitly once RunControls's own

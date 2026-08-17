@@ -42,7 +42,7 @@ describe("RunStep — mount and Run AI", () => {
     const container = makeContainer();
     const step = new RunStep(getPromptFields, jest.fn());
     step.mount(container, makeCtx());
-    await step.ready;
+    for (let i = 0; i < 5; i++) await Promise.resolve();
 
     container.querySelector<HTMLButtonElement>("#run-btn")!.click();
     for (let i = 0; i < 5; i++) await Promise.resolve();
@@ -62,7 +62,7 @@ describe("RunStep — mount and Run AI", () => {
     const container = makeContainer();
     const step = new RunStep(() => ({ promptCols: [{ col: "a", kind: "auto" }] }), jest.fn());
     step.mount(container, ctx);
-    await step.ready;
+    for (let i = 0; i < 5; i++) await Promise.resolve();
 
     container.querySelector<HTMLButtonElement>("#test-btn")!.click();
     for (let i = 0; i < 5; i++) await Promise.resolve();
@@ -86,7 +86,7 @@ describe("RunStep — Switch to Freeform", () => {
       onSwitchToFreeform,
     );
     step.mount(container, makeCtx());
-    await step.ready;
+    for (let i = 0; i < 5; i++) await Promise.resolve();
 
     container.querySelector<HTMLButtonElement>("#gr-switch-to-freeform")!.click();
 
@@ -105,7 +105,7 @@ describe("RunStep — unmount/mount round trip", () => {
     const container = makeContainer();
     const step = new RunStep(() => ({ promptCols: [] }), jest.fn());
     step.mount(container, makeCtx());
-    await step.ready;
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     container.querySelector<HTMLElement>('[data-value="google_search"]')!.click();
 
     const result = step.unmount();
@@ -113,7 +113,7 @@ describe("RunStep — unmount/mount round trip", () => {
 
     const step2 = new RunStep(() => ({ promptCols: [] }), jest.fn());
     step2.mount(container, makeCtx(), result?.savedState);
-    await step2.ready;
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(
       container
         .querySelector<HTMLElement>('[data-value="google_search"]')
@@ -150,7 +150,7 @@ describe("RunStep — unmount/mount round trip", () => {
     const container = makeContainer();
     const step = new RunStep(() => ({ promptCols: matchingConfig.promptCols }), jest.fn());
     step.mount(container, makeCtx(), savedState);
-    await step.ready;
+    for (let i = 0; i < 5; i++) await Promise.resolve();
 
     const results = container.querySelector<HTMLElement>("#test-results")!;
     expect(results.hidden).toBe(false);
