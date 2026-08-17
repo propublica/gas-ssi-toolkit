@@ -12,6 +12,7 @@ Built with TypeScript, bundled by Rollup, and deployed via clasp.
 - Node.js 22+
 - Apps Script API enabled at [script.google.com/home/usersettings](https://script.google.com/home/usersettings)
 - A Gemini API key — [get one here](https://ai.google.dev/gemini-api/docs/api-key)
+  - Tip: [AI Studio](https://aistudio.google.com/api-keys) makes it easy to mint a key and [set a monthly spend cap](https://aistudio.google.com/spend) to avoid surprise billing
 
 `@google/clasp` is included as a devDependency — no global install needed.
 
