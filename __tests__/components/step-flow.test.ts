@@ -14,6 +14,7 @@ class FakeStep implements Step<{ value: string }> {
   title: string;
   flavorText: string;
   mounted = false;
+  mountCallCount = 0;
   lastCtx: StepContext | null = null;
   private value = "";
 
@@ -24,6 +25,7 @@ class FakeStep implements Step<{ value: string }> {
 
   mount(container: HTMLElement, ctx: StepContext, savedState?: { value: string }): void {
     this.mounted = true;
+    this.mountCallCount++;
     this.lastCtx = ctx;
     this.value = savedState?.value ?? "";
     container.innerHTML = `<input class="fake-step-input" value="${this.value}" />`;
@@ -127,6 +129,9 @@ describe("StepFlow — onError", () => {
     new StepFlow(container, [a]);
     a.lastCtx!.onError();
     expect(container.querySelector(".step-icon")!.textContent).toBe("✕");
+    expect(container.querySelector(".step-icon")!.classList.contains("step-icon--error")).toBe(
+      true,
+    );
     expect(a.mounted).toBe(true); // still active/mounted, not collapsed
   });
 
@@ -138,6 +143,7 @@ describe("StepFlow — onError", () => {
     a.lastCtx!.onComplete();
     const icons = container.querySelectorAll(".step-icon");
     expect(icons[0].textContent).toBe("✓");
+    expect(icons[0].classList.contains("step-icon--error")).toBe(false);
   });
 });
 
@@ -168,6 +174,32 @@ describe("StepFlow — [Edit]", () => {
     expect(b.mounted).toBe(true);
     const rows = container.querySelectorAll(".step-row");
     expect(rows[1].querySelector<HTMLElement>(".step-body")!.hidden).toBe(false);
+  });
+
+  it("editing an earlier step while a later non-terminal step is active keeps both mounted", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStep("C")];
+    const container = makeContainer();
+    const flow = new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete(); // a: complete/collapsed, b: active
+    b.setValue("in-progress-b");
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    expect(a.mounted).toBe(true);
+    expect(b.mounted).toBe(true); // b must still be considered mounted
+    const saved = flow.getValue();
+    const bSaved = saved.steps[1].saved;
+    expect(bSaved?.savedState).toEqual({ value: "in-progress-b" }); // b's live state must be captured, not lost
+  });
+
+  it("re-completing an edited earlier step does not remount an already-active later step", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b]);
+    a.lastCtx!.onComplete(); // a: complete, b: active
+    expect(b.mountCallCount).toBe(1);
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a; b untouched
+    a.lastCtx!.onComplete(); // re-complete a
+    expect(b.mounted).toBe(true); // b should still be mounted, not remounted-then-hidden
+    expect(b.mountCallCount).toBe(1); // and never remounted a second time
   });
 });
 

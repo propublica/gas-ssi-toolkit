@@ -132,4 +132,37 @@ describe("GuidedAIInferencePanel — persistence", () => {
     expect(icons[0].textContent).toBe("✓");
     expect(icons[1].textContent).toBe("●");
   });
+
+  it("restoring a fully-completed flow still allows Run AI to succeed (regression: step results must survive a remount)", async () => {
+    (services.prepRecipe as jest.Mock).mockResolvedValue({ rowRange: { start: 2, end: 5 } });
+    const { container, panel } = await mountAndLoad();
+
+    container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+    container.querySelector<HTMLElement>(".token-add-btn")!.click();
+    container.querySelector<HTMLElement>('.token-option[data-value="NoteCol"]')!.click();
+    container.querySelector<HTMLButtonElement>("#gi-continue")!.click();
+    await Promise.resolve();
+
+    container.querySelector<HTMLTextAreaElement>("#gp-prompt-text")!.value = "Summarize this.";
+    container.querySelector<HTMLButtonElement>("#gp-continue")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    const saved = panel.unmount();
+
+    const container2 = makeContainer();
+    const panel2 = new GuidedAIInferencePanel();
+    panel2.mount(container2, mockNav, undefined, saved);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    container2.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(services.runBatchAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        promptCols: [{ col: "NoteCol", kind: "auto" }],
+        systemPromptCol: "System Prompt",
+      }),
+      expect.any(String),
+    );
+  });
 });

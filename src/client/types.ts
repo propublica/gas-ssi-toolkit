@@ -47,8 +47,11 @@ export interface StepContext {
    * the shell's handling of this is idempotent. */
   onComplete(): void;
   /** Purely cosmetic — flips this step's checklist icon to a red ✕. Does
-   * NOT change locked/active/complete status. The step's own mount()
-   * remains responsible for displaying the actual error message inline. */
+   * NOT change locked/active/complete status. The step itself is
+   * responsible for surfacing the failure to the user — currently via
+   * `globalThis.alert()`, consistent with how every other RPC-failure path
+   * in this codebase reports errors. The shell only ever renders the icon,
+   * never message text. */
   onError(): void;
 }
 
@@ -57,6 +60,14 @@ export interface Step<S = unknown> {
   flavorText: string;
   mount(container: HTMLElement, ctx: StepContext, savedState?: S): void;
   unmount(): { savedState: S; summary: string } | undefined;
+  /** Optional. Called by the shell immediately after construction for any
+   * step that is NOT being mounted this session (locked, or complete and
+   * collapsed) but has cached savedState from a prior session — so a later
+   * step's derived result (e.g. via getResult()) stays correct even when
+   * this step is never re-mounted after a panel reload. Steps whose result
+   * is entirely derivable from their own savedState should implement this;
+   * omit it if nothing downstream depends on this step's derived state. */
+  hydrate?(savedState: S): void;
 }
 
 export interface StepFlowSavedState {

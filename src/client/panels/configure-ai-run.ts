@@ -244,7 +244,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     return `
     <div class="panel-header">
       <button id="back-btn" class="back-btn">← Back</button>
-      <span class="panel-title">▶️ Run AI Inference</span>
+      <span class="panel-title">▶️ Freeform AI Inference</span>
       <button id="refresh-btn" class="refresh-btn" title="Refresh columns">↻</button>
     </div>
     <div id="panel-loader" class="panel-loader" hidden>

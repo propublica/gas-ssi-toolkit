@@ -23,6 +23,10 @@ export class PromptStep implements Step<PromptStepSavedState> {
     return this.result;
   }
 
+  hydrate(_savedState: PromptStepSavedState): void {
+    this.result = { systemPromptCol: SYSTEM_PROMPT_COLUMN_TITLE };
+  }
+
   mount(container: HTMLElement, ctx: StepContext, savedState?: PromptStepSavedState): void {
     container.innerHTML = `
       <textarea id="gp-prompt-text" class="guided-prompt-textarea"></textarea>

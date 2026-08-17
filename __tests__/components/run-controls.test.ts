@@ -91,6 +91,17 @@ describe("computeChunks", () => {
   it("returns a single chunk for exactly one row", () => {
     expect(computeChunks({ start: 5, end: 5 }, 50)).toEqual([{ start: 5, end: 5 }]);
   });
+
+  it("returns a single chunk when row count is less than chunk size", () => {
+    expect(computeChunks({ start: 2, end: 11 }, 50)).toEqual([{ start: 2, end: 11 }]);
+  });
+
+  it("handles a start row other than 2", () => {
+    expect(computeChunks({ start: 10, end: 69 }, 50)).toEqual([
+      { start: 10, end: 59 },
+      { start: 60, end: 69 },
+    ]);
+  });
 });
 
 describe("RunControls — mount", () => {

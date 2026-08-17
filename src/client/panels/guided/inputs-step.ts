@@ -33,6 +33,13 @@ export class InputsStep implements Step<InputsStepSavedState> {
     return this.result;
   }
 
+  hydrate(savedState: InputsStepSavedState): void {
+    const rows = savedState.rows.filter((r) =>
+      r.kind === "column" ? r.colTitle !== "" : r.url !== "",
+    );
+    this.result = { promptCols: rows.map((r) => ({ col: r.colTitle, kind: "auto" as const })) };
+  }
+
   mount(container: HTMLElement, ctx: StepContext, savedState?: InputsStepSavedState): void {
     this.container = container;
     this.rows = [];
@@ -67,6 +74,16 @@ export class InputsStep implements Step<InputsStepSavedState> {
         .filter(Boolean)
         .join(", ") || "No inputs selected";
     return { savedState: { rows }, summary };
+  }
+
+  /** Tears down all row-level TokenInputs (their document-level click
+   * listeners in particular). Call this only when the step's container is
+   * actually being discarded — NOT from unmount(), which is also called on
+   * steps that remain visibly mounted (see StepFlow.getValue()). */
+  destroy(): void {
+    for (const { tokenInput } of this.rows) {
+      tokenInput?.destroy();
+    }
   }
 
   private computeNextFolderNumber(): number {

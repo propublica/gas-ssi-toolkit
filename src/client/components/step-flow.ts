@@ -29,7 +29,11 @@ export class StepFlow {
     this.rowEls = steps.map((step, i) => this.buildRow(step, i));
     this.rowEls.forEach((row) => this.container.appendChild(row));
     steps.forEach((_, i) => {
-      if (this.isMountedState(i)) this.mountStep(i);
+      if (this.isMountedState(i)) {
+        this.mountStep(i);
+      } else if (this.savedByIndex[i]) {
+        steps[i].hydrate?.(this.savedByIndex[i]!.savedState);
+      }
     });
   }
 
@@ -51,9 +55,8 @@ export class StepFlow {
   }
 
   private isMountedState(index: number): boolean {
-    return (
-      index === this.activeIndex || (this.isLastStep(index) && this.statuses[index] === "complete")
-    );
+    const status = this.statuses[index];
+    return status !== "locked" && !(status === "complete" && !this.isLastStep(index));
   }
 
   private iconFor(index: number): string {
@@ -130,9 +133,10 @@ export class StepFlow {
     this.statuses[index] = "complete";
 
     const nextIndex = index + 1;
-    if (this.statuses[nextIndex] === "locked") this.statuses[nextIndex] = "active";
+    const nextWasLocked = this.statuses[nextIndex] === "locked";
+    if (nextWasLocked) this.statuses[nextIndex] = "active";
     this.activeIndex = nextIndex;
-    this.mountStep(nextIndex);
+    if (nextWasLocked) this.mountStep(nextIndex);
 
     this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
     this.applyRowDisplay(this.rowEls[nextIndex], nextIndex, this.steps[nextIndex]);
@@ -147,7 +151,10 @@ export class StepFlow {
 
   private updateIcon(index: number): void {
     const icon = this.rowEls[index].querySelector<HTMLElement>(".step-icon");
-    if (icon) icon.textContent = this.iconFor(index);
+    if (icon) {
+      icon.textContent = this.iconFor(index);
+      icon.classList.toggle("step-icon--error", this.hasErrorByIndex[index]);
+    }
   }
 
   private editStep(index: number): void {

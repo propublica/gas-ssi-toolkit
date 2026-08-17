@@ -42,7 +42,7 @@ export class RunStep implements Step<RunStepSavedState> {
         wrapPromptsInTags: undefined,
         applyMarkdown: undefined,
       }),
-      onRunSucceeded: () => ctx.onComplete(),
+      onRunSucceeded: (): void => ctx.onComplete(),
       savedState: savedState?.runControls,
     });
     // RunControls no longer checks test-result freshness on its own (Task 1
@@ -56,10 +56,14 @@ export class RunStep implements Step<RunStepSavedState> {
     container
       .querySelector<HTMLButtonElement>("#gr-switch-to-freeform")!
       .addEventListener("click", () => {
+        const runControlsValue = this.runControls!.getValue();
         this.onSwitchToFreeform({
           ...this.getPromptFields(),
           outputCol: GUIDED_OUTPUT_COLUMN_TITLE,
-          ...this.runControls!.getValue(),
+          rowRange: runControlsValue.rowRange,
+          tools: runControlsValue.tools,
+          includeGrounding: runControlsValue.includeGrounding,
+          model: runControlsValue.model,
         });
       });
   }
