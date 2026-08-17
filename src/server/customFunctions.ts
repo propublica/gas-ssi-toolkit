@@ -14,6 +14,7 @@
 import { callGeminiAPI } from "./api";
 import { flattenArg } from "./utils";
 import { TOOL_REGISTRY } from "./tools";
+import { DomainError, logUnexpected, toSafeMessage, formatCellError } from "./error-handling";
 import type { ToolId } from "../shared/types";
 import type { GeminiUserPart } from "./types";
 
@@ -27,13 +28,13 @@ import type { GeminiUserPart } from "./types";
  *   Example: "You are a concise summarizer."
  * @param {string|Array} [toolNames] (Optional) Names of tools to enable.
  *   Example: "google_search" or {A5,A6}
- * @return {string} The model's text response, or "[SSI Error: ...]" on failure.
+ * @return {string} The model's text response, or "[Error: ...]" on failure.
  * @customfunction
  */
 export function SSI(userTexts: unknown, systemPrompt?: string, toolNames?: unknown): string {
   try {
     const resolvedToolIds = flattenArg(toolNames).map((name) => {
-      if (!TOOL_REGISTRY[name as ToolId]) throw new Error(`unknown tool '${name}'`);
+      if (!TOOL_REGISTRY[name as ToolId]) throw new DomainError(`unknown tool '${name}'`);
       return name as ToolId;
     });
 
@@ -43,7 +44,7 @@ export function SSI(userTexts: unknown, systemPrompt?: string, toolNames?: unkno
       tools: resolvedToolIds.length ? resolvedToolIds : undefined,
     }).text;
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return `[SSI Error: ${msg}]`;
+    logUnexpected("SSI", e);
+    return formatCellError(toSafeMessage(e, "request failed — see script logs"));
   }
 }

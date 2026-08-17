@@ -11,6 +11,7 @@
 import { CONFIG } from "./config";
 import { geminiAuthHeaders } from "./gemini-auth";
 import { TOOL_REGISTRY } from "./tools";
+import { DomainError, logError, formatCellError } from "./error-handling";
 import type { GeminiRequest, GeminiResponse, GeminiCodePair, GeminiUsageMetadata } from "./types";
 
 /**
@@ -69,7 +70,7 @@ export function callGeminiAPI(req: GeminiRequest): GeminiResponse {
   const response = UrlFetchApp.fetch(url, options);
   const json = JSON.parse(response.getContentText()) as Record<string, unknown>;
 
-  if (json.error) throw new Error((json.error as { message: string }).message);
+  if (json.error) throw new DomainError((json.error as { message: string }).message);
 
   const candidate = (json.candidates as Array<Record<string, unknown>> | undefined)?.[0];
   const parts =
@@ -111,8 +112,8 @@ export function callGeminiAPI(req: GeminiRequest): GeminiResponse {
 
 /**
  * Call the Gemini generateContent endpoint for multiple requests in parallel using UrlFetchApp.fetchAll.
- * Unlike callGeminiAPI (which throws on error), the batch version maps errors to { text: "Error: ..." }
- * so one bad row does not abort the whole chunk.
+ * Unlike callGeminiAPI (which throws on error), the batch version maps errors to
+ * { text: "[Error: ...]" } so one bad row does not abort the whole chunk.
  */
 export function callGeminiAPIBatch(reqs: GeminiRequest[]): GeminiResponse[] {
   if (reqs.length === 0) return [];
@@ -140,12 +141,14 @@ export function callGeminiAPIBatch(reqs: GeminiRequest[]): GeminiResponse[] {
     let json: Record<string, unknown>;
     try {
       json = JSON.parse(response.getContentText()) as Record<string, unknown>;
-    } catch (_e) {
-      return { text: `Error: invalid response body (HTTP ${response.getResponseCode()})` };
+    } catch (e) {
+      const httpCode = response.getResponseCode();
+      logError("callGeminiAPIBatch:parse", e, { httpCode });
+      return { text: formatCellError(`invalid response body (HTTP ${httpCode})`) };
     }
 
     if (json.error) {
-      return { text: `Error: ${(json.error as { message: string }).message}` };
+      return { text: formatCellError((json.error as { message: string }).message) };
     }
 
     const candidate = (json.candidates as Array<Record<string, unknown>> | undefined)?.[0];

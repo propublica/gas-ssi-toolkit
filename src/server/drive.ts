@@ -7,6 +7,7 @@
  */
 
 import { CONFIG } from "./config";
+import { logError, formatCellError } from "./error-handling";
 import type { GeminiInlineData } from "./types";
 
 /**
@@ -37,9 +38,11 @@ export function checkDriveService(ui: GoogleAppsScript.Base.Ui): boolean {
  * - Everything else returns a skip message.
  */
 export function extractTextUniversal(fileId: string): string {
+  let file: GoogleAppsScript.Drive.File;
+  let mimeType: string;
   try {
-    const file = DriveApp.getFileById(fileId);
-    const mimeType = file.getMimeType();
+    file = DriveApp.getFileById(fileId);
+    mimeType = file.getMimeType();
 
     // Native Google Doc — read directly
     if (mimeType === MimeType.GOOGLE_DOCS) {
@@ -50,27 +53,52 @@ export function extractTextUniversal(fileId: string): string {
     if (mimeType === MimeType.PLAIN_TEXT) {
       return file.getBlob().getDataAsString();
     }
-
-    // PDF or image — OCR via temporary Doc conversion (Drive API v3)
-    if (mimeType === MimeType.PDF || mimeType.includes("image/")) {
-      const resource = {
-        name: "Temp_" + file.getName(),
-        mimeType: MimeType.GOOGLE_DOCS,
-      };
-      // Drive.Files.create with content triggers server-side OCR
-      // TODO: enforce a max file size here if needed before calling the Drive API
-      // e.g. if (file.getBlob().getBytes().length > MAX_BYTES) return "[Skipped: File too large]";
-      const tempFile = Drive.Files.create(resource, file.getBlob());
-      const tempId = tempFile.id!;
-      const text = DocumentApp.openById(tempId).getBody().getText();
-      Drive.Files.remove(tempId);
-      return text;
-    }
-
-    return "[Skipped: Unsupported Type]";
   } catch (e) {
-    return `[Error: ${(e as Error).message}]`;
+    logError("extractTextUniversal:read", e);
+    return formatCellError(
+      "couldn't access this file — check that it still exists and you have permission to view it",
+    );
   }
+
+  if (!(mimeType === MimeType.PDF || mimeType.includes("image/"))) {
+    return "[Skipped: Unsupported Type]";
+  }
+
+  // PDF or image — OCR via temporary Doc conversion (Drive API v3)
+  let tempId: string;
+  try {
+    const resource = {
+      name: "Temp_" + file.getName(),
+      mimeType: MimeType.GOOGLE_DOCS,
+    };
+    // Drive.Files.create with content triggers server-side OCR
+    // TODO: enforce a max file size here if needed before calling the Drive API (T13/R35)
+    const tempFile = Drive.Files.create(resource, file.getBlob());
+    tempId = tempFile.id!;
+  } catch (e) {
+    logError("extractTextUniversal:ocrConvert", e);
+    return formatCellError(
+      "couldn't convert this file for text extraction — it may be too large or in an unsupported format",
+    );
+  }
+
+  let text: string;
+  try {
+    text = DocumentApp.openById(tempId).getBody().getText();
+  } catch (e) {
+    logError("extractTextUniversal:ocrRead", e);
+    return formatCellError("OCR text extraction failed after conversion");
+  }
+
+  try {
+    Drive.Files.remove(tempId);
+  } catch (e) {
+    // Cleanup failure must not discard a successful extraction — the orphaned
+    // temp doc is a separate concern (T15/R19, tracked in AI-85).
+    logError("extractTextUniversal:ocrCleanup", e);
+  }
+
+  return text;
 }
 
 /**
@@ -263,8 +291,8 @@ export function fetchDriveMetadata(
       try {
         const parsed = JSON.parse(response.getContentText()) as { error?: { message: string } };
         if (parsed.error?.message) message = parsed.error.message;
-      } catch (_e) {
-        // ignore parse errors, use HTTP code in message
+      } catch (e) {
+        logError("fetchDriveMetadata:parse", e, { httpCode: code });
       }
       errors.set(fileIds[i], message);
       return;
@@ -332,8 +360,8 @@ export function downloadDriveFiles(
       try {
         const parsed = JSON.parse(response.getContentText()) as { error?: { message: string } };
         if (parsed.error?.message) message = parsed.error.message;
-      } catch (_e) {
-        // ignore parse errors, use HTTP code in message
+      } catch (e) {
+        logError("downloadDriveFiles:parse", e, { httpCode: code });
       }
       errors.set(fileIds[i], message);
       return;

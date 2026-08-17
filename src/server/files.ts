@@ -15,6 +15,7 @@
  */
 
 import { geminiAuthHeaders } from "./gemini-auth";
+import { logError } from "./error-handling";
 
 /**
  * Upload a batch of Drive file blobs to the Gemini Files API in parallel.
@@ -100,7 +101,8 @@ export function uploadFilesToGemini(
     let json: { file?: { uri: string; mimeType: string }; error?: { message: string } };
     try {
       json = JSON.parse(resp.getContentText()) as typeof json;
-    } catch (_e) {
+    } catch (e) {
+      logError("uploadFilesToGemini:parse", e, { httpCode: resp.getResponseCode() });
       errors.set(fileId, "Invalid JSON in upload response");
       return;
     }
