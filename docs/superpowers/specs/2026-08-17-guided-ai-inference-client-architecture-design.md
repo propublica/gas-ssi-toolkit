@@ -22,6 +22,20 @@ interface StepContext {
    * a step) — the shell's handling of this must be idempotent, since nothing
    * prevents a step from calling it more than once. */
   onComplete(): void;
+  /** Purely cosmetic — flips this step's checklist icon to a red ✕ in place
+   * of ●. Does NOT change locked/active/complete status: the step stays
+   * active, editable, and interactive. The step's own mount() remains
+   * responsible for displaying the actual error message inline — the shell
+   * only renders the icon, never the message text, so there's one place the
+   * message displays, not two.
+   *
+   * Two accepted rough edges, deliberately not solved here: (1) there is no
+   * separate "attempt started" signal, so a retry-in-flight still shows the
+   * stale ✕ until it resolves one way or the other; (2) this decoration is
+   * not part of GuidedSavedState and does not survive navigating away and
+   * back — a fresh mount always starts undecorated, consistent with
+   * treating it as transient UI feedback rather than durable state. */
+  onError(): void;
 }
 
 interface Step<S = unknown> {
@@ -51,7 +65,7 @@ This also means the shell's own error/loading state machinery collapses to almos
 
 ### Why not a separate `error` `StepStatus`
 
-Considered and rejected once the shell stopped owning any button: a discriminated `"error"` status (mirroring `LoadingStatus` in `client/types.ts:21`) would still be the right shape *if* the shell were awaiting a promise and needed to react to its rejection. Since it no longer does, loading/error states are entirely private to each step's own `mount()` implementation, exactly as `ConfigureAIRunPanel.handleTest` already manages its own via `AsyncActionButton` today. The shell has nothing to model here.
+Considered and rejected once the shell stopped owning any button: a discriminated `"error"` status (mirroring `LoadingStatus` in `client/types.ts:21`) would still be the right shape *if* the shell were awaiting a promise and needed to react to its rejection. Since it no longer does, loading/error states are entirely private to each step's own `mount()` implementation, exactly as `ConfigureAIRunPanel.handleTest` already manages its own via `AsyncActionButton` today. The shell still needs *some* way to reflect a step's failure in the checklist itself (so a failure isn't invisible until the user re-expands the step) — `onError()` in the `StepContext` below provides that as a purely cosmetic icon decoration, not a fourth real status. It doesn't reintroduce shell-awaited promises or a discriminated status; it's an additive signal a step calls voluntarily, symmetric to `onComplete()`.
 
 ### Shell-level step status
 
