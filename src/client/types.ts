@@ -35,6 +35,38 @@ export interface Job {
   completedAt?: number;
 }
 
+// ── Step framework (Guided AI Inference) ──────────────────────────
+// Positional, not kind-based: whether completing a step collapses it and
+// unlocks a next step, or leaves it expanded forever, is decided by the
+// StepFlow shell based on array position — the last step behaves
+// differently, but nothing on the step itself declares that.
+
+export interface StepContext {
+  /** Called by the step, at its own discretion, when it considers its own
+   * designated action to have succeeded. May be called more than once —
+   * the shell's handling of this is idempotent. */
+  onComplete(): void;
+  /** Purely cosmetic — flips this step's checklist icon to a red ✕. Does
+   * NOT change locked/active/complete status. The step's own mount()
+   * remains responsible for displaying the actual error message inline. */
+  onError(): void;
+}
+
+export interface Step<S = unknown> {
+  title: string;
+  flavorText: string;
+  mount(container: HTMLElement, ctx: StepContext, savedState?: S): void;
+  unmount(): { savedState: S; summary: string } | undefined;
+}
+
+export interface StepFlowSavedState {
+  activeStepIndex: number;
+  steps: Array<{
+    status: "locked" | "active" | "complete";
+    saved?: { savedState: unknown; summary: string };
+  }>;
+}
+
 // ── Recipe UI types ─────────────────────────────────────────────
 // These are client-only — they define the journalist-facing form, not RPC payloads.
 
