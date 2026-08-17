@@ -6,9 +6,13 @@ jest.mock("../../../src/client/services", () => ({
   prepRecipe: jest.fn(),
 }));
 
-import { InputsStep } from "../../../src/client/panels/guided/inputs-step";
+import {
+  InputsStep,
+  type InputsStepSavedState,
+} from "../../../src/client/panels/guided/inputs-step";
 import * as services from "../../../src/client/services";
 import type { StepContext } from "../../../src/client/types";
+import type { PrepColSpec } from "../../../src/shared/types";
 
 function makeContainer(): HTMLElement {
   document.body.innerHTML = '<div id="app"></div>';
@@ -114,6 +118,66 @@ describe("InputsStep — drive-folder rows", () => {
     expect(ctx.onError).toHaveBeenCalledTimes(1);
     expect(ctx.onComplete).not.toHaveBeenCalled();
     expect(globalThis.alert).toHaveBeenCalledWith(expect.stringContaining("Drive down"));
+  });
+
+  it("avoids title collisions when removing and re-adding folder rows", async () => {
+    (services.prepRecipe as jest.Mock).mockResolvedValue({ rowRange: { start: 2, end: 5 } });
+    const container = makeContainer();
+    const step = new InputsStep([]);
+    const ctx = makeCtx();
+    step.mount(container, ctx);
+
+    // Add two folders: A ("Drive Link"), B ("Drive Link 2")
+    container.querySelector<HTMLButtonElement>("#gi-add-folder")!.click();
+    container.querySelector<HTMLButtonElement>("#gi-add-folder")!.click();
+
+    const urlInputs = container.querySelectorAll<HTMLInputElement>(".guided-input-folder-url");
+    urlInputs[0]!.value = "https://drive.google.com/drive/folders/folderA";
+    urlInputs[1]!.value = "https://drive.google.com/drive/folders/folderB";
+
+    // Remove first folder (A)
+    const removeButtons = container.querySelectorAll<HTMLButtonElement>(".guided-input-remove");
+    removeButtons[0]!.click();
+
+    // Add new folder C — should be "Drive Link 3", not "Drive Link 2"
+    container.querySelector<HTMLButtonElement>("#gi-add-folder")!.click();
+
+    const remainingUrlInputs = container.querySelectorAll<HTMLInputElement>(
+      ".guided-input-folder-url",
+    );
+    remainingUrlInputs[1]!.value = "https://drive.google.com/drive/folders/folderC";
+
+    container.querySelector<HTMLButtonElement>("#gi-continue")!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const call = (services.prepRecipe as jest.Mock).mock.calls[0][0];
+    const colTitles = (call.cols as PrepColSpec[]).map((col) => col.colTitle);
+    expect(colTitles).toEqual(["Drive Link 2", "Drive Link 3"]);
+    // Ensure no duplicates
+    expect(new Set(colTitles).size).toBe(colTitles.length);
+  });
+
+  it("restoring savedState with 'Drive Link 2' and adding new folder produces 'Drive Link 3'", () => {
+    const container = makeContainer();
+    const savedState: InputsStepSavedState = {
+      rows: [{ kind: "drive-folder", url: "https://drive.google.com/x", colTitle: "Drive Link 2" }],
+    };
+    const step = new InputsStep([]);
+    step.mount(container, makeCtx(), savedState);
+
+    // Add a new folder — should be "Drive Link 3"
+    container.querySelector<HTMLButtonElement>("#gi-add-folder")!.click();
+
+    const urlInputs = container.querySelectorAll<HTMLInputElement>(".guided-input-folder-url");
+    expect(urlInputs).toHaveLength(2);
+    // The second input was just created; it should have the title "Drive Link 3" internally
+    // We verify this by unmounting and checking the result
+    const result = step.unmount();
+    const titles = result?.savedState.rows.map((r) =>
+      r.kind === "drive-folder" ? r.colTitle : null,
+    );
+    expect(titles).toEqual(["Drive Link 2", "Drive Link 3"]);
   });
 });
 

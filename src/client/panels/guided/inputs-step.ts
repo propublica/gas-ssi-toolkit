@@ -23,6 +23,7 @@ export class InputsStep implements Step<InputsStepSavedState> {
   private container: HTMLElement | null = null;
   private rows: Array<{ row: InputRow; el: HTMLElement; tokenInput?: TokenInput }> = [];
   private result: InputsStepResult | null = null;
+  private nextFolderNumber = 1;
 
   constructor(headers: string[]) {
     this.headers = headers;
@@ -44,6 +45,7 @@ export class InputsStep implements Step<InputsStepSavedState> {
       <button type="button" class="btn-run" id="gi-continue">Import &amp; Continue</button>
     `;
     for (const row of savedState?.rows ?? []) this.addRow(row);
+    this.nextFolderNumber = this.computeNextFolderNumber();
 
     container.querySelector<HTMLButtonElement>("#gi-add-column")!.addEventListener("click", () => {
       this.addRow({ kind: "column", colTitle: "" });
@@ -67,9 +69,21 @@ export class InputsStep implements Step<InputsStepSavedState> {
     return { savedState: { rows }, summary };
   }
 
+  private computeNextFolderNumber(): number {
+    let max = 0;
+    for (const { row } of this.rows) {
+      if (row.kind !== "drive-folder") continue;
+      const match = /^Drive Link(?: (\d+))?$/.exec(row.colTitle);
+      if (!match) continue;
+      const num = match[1] ? parseInt(match[1], 10) : 1;
+      max = Math.max(max, num);
+    }
+    return max + 1;
+  }
+
   private nextFolderTitle(): string {
-    const existingFolderCount = this.rows.filter((r) => r.row.kind === "drive-folder").length;
-    return existingFolderCount === 0 ? "Drive Link" : `Drive Link ${existingFolderCount + 1}`;
+    const n = this.nextFolderNumber++;
+    return n === 1 ? "Drive Link" : `Drive Link ${n}`;
   }
 
   private addRow(row: InputRow): void {
