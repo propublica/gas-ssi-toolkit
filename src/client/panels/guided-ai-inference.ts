@@ -9,6 +9,7 @@ import { PanelLoader } from "../components/panel-loader";
 
 export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedState> {
   private stepFlow: StepFlow | null = null;
+  private nav: NavigationContext | null = null;
 
   mount(
     container: HTMLElement,
@@ -16,6 +17,7 @@ export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedSta
     _params?: undefined,
     savedState?: StepFlowSavedState,
   ): void {
+    this.nav = nav;
     container.innerHTML = this.template();
     container.querySelector("#back-btn")?.addEventListener("click", () => nav.back());
 
@@ -23,22 +25,28 @@ export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedSta
     loader.setState({ status: "loading", message: "Loading columns..." });
 
     getSheetHeaders()
-      .then((headers) => {
-        const promptStep = new PromptStep();
-        const inputsStep = new InputsStep(headers);
-        const runStep = new RunStep(
-          () => ({
-            promptCols: inputsStep.getResult()?.promptCols ?? [],
-            systemPromptCol: promptStep.getResult()?.systemPromptCol,
-          }),
-          (config: Partial<RunConfig>) => nav.navigate("configure-ai-run", config),
-        );
-        this.stepFlow = new StepFlow(
-          container.querySelector("#steps-container")!,
-          [inputsStep, promptStep, runStep],
-          savedState,
-        );
-      })
+      .then(
+        (headers) => {
+          const promptStep = new PromptStep();
+          const inputsStep = new InputsStep(headers);
+          const runStep = new RunStep(
+            () => ({
+              promptCols: inputsStep.getResult()?.promptCols ?? [],
+              systemPromptCol: promptStep.getResult()?.systemPromptCol,
+            }),
+            (config: Partial<RunConfig>) => nav.navigate("configure-ai-run", config),
+          );
+          this.stepFlow = new StepFlow(
+            container.querySelector("#steps-container")!,
+            [inputsStep, promptStep, runStep],
+            savedState,
+          );
+        },
+        (err: Error) => {
+          globalThis.alert("Error loading headers: " + err.message);
+          this.nav?.back();
+        },
+      )
       .finally(() => loader.setState({ status: "idle" }));
   }
 

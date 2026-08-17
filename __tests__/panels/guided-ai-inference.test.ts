@@ -61,6 +61,17 @@ describe("GuidedAIInferencePanel — mount", () => {
     container.querySelector<HTMLButtonElement>("#back-btn")!.click();
     expect(mockNav.back).toHaveBeenCalled();
   });
+
+  it("alerts and calls nav.back() when getSheetHeaders() rejects", async () => {
+    (services.getSheetHeaders as jest.Mock).mockRejectedValue(new Error("Network error"));
+    globalThis.alert = jest.fn();
+    const container = makeContainer();
+    const panel = new GuidedAIInferencePanel();
+    panel.mount(container, mockNav, undefined, undefined);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(globalThis.alert).toHaveBeenCalledWith(expect.stringContaining("Network error"));
+    expect(mockNav.back).toHaveBeenCalled();
+  });
 });
 
 describe("GuidedAIInferencePanel — end-to-end step progression", () => {
