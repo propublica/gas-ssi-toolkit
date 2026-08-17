@@ -34,7 +34,15 @@ interface StepContext {
    * stale ✕ until it resolves one way or the other; (2) this decoration is
    * not part of GuidedSavedState and does not survive navigating away and
    * back — a fresh mount always starts undecorated, consistent with
-   * treating it as transient UI feedback rather than durable state. */
+   * treating it as transient UI feedback rather than durable state.
+   *
+   * Implementation note: the ✕ decoration is a boolean the shell holds per
+   * step, and it has exactly one place that must clear it — the shell's own
+   * onComplete handling for that step. A fresh mount() already starts
+   * undecorated by construction, so the only in-place transition needing an
+   * explicit clear is "this same mounted step previously called onError(),
+   * now calls onComplete()." Missing that clear would let a stale ✕ survive
+   * into a step that just succeeded. */
   onError(): void;
 }
 
