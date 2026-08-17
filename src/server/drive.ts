@@ -32,6 +32,7 @@ export function checkDriveService(ui: GoogleAppsScript.Base.Ui): boolean {
 /**
  * Extract text from a Drive file. Handles:
  * - Google Docs (native text extraction)
+ * - Plain text files (direct blob read)
  * - PDFs and images (OCR via temporary conversion to Google Doc)
  * - Everything else returns a skip message.
  */
@@ -43,6 +44,11 @@ export function extractTextUniversal(fileId: string): string {
     // Native Google Doc — read directly
     if (mimeType === MimeType.GOOGLE_DOCS) {
       return DocumentApp.openById(fileId).getBody().getText();
+    }
+
+    // Plain text — read the blob content directly, no conversion needed
+    if (mimeType === MimeType.PLAIN_TEXT) {
+      return file.getBlob().getDataAsString();
     }
 
     // PDF or image — OCR via temporary Doc conversion (Drive API v3)
