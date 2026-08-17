@@ -41,7 +41,8 @@ This is the foundational, highest-risk task: pulling Model/Tools/Row-range/Test/
   - `export type PromptConfig = Pick<RunConfig, "promptCols" | "systemPromptCol" | "outputCol" | "wrapPromptsInTags" | "applyMarkdown">`
   - `export interface RunControlsSavedState { rowRange?: RowRangeValue; tools?: ToolId[]; includeGrounding?: boolean; model?: ModelId; toolsExpanded?: boolean; modelExpanded?: boolean; lastTest?: TestRunDisplay; }`
   - `export interface RunControlsConfig { getPromptConfig: () => PromptConfig; onRunSucceeded?: () => void; savedState?: RunControlsSavedState; }`
-  - `export class RunControls { constructor(container: HTMLElement, config: RunControlsConfig); readonly ready: Promise<void>; getValue(): RunControlsSavedState; refreshRowRange(): Promise<void>; destroy(): void; }`
+  - `export class RunControls { constructor(container: HTMLElement, config: RunControlsConfig); readonly ready: Promise<void>; getValue(): RunControlsSavedState; refreshRowRange(): Promise<void>; checkTestStatsFreshness(): void; destroy(): void; }`
+  - `checkTestStatsFreshness()` is public (added during Task 1's implementation/review, not in the original design) so a host can explicitly re-validate the displayed test results against its own live prompt-config state once its own async loading has settled — see the mount-time ordering note below.
 
 Rendered markup uses the exact same element ids `ConfigureAIRunPanel` uses today (`#model-list`, `#model-toggle`, `#model-summary`, `#model-content`, `#tools-list`, `#tools-toggle`, `#tools-summary`, `#tools-content`, `#include-grounding-cb`, `#include-grounding-group`, `#grounding-col-name`, `#row-range-container`, `#test-btn`, `#run-btn`, `#test-results`) — this is what lets the existing `__tests__/panels/configure-ai-run.test.ts` suite keep passing unmodified: it only cares that mounting the panel produces those ids and behaviors, not which class renders them.
 
@@ -1433,7 +1434,11 @@ export class StepFlow {
   }
 
   private handleComplete(index: number): void {
-    if (this.statuses[index] === "complete" && this.isLastStep(index)) return; // idempotent
+    // Idempotent for ANY already-complete step, not just the terminal one —
+    // a second call must not re-unmount an already-collapsed step or
+    // re-mount an already-live next step (found during Task 2 review: the
+    // StepContext.onComplete contract promises this unconditionally).
+    if (this.statuses[index] === "complete") return;
 
     this.hasErrorByIndex[index] = false;
 
@@ -1459,6 +1464,7 @@ export class StepFlow {
     this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
     this.applyRowDisplay(this.rowEls[nextIndex], nextIndex, this.steps[nextIndex]);
     this.updateIcon(index);
+    this.updateIcon(nextIndex); // newly-unlocked step's icon must flip ○ -> ● (found during Task 2 review)
   }
 
   private handleError(index: number): void {
