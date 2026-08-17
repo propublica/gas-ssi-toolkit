@@ -100,6 +100,7 @@ export interface RecipeInput {
  */
 export type PanelId =
   | "tool-list"
+  | "guided-ai-inference"
   | "configure-ai-run"
   | "recipes-list"
   | "recipe"

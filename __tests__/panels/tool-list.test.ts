@@ -36,10 +36,22 @@ beforeEach(() => {
 });
 
 describe("ToolListPanel", () => {
+  it("clicking Guided AI Inference navigates to guided-ai-inference", () => {
+    const c = mountPanel();
+    c.querySelector<HTMLButtonElement>("#btn-guided-ai")!.click();
+    expect(mockNav.navigate).toHaveBeenCalledWith("guided-ai-inference");
+  });
+
   it("clicking Run AI navigates to configure-ai-run", () => {
     const c = mountPanel();
     c.querySelector<HTMLButtonElement>("#btn-run-ai")!.click();
     expect(mockNav.navigate).toHaveBeenCalledWith("configure-ai-run");
+  });
+
+  it("renders Guided AI Inference, Freeform AI Inference, and Recipes first, in that order", () => {
+    const c = mountPanel();
+    const ids = Array.from(c.querySelectorAll(".tool-btn")).map((btn) => btn.id);
+    expect(ids.slice(0, 3)).toEqual(["btn-guided-ai", "btn-run-ai", "btn-recipes"]);
   });
 
   it("clicking Recipes navigates to recipes-list", () => {

@@ -13,6 +13,9 @@ export class ToolListPanel implements Panel {
   }
 
   private wireEvents(container: HTMLElement, nav: NavigationContext): void {
+    container.querySelector("#btn-guided-ai")?.addEventListener("click", () => {
+      nav.navigate("guided-ai-inference");
+    });
     container.querySelector("#btn-run-ai")?.addEventListener("click", () => {
       nav.navigate("configure-ai-run");
     });
@@ -55,11 +58,14 @@ export class ToolListPanel implements Panel {
     return `
       <div class="section">
         <h3>Main Tools</h3>
-        <button id="btn-recipes" class="tool-btn">
-          <span class="icon">🥞</span> Recipes
+        <button id="btn-guided-ai" class="tool-btn">
+          <span class="icon">🧭</span> Guided AI Inference
         </button>
         <button id="btn-run-ai" class="tool-btn">
-          <span class="icon">▶️</span> Run AI Inference
+          <span class="icon">▶️</span> Freeform AI Inference
+        </button>
+        <button id="btn-recipes" class="tool-btn">
+          <span class="icon">🥞</span> Recipes
         </button>
       </div>
       <div class="section">
