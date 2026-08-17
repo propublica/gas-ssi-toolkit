@@ -76,6 +76,21 @@ describe("StepFlow — onComplete for a non-terminal step", () => {
     expect(container.querySelector(".step-summary")!.textContent).toBe("col_x");
     expect(container.querySelector<HTMLButtonElement>(".step-edit-btn")!.hidden).toBe(false);
   });
+
+  it("calling onComplete again on an already-complete non-terminal step is a no-op", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b]);
+    a.lastCtx!.onComplete();
+    // Simulate user typing in B's input
+    const input = container.querySelector<HTMLInputElement>(".fake-step-input")!;
+    input.value = "live-state";
+    // Call onComplete on A again — should not remount B or affect its state
+    a.lastCtx!.onComplete();
+
+    expect(b.mounted).toBe(true);
+    expect(container.querySelector<HTMLInputElement>(".fake-step-input")!.value).toBe("live-state");
+  });
 });
 
 describe("StepFlow — onComplete for the terminal (last) step", () => {

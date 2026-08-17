@@ -111,7 +111,7 @@ export class StepFlow {
   }
 
   private handleComplete(index: number): void {
-    if (this.statuses[index] === "complete" && this.isLastStep(index)) return; // idempotent
+    if (this.statuses[index] === "complete") return; // idempotent
 
     this.hasErrorByIndex[index] = false;
 
