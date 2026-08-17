@@ -68,7 +68,12 @@ jest.mock("../../src/client/job-store", () => ({
   },
 }));
 
-import { RunControls, computeChunks, CHUNK_SIZE } from "../../src/client/components/run-controls";
+import {
+  RunControls,
+  computeChunks,
+  CHUNK_SIZE,
+  type RunControlsConfig,
+} from "../../src/client/components/run-controls";
 import * as services from "../../src/client/services";
 import type { RunStats } from "../../src/shared/types";
 
@@ -105,12 +110,12 @@ function basicPromptConfig() {
   };
 }
 
-async function mountAndSettle(configOverrides: Partial<Parameters<typeof RunControls>[1]> = {}) {
+async function mountAndSettle(configOverrides: Partial<RunControlsConfig> = {}) {
   const container = makeContainer();
   const rc = new RunControls(container, {
     getPromptConfig: basicPromptConfig,
     ...configOverrides,
-  } as any);
+  });
   await rc.ready;
   return { container, rc };
 }
