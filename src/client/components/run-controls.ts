@@ -213,7 +213,6 @@ export class RunControls {
     this.container
       .querySelector<HTMLButtonElement>("#test-btn")!
       .addEventListener("click", () => this.handleTest());
-    this.checkTestStatsFreshness();
   }
 
   private applyToolsExpandState(): void {

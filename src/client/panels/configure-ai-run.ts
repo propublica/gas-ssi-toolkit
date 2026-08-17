@@ -81,9 +81,9 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
 
     const loader = new PanelLoader(container);
     loader.setState({ status: "loading", message: "Loading columns..." });
-    Promise.all([this.loadHeaders(container, preset), this.runControls.ready]).finally(() =>
-      loader.setState({ status: "idle" }),
-    );
+    Promise.all([this.loadHeaders(container, preset), this.runControls.ready])
+      .then(() => this.runControls?.checkTestStatsFreshness())
+      .finally(() => loader.setState({ status: "idle" }));
   }
 
   private buildRunControlsSavedState(
@@ -99,7 +99,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       toolsExpanded: savedState?.toolsExpanded,
       modelExpanded: savedState?.modelExpanded,
       lastTest: savedState?.lastTest,
-    } as RunControlsSavedState;
+    };
   }
 
   private getPromptConfig(): PromptConfig {
