@@ -2230,6 +2230,43 @@ describe("RunStep — unmount/mount round trip", () => {
     await Promise.resolve();
     expect(container.querySelector('[data-value="google_search"]')).toHaveClass("selected");
   });
+
+  it("restores and re-validates a saved lastTest against the live config on mount", async () => {
+    const matchingConfig = {
+      promptCols: [{ col: "NoteCol", kind: "auto" as const }],
+      systemPromptCol: undefined,
+      tools: [],
+      wrapPromptsInTags: true,
+      model: "gemini-3.1-flash-lite" as const,
+    };
+    const savedState = {
+      runControls: {
+        lastTest: {
+          stats: {
+            rowCount: 10,
+            totalTimeMs: 4200,
+            totalInputTokens: 500,
+            totalOutputTokens: 300,
+            totalTokenCost: 0.002,
+            totalGroundingQueries: 0,
+            totalGroundingCost: 0,
+            testedAt: 1234567890,
+            config: matchingConfig,
+          },
+          fullRowCount: 10,
+        },
+      },
+    };
+    const container = makeContainer();
+    const step = new RunStep(() => ({ promptCols: matchingConfig.promptCols }), jest.fn());
+    step.mount(container, makeCtx(), savedState);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    const results = container.querySelector<HTMLElement>("#test-results")!;
+    expect(results.hidden).toBe(false);
+    expect(results.textContent).toContain("Test run:");
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.textContent).toBe("Tested ✓");
+  });
 });
 ```
 
@@ -2286,6 +2323,14 @@ export class RunStep implements Step<RunStepSavedState> {
       onRunSucceeded: () => ctx.onComplete(),
       savedState: savedState?.runControls,
     });
+    // RunControls no longer checks test-result freshness on its own (Task 1
+    // fix removed that internal auto-call to close a mount-time ordering
+    // race) — the host must call it explicitly once RunControls's own
+    // row-range fetch settles, exactly like ConfigureAIRunPanel does. Without
+    // this, restoring a saved lastTest (e.g. after navigating away and back)
+    // would leave the test-results UI in whatever raw state its template
+    // left it, never re-validated against the live config.
+    this.runControls.ready.then(() => this.runControls?.checkTestStatsFreshness());
     container.querySelector<HTMLButtonElement>("#gr-switch-to-freeform")!.addEventListener("click", () => {
       this.onSwitchToFreeform({
         ...this.getPromptFields(),
