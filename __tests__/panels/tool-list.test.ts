@@ -119,7 +119,7 @@ describe("ToolListPanel", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(btn.disabled).toBe(false);
-    expect(mockAlert).toHaveBeenCalledWith("Error: GAS error");
+    expect(mockAlert).toHaveBeenCalledWith("GAS error");
 
     globalThis.alert = origAlert;
   });

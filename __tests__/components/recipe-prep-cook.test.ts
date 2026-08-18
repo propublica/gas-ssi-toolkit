@@ -110,7 +110,7 @@ describe("error handling", () => {
     container.querySelector<HTMLButtonElement>("#prep-btn")!.click();
     await Promise.resolve();
     await Promise.resolve();
-    expect(alertMock).toHaveBeenCalledWith("Error: prep failed");
+    expect(alertMock).toHaveBeenCalledWith("prep failed");
     expect(component.isPrepComplete()).toBe(false);
     const prep = container.querySelector<HTMLButtonElement>("#prep-btn")!;
     expect(prep.disabled).toBe(false);

@@ -65,7 +65,7 @@ export class ImportDriveLinksPanel implements Panel<undefined, SavedState> {
           loader.setState({ status: "idle" });
         },
         (err: Error) => {
-          globalThis.alert("Error loading headers: " + err.message);
+          globalThis.alert("Couldn't load headers: " + err.message);
           nav.back();
         },
       );
@@ -105,7 +105,7 @@ export class ImportDriveLinksPanel implements Panel<undefined, SavedState> {
     const jobId = `import-drive-links-${Date.now()}`;
     jobStore
       .dispatch(jobId, "Import Drive Links", importDriveLinks(config, jobId))
-      .catch((err: Error) => globalThis.alert("Error: " + err.message));
+      .catch((err: Error) => globalThis.alert(err.message));
   }
 
   private assembleConfig(): ImportDriveLinksConfig | null {
