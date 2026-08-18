@@ -480,6 +480,12 @@
 
         .tool-btn:hover .tool-btn-sub { color: var(--primary-blue); opacity: 0.8; }
 
+        /* Buttons with a stacked title+caption (this pattern, not the plain
+           single-line ones below) should align the icon with the title line,
+           not center it against the whole two-line block. */
+        .tool-btn:has(.tool-btn-text) { align-items: flex-start; }
+        .tool-btn:has(.tool-btn-text) .icon { margin-top: 2px; }
+
         /* ── Coming soon stub ── */
 
         .tool-btn-stub {

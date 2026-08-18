@@ -64,7 +64,7 @@ describe("ToolListPanel", () => {
   it("renders short names with descriptive captions for the three AI buttons", () => {
     const c = mountPanel();
     const expectations: Array<[string, string, string]> = [
-      ["#btn-guided-ai", "Guided", "Perform your custom AI task with a step-by-step walkthrough"],
+      ["#btn-guided-ai", "Guided", "Not sure where to begin? Start here."],
       ["#btn-run-ai", "Freeform", "Full control over inputs, prompts and settings"],
       ["#btn-recipes", "Recipes", "Ready-made presets for common tasks"],
     ];

@@ -62,7 +62,7 @@ export class ToolListPanel implements Panel {
           <span class="icon">🧭</span>
           <div class="tool-btn-text">
             <span class="tool-btn-name">Guided</span>
-            <span class="tool-btn-sub">Perform your custom AI task with a step-by-step walkthrough</span>
+            <span class="tool-btn-sub">Not sure where to begin? Start here.</span>
           </div>
         </button>
         <button id="btn-run-ai" class="tool-btn">
