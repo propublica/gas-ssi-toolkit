@@ -57,9 +57,33 @@ import {
   prepareDriveAttachments,
   fetchDriveMetadata,
   downloadDriveFiles,
+  getDriveFolderOrThrow,
 } from "../src/server/drive";
+import { DomainError } from "../src/server/error-handling";
 
 // ── Tests ──────────────────────────────────────────────────────
+
+describe("getDriveFolderOrThrow", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("returns the folder when getFolderById succeeds", () => {
+    const mockFolder = { getName: () => "My Folder" };
+    (globalThis as any).DriveApp.getFolderById = jest.fn().mockReturnValue(mockFolder);
+
+    expect(getDriveFolderOrThrow("folderId123")).toBe(mockFolder);
+  });
+
+  it("throws an actionable DomainError when getFolderById throws", () => {
+    (globalThis as any).DriveApp.getFolderById = jest.fn().mockImplementation(() => {
+      throw new Error("Invalid argument: id");
+    });
+
+    expect(() => getDriveFolderOrThrow("bad-id")).toThrow(DomainError);
+    expect(() => getDriveFolderOrThrow("bad-id")).toThrow(
+      "Could not find that Drive folder — check the link and that you have access to it",
+    );
+  });
+});
 
 describe("checkDriveService", () => {
   beforeEach(() => jest.clearAllMocks());

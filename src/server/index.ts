@@ -17,6 +17,7 @@ import {
   downloadDriveFiles,
   checkDriveService,
   extractTextUniversal,
+  getDriveFolderOrThrow,
 } from "./drive";
 import { uploadFilesToGemini } from "./files";
 import { hasGeminiApiKey, MISSING_API_KEY_MESSAGE } from "./gemini-auth";
@@ -106,7 +107,7 @@ export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string)
       writeJobProgress(CacheService.getUserCache(), jobId, { message: "Scanning folder..." });
     }
 
-    const parentFolder = DriveApp.getFolderById(folderId);
+    const parentFolder = getDriveFolderOrThrow(folderId);
     const allFiles: DriveFileInfo[] = [];
     getAllFilesRecursive(parentFolder, allFiles, config.mimeTypes);
 
@@ -639,7 +640,7 @@ export function prepRecipe({ cols, inputValues }: PrepRecipeParams): PrepRecipeR
       if (col.fillStrategy.kind === "list-drive-folder") {
         const url = inputValues[col.fillStrategy.inputId] ?? "";
         if (!folderCache.has(url)) {
-          const folder = DriveApp.getFolderById(extractId(url));
+          const folder = getDriveFolderOrThrow(extractId(url));
           const files: { url: string }[] = [];
           getAllFilesRecursive(folder, files);
           folderCache.set(

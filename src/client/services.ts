@@ -29,11 +29,26 @@ export function normalizeNulls<T>(value: T): T {
   return value;
 }
 
+/**
+ * google.script.run relays a thrown server-side Error's default toString()
+ * representation as the failure handler's err.message — for any Error whose
+ * name is the default "Error" (true of every error this add-on throws, since
+ * neither the built-in Error class nor our own DomainError override .name),
+ * that's "Error: <message>". Every panel that also prefixes its own "Error: "
+ * text before display would otherwise show a doubled "Error: Error: ...".
+ * Strip it once here so every consumer downstream gets the clean message.
+ * A no-op if the message doesn't have the prefix, so this is safe even if
+ * a given failure didn't originate from an explicit server-side throw.
+ */
+function cleanRpcError(err: Error): Error {
+  return new Error(err.message.replace(/^Error:\s*/, ""));
+}
+
 export function getSheetHeaders(): Promise<string[]> {
   return new Promise((resolve, reject) => {
     google.script.run
       .withSuccessHandler((headers: unknown) => resolve(normalizeNulls(headers) as string[]))
-      .withFailureHandler((err: Error) => reject(err))
+      .withFailureHandler((err: Error) => reject(cleanRpcError(err)))
       .getSheetHeaders();
   });
 }
@@ -44,7 +59,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): Promise<RunStats 
       .withSuccessHandler((result: unknown) =>
         resolve(normalizeNulls(result) as RunStats | undefined),
       )
-      .withFailureHandler((err: Error) => reject(err))
+      .withFailureHandler((err: Error) => reject(cleanRpcError(err)))
       .runBatchAI(config, jobId);
   });
 }
@@ -53,7 +68,7 @@ export function runTool(fn: string, jobId?: string): Promise<void> {
   return new Promise((resolve, reject) => {
     google.script.run
       .withSuccessHandler(() => resolve())
-      .withFailureHandler((err: Error) => reject(err))
+      .withFailureHandler((err: Error) => reject(cleanRpcError(err)))
       .runTool(fn, jobId);
   });
 }
@@ -62,7 +77,7 @@ export function prepRecipe(params: PrepRecipeParams): Promise<PrepRecipeResult> 
   return new Promise((resolve, reject) => {
     google.script.run
       .withSuccessHandler((result: unknown) => resolve(normalizeNulls(result) as PrepRecipeResult))
-      .withFailureHandler((err: Error) => reject(err))
+      .withFailureHandler((err: Error) => reject(cleanRpcError(err)))
       .prepRecipe(params);
   });
 }
@@ -71,7 +86,7 @@ export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string)
   return new Promise((resolve, reject) => {
     google.script.run
       .withSuccessHandler(() => resolve())
-      .withFailureHandler((err: Error) => reject(err))
+      .withFailureHandler((err: Error) => reject(cleanRpcError(err)))
       .importDriveLinks(config, jobId);
   });
 }
@@ -80,7 +95,7 @@ export function extractText(config: ExtractTextConfig, jobId?: string): Promise<
   return new Promise((resolve, reject) => {
     google.script.run
       .withSuccessHandler(() => resolve())
-      .withFailureHandler((err: Error) => reject(err))
+      .withFailureHandler((err: Error) => reject(cleanRpcError(err)))
       .extractText(config, jobId);
   });
 }
@@ -91,7 +106,7 @@ export function getActiveRangeInfo(): Promise<{ start: number; end: number } | u
       .withSuccessHandler((result: unknown) =>
         resolve(normalizeNulls(result) as { start: number; end: number } | undefined),
       )
-      .withFailureHandler((err: Error) => reject(err))
+      .withFailureHandler((err: Error) => reject(cleanRpcError(err)))
       .getActiveRangeInfo();
   });
 }
@@ -108,7 +123,7 @@ export function getJobProgress(
             | undefined,
         ),
       )
-      .withFailureHandler((err: Error) => reject(err))
+      .withFailureHandler((err: Error) => reject(cleanRpcError(err)))
       .getJobProgress(jobId);
   });
 }
@@ -117,7 +132,7 @@ export function formatMarkdownSelection(): Promise<void> {
   return new Promise((resolve, reject) => {
     google.script.run
       .withSuccessHandler(() => resolve())
-      .withFailureHandler((err: Error) => reject(err))
+      .withFailureHandler((err: Error) => reject(cleanRpcError(err)))
       .formatMarkdownSelection();
   });
 }
