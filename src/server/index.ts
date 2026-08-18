@@ -615,7 +615,16 @@ export function runTool(functionName: string, jobId?: string): void {
 
 export function prepRecipe({ cols, inputValues }: PrepRecipeParams): PrepRecipeResult {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  let numRows = 1;
+  const hasFolderSpec = cols.some((col) => col.fillStrategy.kind === "list-drive-folder");
+  // When nothing in this call determines a row count from an actual listing
+  // (no list-drive-folder spec), fall back to however many rows the sheet
+  // already has data in. Without this, a fill-value/template-only call (e.g.
+  // Guided AI Inference's system-prompt step, writing into a column
+  // alongside pre-existing data) silently wrote exactly 1 row regardless of
+  // the sheet's real size. Existing list-drive-folder-driven recipes are
+  // unaffected: numRows still starts at 1 and is only ever raised by the
+  // folder scan below, exactly as before.
+  let numRows = hasFolderSpec ? 1 : Math.max(1, sheet.getLastRow() - 1);
 
   // Pass 1: scan Drive folders, cache results, determine numRows
   const folderCache = new Map<string, string[]>();

@@ -45,6 +45,7 @@ const mockSpreadsheetApp = {
   }),
   getActive: jest.fn().mockReturnValue({ toast: jest.fn() }),
   WrapStrategy: { CLIP: "CLIP", WRAP: "WRAP", OVERFLOW: "OVERFLOW" },
+  flush: jest.fn(),
 };
 
 const mockEvaluate = jest.fn().mockReturnValue({
@@ -74,6 +75,7 @@ import {
   runTool,
   importDriveLinks,
   getDefaultRowRange,
+  prepRecipe,
 } from "../src/server/index";
 
 // ── Tests ──────────────────────────────────────────────────────
@@ -193,5 +195,91 @@ describe("getDefaultRowRange", () => {
   it("returns null for a completely empty sheet", () => {
     mockActiveSheet.getLastRow.mockReturnValue(0);
     expect(getDefaultRowRange()).toBeNull();
+  });
+});
+
+describe("prepRecipe", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockActiveSheet.getLastColumn.mockReturnValue(1);
+    (mockActiveSheet as unknown as { getMaxRows: jest.Mock }).getMaxRows = jest
+      .fn()
+      .mockReturnValue(1000);
+    // findOrCreateColumn's header lookup, its new-header-cell write, its
+    // wrap-strategy range, and writeColumn's data write are all distinct
+    // getRange call shapes sharing one mock, distinguished by arg shape.
+    mockActiveSheet.getRange.mockImplementation(
+      (row: number, col: number, numRows?: number, numCols?: number) => {
+        if (row === 1 && col === 1 && numRows === 1 && numCols !== undefined) {
+          return { getValues: () => [["existing_col"]] }; // header-row lookup
+        }
+        if (row === 1 && numRows === undefined) {
+          return { setValue: jest.fn() }; // new column's header cell
+        }
+        if (row === 1 && numCols === 1) {
+          return { setWrapStrategy: jest.fn() }; // wrap-strategy range
+        }
+        return { setValues: mockSetValues, setWrapStrategy: jest.fn() }; // data write (writeColumn)
+      },
+    );
+  });
+
+  it("fills a bare fill-value column to match the sheet's existing row count when no list-drive-folder spec is present", () => {
+    mockActiveSheet.getLastRow.mockReturnValue(51); // header + 50 data rows
+
+    const result = prepRecipe({
+      cols: [
+        {
+          colTitle: "System Prompt",
+          fillStrategy: { kind: "fill-value", value: "Summarize this." },
+        },
+      ],
+      inputValues: {},
+    });
+
+    expect(mockSetValues).toHaveBeenCalledWith(Array(50).fill(["Summarize this."]));
+    expect(result).toEqual({ rowRange: { start: 2, end: 51 } });
+  });
+
+  it("falls back to 1 row when the sheet has only a header row and no folder spec", () => {
+    mockActiveSheet.getLastRow.mockReturnValue(1);
+
+    prepRecipe({
+      cols: [{ colTitle: "System Prompt", fillStrategy: { kind: "fill-value", value: "x" } }],
+      inputValues: {},
+    });
+
+    expect(mockSetValues).toHaveBeenCalledWith([["x"]]);
+  });
+
+  it("keeps numRows folder-count-driven when a list-drive-folder spec is present, ignoring a larger pre-existing sheet size (regression guard)", () => {
+    // Sheet already has far more rows than the folder has files — this must
+    // NOT inflate the accompanying fill-value column beyond the folder count.
+    mockActiveSheet.getLastRow.mockReturnValue(500);
+    const mockFiles = (() => {
+      const files = [
+        { getUrl: () => "https://drive.google.com/file/1" },
+        { getUrl: () => "https://drive.google.com/file/2" },
+      ];
+      let i = 0;
+      return { hasNext: () => i < files.length, next: () => files[i++] };
+    })();
+    const mockSubfolders = { hasNext: () => false, next: () => undefined };
+    (globalThis as unknown as { DriveApp: unknown }).DriveApp = {
+      getFolderById: jest.fn().mockReturnValue({
+        getFiles: () => mockFiles,
+        getFolders: () => mockSubfolders,
+      }),
+    };
+
+    prepRecipe({
+      cols: [
+        { colTitle: "Drive Link", fillStrategy: { kind: "list-drive-folder", inputId: "folder" } },
+        { colTitle: "System Prompt", fillStrategy: { kind: "fill-value", value: "Summarize." } },
+      ],
+      inputValues: { folder: "https://drive.google.com/drive/folders/abc123" },
+    });
+
+    expect(mockSetValues).toHaveBeenCalledWith(Array(2).fill(["Summarize."]));
   });
 });
