@@ -20,6 +20,7 @@
 // ── Import after mocks ─────────────────────────────────────────
 
 import { SSI } from "../src/server/customFunctions";
+import { GENERIC_FAILURE_MESSAGE } from "../src/server/error-handling";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -150,7 +151,7 @@ describe("SSI", () => {
 
       const result = SSI("prompt");
 
-      expect(result).toBe("[Error: request failed — see script logs]");
+      expect(result).toBe(`[Error: ${GENERIC_FAILURE_MESSAGE}]`);
       expect(consoleErrorSpy).toHaveBeenCalledWith("SSI", { kind: "Error" });
       consoleErrorSpy.mockRestore();
     });

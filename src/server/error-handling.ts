@@ -63,3 +63,31 @@ export function logUnexpected(site: string, e: unknown, meta?: LogMeta): void {
 export function formatCellError(message: string): string {
   return `[Error: ${message}]`;
 }
+
+/**
+ * Fallback for an RPC-boundary function whose body throws something other
+ * than a DomainError. Deliberately does NOT say "see script logs" — most
+ * users of this add-on have edit access to the spreadsheet but not to the
+ * Apps Script project, so they can't see Cloud Logging at all. This wording
+ * is actionable for that audience instead.
+ */
+export const GENERIC_FAILURE_MESSAGE =
+  "Something went wrong — try again, or contact an admin if it persists.";
+
+/**
+ * Run an RPC-exposed function's body with the standard scrub-and-log
+ * behavior: a DomainError's message passes through to the client verbatim
+ * (see toSafeMessage); anything else is logged (type only) and replaced with
+ * GENERIC_FAILURE_MESSAGE before crossing the google.script.run boundary.
+ *
+ * `site` is used for logging only — it never reaches the user, so it can
+ * name the internal function rather than mimic user-facing copy.
+ */
+export function withErrorScrubbing<T>(site: string, fn: () => T): T {
+  try {
+    return fn();
+  } catch (e) {
+    logUnexpected(site, e);
+    throw new Error(toSafeMessage(e, GENERIC_FAILURE_MESSAGE));
+  }
+}

@@ -21,7 +21,7 @@ import {
 import { uploadFilesToGemini } from "./files";
 import { hasGeminiApiKey, MISSING_API_KEY_MESSAGE } from "./gemini-auth";
 import { buildInferenceRequest } from "./inference";
-import { DomainError, logUnexpected, toSafeMessage, formatCellError } from "./error-handling";
+import { DomainError, formatCellError, withErrorScrubbing } from "./error-handling";
 import { parseMarkdown, type RichSpan } from "./markdown-to-rich-text";
 import { injectCitations, groundingToMarkdown } from "./gemini-grounding";
 import {
@@ -98,7 +98,7 @@ export function showSidebar(): void {
 // ==========================================
 
 export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string): void {
-  try {
+  withErrorScrubbing("Import Drive Links", () => {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     const folderId = extractId(config.folderUrl);
 
@@ -121,10 +121,7 @@ export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string)
       "Complete",
       5,
     );
-  } catch (e) {
-    logUnexpected("Import Drive Links", e);
-    throw new Error(toSafeMessage(e, "Import Drive Links failed — see script logs"));
-  }
+  });
 }
 
 // ==========================================
@@ -132,7 +129,7 @@ export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string)
 // ==========================================
 
 export function extractText(config: ExtractTextConfig, jobId?: string): void {
-  try {
+  withErrorScrubbing("Extract Text", () => {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
 
     if (!checkDriveService(SpreadsheetApp.getUi())) return;
@@ -183,10 +180,7 @@ export function extractText(config: ExtractTextConfig, jobId?: string): void {
       writeSafeValue(sheet.getRange(rowIdx, outputCol), text);
       SpreadsheetApp.flush();
     }
-  } catch (e) {
-    logUnexpected("Extract Text", e);
-    throw new Error(toSafeMessage(e, "Extract Text failed — see script logs"));
-  }
+  });
 }
 
 // ==========================================
@@ -194,7 +188,7 @@ export function extractText(config: ExtractTextConfig, jobId?: string): void {
 // ==========================================
 
 export function sampleRowsToEvaluation(_jobId?: string): void {
-  try {
+  withErrorScrubbing("Sample Rows", () => {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const ui = SpreadsheetApp.getUi();
     const sourceSheet = ss.getActiveSheet();
@@ -262,10 +256,7 @@ export function sampleRowsToEvaluation(_jobId?: string): void {
       `Copied ${sampleSize} rows from "${sourceName}" to "${targetName}" using seed ${seed}.`,
       ui.ButtonSet.OK,
     );
-  } catch (e) {
-    logUnexpected("Sample Rows", e);
-    throw new Error(toSafeMessage(e, "Sample Rows failed — see script logs"));
-  }
+  });
 }
 
 // ==========================================
@@ -330,7 +321,7 @@ export function formatMarkdownSelection(): void {
 const FILE_PIPELINE_BATCH_SIZE = 10;
 
 export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
-  try {
+  return withErrorScrubbing("Run AI", () => {
     const startTime = Date.now();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getActiveSheet();
@@ -619,10 +610,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
     }
 
     return stats;
-  } catch (e) {
-    logUnexpected("Run AI", e);
-    throw new Error(toSafeMessage(e, "Run AI failed — see script logs"));
-  }
+  });
 }
 
 // ==========================================
@@ -641,7 +629,7 @@ export function runTool(functionName: string, jobId?: string): void {
 // ==========================================
 
 export function prepRecipe({ cols, inputValues }: PrepRecipeParams): PrepRecipeResult {
-  try {
+  return withErrorScrubbing("Recipe Setup", () => {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     let numRows = 1;
 
@@ -697,10 +685,7 @@ export function prepRecipe({ cols, inputValues }: PrepRecipeParams): PrepRecipeR
 
     SpreadsheetApp.flush();
     return { rowRange: { start: 2, end: 2 + numRows - 1 } };
-  } catch (e) {
-    logUnexpected("Recipe Setup", e);
-    throw new Error(toSafeMessage(e, "Recipe setup failed — see script logs"));
-  }
+  });
 }
 
 // ==========================================

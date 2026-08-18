@@ -14,7 +14,13 @@
 import { callGeminiAPI } from "./api";
 import { flattenArg } from "./utils";
 import { TOOL_REGISTRY } from "./tools";
-import { DomainError, logUnexpected, toSafeMessage, formatCellError } from "./error-handling";
+import {
+  DomainError,
+  logUnexpected,
+  toSafeMessage,
+  formatCellError,
+  GENERIC_FAILURE_MESSAGE,
+} from "./error-handling";
 import type { ToolId } from "../shared/types";
 import type { GeminiUserPart } from "./types";
 
@@ -45,6 +51,6 @@ export function SSI(userTexts: unknown, systemPrompt?: string, toolNames?: unkno
     }).text;
   } catch (e) {
     logUnexpected("SSI", e);
-    return formatCellError(toSafeMessage(e, "request failed — see script logs"));
+    return formatCellError(toSafeMessage(e, GENERIC_FAILURE_MESSAGE));
   }
 }
