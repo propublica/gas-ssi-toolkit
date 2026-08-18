@@ -54,6 +54,27 @@ describe("ToolListPanel", () => {
     expect(ids.slice(0, 3)).toEqual(["btn-guided-ai", "btn-run-ai", "btn-recipes"]);
   });
 
+  it("renders the AI section header (not the old 'Main Tools' label)", () => {
+    const c = mountPanel();
+    const headers = Array.from(c.querySelectorAll("h3")).map((h) => h.textContent);
+    expect(headers).toContain("AI");
+    expect(headers).not.toContain("Main Tools");
+  });
+
+  it("renders short names with descriptive captions for the three AI buttons", () => {
+    const c = mountPanel();
+    const expectations: Array<[string, string, string]> = [
+      ["#btn-guided-ai", "Guided", "A step-by-step walkthrough for a custom AI task"],
+      ["#btn-run-ai", "Freeform", "Full control over inputs, prompts and settings in one form"],
+      ["#btn-recipes", "Recipes", "Ready-made presets for common tasks"],
+    ];
+    for (const [selector, name, caption] of expectations) {
+      const btn = c.querySelector(selector)!;
+      expect(btn.querySelector(".tool-btn-name")!.textContent).toBe(name);
+      expect(btn.querySelector(".tool-btn-sub")!.textContent).toBe(caption);
+    }
+  });
+
   it("clicking Recipes navigates to recipes-list", () => {
     const c = mountPanel();
     c.querySelector<HTMLButtonElement>("#btn-recipes")!.click();

@@ -57,15 +57,27 @@ export class ToolListPanel implements Panel {
   private template(): string {
     return `
       <div class="section">
-        <h3>Main Tools</h3>
+        <h3>AI</h3>
         <button id="btn-guided-ai" class="tool-btn">
-          <span class="icon">🧭</span> Guided AI Inference
+          <span class="icon">🧭</span>
+          <div class="tool-btn-text">
+            <span class="tool-btn-name">Guided</span>
+            <span class="tool-btn-sub">A step-by-step walkthrough for a custom AI task</span>
+          </div>
         </button>
         <button id="btn-run-ai" class="tool-btn">
-          <span class="icon">▶️</span> Freeform AI Inference
+          <span class="icon">▶️</span>
+          <div class="tool-btn-text">
+            <span class="tool-btn-name">Freeform</span>
+            <span class="tool-btn-sub">Full control over inputs, prompts and settings in one form</span>
+          </div>
         </button>
         <button id="btn-recipes" class="tool-btn">
-          <span class="icon">🥞</span> Recipes
+          <span class="icon">🥞</span>
+          <div class="tool-btn-text">
+            <span class="tool-btn-name">Recipes</span>
+            <span class="tool-btn-sub">Ready-made presets for common tasks</span>
+          </div>
         </button>
       </div>
       <div class="section">
