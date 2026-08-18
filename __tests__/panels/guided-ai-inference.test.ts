@@ -165,4 +165,45 @@ describe("GuidedAIInferencePanel — persistence", () => {
       expect.any(String),
     );
   });
+
+  it("editing the Prompt step (without re-completing it) then restoring the flow still runs with systemPromptCol set (regression: hydrate() must run for a re-opened-but-not-remounted step)", async () => {
+    (services.prepRecipe as jest.Mock).mockResolvedValue({ rowRange: { start: 2, end: 5 } });
+    const { container, panel } = await mountAndLoad();
+
+    // Step 1: pick a column, continue.
+    container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+    container.querySelector<HTMLElement>(".token-add-btn")!.click();
+    container.querySelector<HTMLElement>('.token-option[data-value="NoteCol"]')!.click();
+    container.querySelector<HTMLButtonElement>("#gi-continue")!.click();
+    await Promise.resolve();
+
+    // Step 2: write a prompt, continue — reaches Step 3, all steps complete.
+    container.querySelector<HTMLTextAreaElement>("#gp-prompt-text")!.value = "Summarize this.";
+    container.querySelector<HTMLButtonElement>("#gp-continue")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    // Click [Edit] on Step 2 (the Prompt step) specifically, then navigate away
+    // WITHOUT re-completing it.
+    const promptRow = container.querySelector('.step-row[data-step-index="1"]')!;
+    promptRow.querySelector<HTMLButtonElement>(".step-edit-btn")!.click();
+
+    const saved = panel.unmount();
+
+    // Simulate navigating back to a fresh panel instance restored from saved state.
+    const container2 = makeContainer();
+    const panel2 = new GuidedAIInferencePanel();
+    panel2.mount(container2, mockNav, undefined, saved);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    container2.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(services.runBatchAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        promptCols: [{ col: "NoteCol", kind: "auto" }],
+        systemPromptCol: "System Prompt",
+      }),
+      expect.any(String),
+    );
+  });
 });

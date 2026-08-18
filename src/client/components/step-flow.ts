@@ -29,11 +29,8 @@ export class StepFlow {
     this.rowEls = steps.map((step, i) => this.buildRow(step, i));
     this.rowEls.forEach((row) => this.container.appendChild(row));
     steps.forEach((_, i) => {
-      if (this.isMountedState(i)) {
-        this.mountStep(i);
-      } else if (this.savedByIndex[i]) {
-        steps[i].hydrate?.(this.savedByIndex[i]!.savedState);
-      }
+      if (this.isMountedState(i)) this.mountStep(i);
+      if (this.savedByIndex[i]) steps[i].hydrate?.(this.savedByIndex[i]!.savedState);
     });
   }
 
