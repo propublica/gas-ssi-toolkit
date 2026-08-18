@@ -17,12 +17,16 @@ import {
   downloadDriveFiles,
   checkDriveService,
   extractTextUniversal,
-  getDriveFolderOrThrow,
 } from "./drive";
 import { uploadFilesToGemini } from "./files";
 import { hasGeminiApiKey, MISSING_API_KEY_MESSAGE } from "./gemini-auth";
 import { buildInferenceRequest } from "./inference";
-import { DomainError, formatCellError, withErrorScrubbing } from "./error-handling";
+import {
+  DomainError,
+  formatCellError,
+  withErrorScrubbing,
+  withActionableError,
+} from "./error-handling";
 import { parseMarkdown, type RichSpan } from "./markdown-to-rich-text";
 import { injectCitations, groundingToMarkdown } from "./gemini-grounding";
 import {
@@ -94,6 +98,12 @@ export function showSidebar(): void {
   SpreadsheetApp.getUi().showSidebar(output);
 }
 
+// Shown for DriveApp.getFolderById failures — it throws the same generic
+// exception for both a malformed/nonexistent ID and a real ID the user lacks
+// access to, so this doesn't claim more precision than GAS actually gives us.
+const FOLDER_NOT_FOUND_MESSAGE =
+  "Could not find that Drive folder — check the link and that you have access to it";
+
 // ==========================================
 // 📂 TOOL 1: IMPORT DRIVE LINKS
 // ==========================================
@@ -107,7 +117,10 @@ export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string)
       writeJobProgress(CacheService.getUserCache(), jobId, { message: "Scanning folder..." });
     }
 
-    const parentFolder = getDriveFolderOrThrow(folderId);
+    const parentFolder = withActionableError(
+      () => DriveApp.getFolderById(folderId),
+      FOLDER_NOT_FOUND_MESSAGE,
+    );
     const allFiles: DriveFileInfo[] = [];
     getAllFilesRecursive(parentFolder, allFiles, config.mimeTypes);
 
@@ -640,7 +653,11 @@ export function prepRecipe({ cols, inputValues }: PrepRecipeParams): PrepRecipeR
       if (col.fillStrategy.kind === "list-drive-folder") {
         const url = inputValues[col.fillStrategy.inputId] ?? "";
         if (!folderCache.has(url)) {
-          const folder = getDriveFolderOrThrow(extractId(url));
+          const folderId = extractId(url);
+          const folder = withActionableError(
+            () => DriveApp.getFolderById(folderId),
+            FOLDER_NOT_FOUND_MESSAGE,
+          );
           const files: { url: string }[] = [];
           getAllFilesRecursive(folder, files);
           folderCache.set(

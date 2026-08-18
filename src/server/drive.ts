@@ -7,7 +7,7 @@
  */
 
 import { CONFIG } from "./config";
-import { DomainError, logError, formatCellError } from "./error-handling";
+import { logError, formatCellError } from "./error-handling";
 import type { GeminiInlineData } from "./types";
 
 /**
@@ -27,23 +27,6 @@ export function checkDriveService(ui: GoogleAppsScript.Base.Ui): boolean {
       ui.ButtonSet.OK,
     );
     return false;
-  }
-}
-
-/**
- * Look up a Drive folder by ID, converting the ambiguous exception
- * DriveApp.getFolderById throws (covers both a malformed/non-existent ID and
- * a real ID the user lacks access to — GAS doesn't reliably distinguish the
- * two) into one actionable DomainError. Shared by importDriveLinks and
- * prepRecipe's list-drive-folder fill strategy.
- */
-export function getDriveFolderOrThrow(folderId: string): GoogleAppsScript.Drive.Folder {
-  try {
-    return DriveApp.getFolderById(folderId);
-  } catch (_e) {
-    throw new DomainError(
-      "Could not find that Drive folder — check the link and that you have access to it",
-    );
   }
 }
 

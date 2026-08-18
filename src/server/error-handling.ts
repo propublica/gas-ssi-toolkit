@@ -91,3 +91,25 @@ export function withErrorScrubbing<T>(site: string, fn: () => T): T {
     throw new Error(toSafeMessage(e, GENERIC_FAILURE_MESSAGE));
   }
 }
+
+/**
+ * Run fn(), converting anything it throws into a DomainError with the given
+ * message. Use at a call site where a specific, known failure reason is more
+ * helpful to the user than the underlying exception's own (often ambiguous
+ * or internal-detail-laden) message — e.g. DriveApp.getFolderById throwing
+ * the same generic exception for both a malformed ID and a real one the user
+ * can't access. A plain inline call, not a named wrapper per operation: reuse
+ * this directly at any site that needs it rather than writing a new
+ * single-purpose "getXOrThrow" function.
+ *
+ * Only fits a site where every possible failure means the same thing to the
+ * user. If a call can fail for meaningfully different reasons that deserve
+ * different messages, write a normal try/catch instead.
+ */
+export function withActionableError<T>(fn: () => T, message: string): T {
+  try {
+    return fn();
+  } catch (_e) {
+    throw new DomainError(message);
+  }
+}

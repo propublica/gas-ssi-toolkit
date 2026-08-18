@@ -8,6 +8,7 @@ import {
   toSafeMessage,
   formatCellError,
   withErrorScrubbing,
+  withActionableError,
   GENERIC_FAILURE_MESSAGE,
 } from "../src/server/error-handling";
 
@@ -123,5 +124,36 @@ describe("withErrorScrubbing", () => {
       thrown = e as Error;
     }
     expect(thrown?.message).not.toContain("cell content that must not be retained");
+  });
+});
+
+describe("withActionableError", () => {
+  it("returns the callback's result when it succeeds", () => {
+    expect(withActionableError(() => "ok", "fallback message")).toBe("ok");
+  });
+
+  it("converts any thrown exception into a DomainError with the given message", () => {
+    expect(() =>
+      withActionableError(() => {
+        throw new Error("Invalid argument: id");
+      }, "Could not find that Drive folder — check the link and that you have access to it"),
+    ).toThrow(DomainError);
+    expect(() =>
+      withActionableError(() => {
+        throw new Error("Invalid argument: id");
+      }, "Could not find that Drive folder — check the link and that you have access to it"),
+    ).toThrow("Could not find that Drive folder — check the link and that you have access to it");
+  });
+
+  it("never includes the caught exception's own message in the thrown DomainError", () => {
+    let thrown: Error | undefined;
+    try {
+      withActionableError(() => {
+        throw new Error("cell content that must not be retained");
+      }, "generic message");
+    } catch (e) {
+      thrown = e as Error;
+    }
+    expect(thrown?.message).toBe("generic message");
   });
 });
