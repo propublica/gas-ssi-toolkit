@@ -62,14 +62,14 @@ export class ToolListPanel implements Panel {
           <span class="icon">🧭</span>
           <div class="tool-btn-text">
             <span class="tool-btn-name">Guided</span>
-            <span class="tool-btn-sub">A step-by-step walkthrough for a custom AI task</span>
+            <span class="tool-btn-sub">Perform your custom AI task with a step-by-step walkthrough</span>
           </div>
         </button>
         <button id="btn-run-ai" class="tool-btn">
           <span class="icon">▶️</span>
           <div class="tool-btn-text">
             <span class="tool-btn-name">Freeform</span>
-            <span class="tool-btn-sub">Full control over inputs, prompts and settings in one form</span>
+            <span class="tool-btn-sub">Full control over inputs, prompts and settings</span>
           </div>
         </button>
         <button id="btn-recipes" class="tool-btn">
