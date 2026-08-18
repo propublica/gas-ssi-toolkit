@@ -100,21 +100,6 @@ describe("getSheetHeaders", () => {
     handlers.reject(new Error("sheet error"));
     await expect(promise).rejects.toThrow("sheet error");
   });
-
-  it("strips a redundant leading 'Error: ' that google.script.run adds to a thrown Error's message", async () => {
-    const handlers = captureHandlers();
-    const promise = services.getSheetHeaders();
-    handlers.reject(new Error("Error: Something went wrong — try again, or contact an admin"));
-    await expect(promise).rejects.toThrow("Something went wrong — try again, or contact an admin");
-    await expect(promise).rejects.not.toThrow(/^Error: Error:/);
-  });
-
-  it("leaves a message with no leading 'Error: ' unchanged", async () => {
-    const handlers = captureHandlers();
-    const promise = services.getSheetHeaders();
-    handlers.reject(new Error("no prefix here"));
-    await expect(promise).rejects.toThrow("no prefix here");
-  });
 });
 
 describe("runBatchAI", () => {

@@ -244,7 +244,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         this.checkTestStatsFreshness(container);
       },
       (err: Error) => {
-        globalThis.alert("Error loading headers: " + err.message);
+        globalThis.alert("Couldn't load headers: " + err.message);
         this.nav?.back();
       },
     );
@@ -367,11 +367,11 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         jobStore
           .dispatch(jobId, "Batch AI Run", this.runChunks(jobId, config, chunks))
           .catch((err: Error) => {
-            globalThis.alert("Error: " + err.message);
+            globalThis.alert(err.message);
           });
       })
       .catch((err: Error) => {
-        globalThis.alert("Error: " + err.message);
+        globalThis.alert(err.message);
       });
     // NOTE: loadHeaders() is intentionally NOT called here.
     // Reloading after dispatch caused flicker and re-initialization mid-run.
@@ -457,7 +457,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         }
       })
       .catch((err: Error) => {
-        globalThis.alert("Error: " + err.message);
+        globalThis.alert(err.message);
         this.testButton?.setIdle();
       });
   }
