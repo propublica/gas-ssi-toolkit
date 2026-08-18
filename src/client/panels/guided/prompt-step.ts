@@ -1,4 +1,5 @@
 import type { Step, StepContext } from "../../types";
+import { AsyncActionButton } from "../../components/async-action-button";
 import { prepRecipe } from "../../services";
 
 export const SYSTEM_PROMPT_COLUMN_TITLE = "System Prompt";
@@ -18,6 +19,7 @@ export class PromptStep implements Step<PromptStepSavedState> {
 
   private textarea: HTMLTextAreaElement | null = null;
   private result: PromptStepResult | null = null;
+  private continueButton: AsyncActionButton | null = null;
 
   getResult(): PromptStepResult | null {
     return this.result;
@@ -34,6 +36,14 @@ export class PromptStep implements Step<PromptStepSavedState> {
     `;
     this.textarea = container.querySelector<HTMLTextAreaElement>("#gp-prompt-text")!;
     this.textarea.value = savedState?.promptText ?? "";
+    this.continueButton = new AsyncActionButton(
+      container.querySelector<HTMLButtonElement>("#gp-continue")!,
+      {
+        idleLabel: "Import & Continue",
+        loadingLabel: "Importing...",
+        doneLabel: "Import & Continue",
+      },
+    );
 
     container.querySelector<HTMLButtonElement>("#gp-continue")!.addEventListener("click", () => {
       this.handleContinue(ctx);
@@ -53,6 +63,7 @@ export class PromptStep implements Step<PromptStepSavedState> {
       globalThis.alert("Please describe what the AI should do.");
       return;
     }
+    this.continueButton?.setLoading();
     prepRecipe({
       cols: [
         {
@@ -69,6 +80,7 @@ export class PromptStep implements Step<PromptStepSavedState> {
       (err: Error) => {
         globalThis.alert("Error saving prompt: " + err.message);
         ctx.onError();
+        this.continueButton?.setIdle();
       },
     );
   }

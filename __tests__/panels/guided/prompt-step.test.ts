@@ -78,6 +78,31 @@ describe("PromptStep — commit", () => {
     expect(step.getResult()).toEqual({ systemPromptCol: SYSTEM_PROMPT_COLUMN_TITLE });
   });
 
+  it("shows a loading state on the continue button while prepRecipe is in flight, then reverts to idle on failure", async () => {
+    let rejectPrepRecipe!: (err: Error) => void;
+    (services.prepRecipe as jest.Mock).mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectPrepRecipe = reject;
+      }),
+    );
+    const container = makeContainer();
+    const step = new PromptStep();
+    step.mount(container, makeCtx());
+    container.querySelector<HTMLTextAreaElement>("#gp-prompt-text")!.value = "Do something.";
+    const continueBtn = container.querySelector<HTMLButtonElement>("#gp-continue")!;
+    continueBtn.click();
+    await Promise.resolve();
+
+    expect(continueBtn.disabled).toBe(true);
+    expect(continueBtn.textContent).toContain("Importing...");
+
+    rejectPrepRecipe(new Error("boom"));
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(continueBtn.disabled).toBe(false);
+    expect(continueBtn.textContent).toBe("Import & Continue");
+  });
+
   it("calls ctx.onError and alerts, not onComplete, when prepRecipe rejects", async () => {
     (services.prepRecipe as jest.Mock).mockRejectedValue(new Error("write failed"));
     const container = makeContainer();

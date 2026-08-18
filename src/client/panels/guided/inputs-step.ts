@@ -1,6 +1,7 @@
 import type { Step, StepContext } from "../../types";
 import type { PrepColSpec, PromptColumnSpec } from "../../../shared/types";
 import { TokenInput } from "../../components/token-input";
+import { AsyncActionButton } from "../../components/async-action-button";
 import { prepRecipe } from "../../services";
 
 export type InputRow =
@@ -24,6 +25,7 @@ export class InputsStep implements Step<InputsStepSavedState> {
   private rows: Array<{ row: InputRow; el: HTMLElement; tokenInput?: TokenInput }> = [];
   private result: InputsStepResult | null = null;
   private nextFolderNumber = 1;
+  private continueButton: AsyncActionButton | null = null;
 
   constructor(headers: string[]) {
     this.headers = headers;
@@ -53,6 +55,14 @@ export class InputsStep implements Step<InputsStepSavedState> {
     `;
     for (const row of savedState?.rows ?? []) this.addRow(row);
     this.nextFolderNumber = this.computeNextFolderNumber();
+    this.continueButton = new AsyncActionButton(
+      container.querySelector<HTMLButtonElement>("#gi-continue")!,
+      {
+        idleLabel: "Import & Continue",
+        loadingLabel: "Importing...",
+        doneLabel: "Import & Continue",
+      },
+    );
 
     container.querySelector<HTMLButtonElement>("#gi-add-column")!.addEventListener("click", () => {
       this.addRow({ kind: "column", colTitle: "" });
@@ -177,9 +187,11 @@ export class InputsStep implements Step<InputsStepSavedState> {
     const inputValues: Record<string, string> = {};
     folderRows.forEach((r, i) => (inputValues[`driveFolder_${i}`] = r.url));
 
+    this.continueButton?.setLoading();
     prepRecipe({ cols, inputValues }).then(finish, (err: Error) => {
       globalThis.alert("Error importing Drive folder: " + err.message);
       ctx.onError();
+      this.continueButton?.setIdle();
     });
   }
 }

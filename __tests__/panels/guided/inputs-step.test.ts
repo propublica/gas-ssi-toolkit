@@ -101,6 +101,35 @@ describe("InputsStep — drive-folder rows", () => {
     expect(step.getResult()?.promptCols).toEqual([{ col: "Drive Link", kind: "auto" }]);
   });
 
+  it("shows a loading state on the continue button while prepRecipe is in flight, then reverts to idle on failure", async () => {
+    let rejectPrepRecipe!: (err: Error) => void;
+    (services.prepRecipe as jest.Mock).mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectPrepRecipe = reject;
+      }),
+    );
+    globalThis.alert = jest.fn();
+    const container = makeContainer();
+    const step = new InputsStep([]);
+    step.mount(container, makeCtx());
+
+    container.querySelector<HTMLButtonElement>("#gi-add-folder")!.click();
+    container.querySelector<HTMLInputElement>(".guided-input-folder-url")!.value =
+      "https://drive.google.com/x";
+    const continueBtn = container.querySelector<HTMLButtonElement>("#gi-continue")!;
+    continueBtn.click();
+    await Promise.resolve();
+
+    expect(continueBtn.disabled).toBe(true);
+    expect(continueBtn.textContent).toContain("Importing...");
+
+    rejectPrepRecipe(new Error("boom"));
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(continueBtn.disabled).toBe(false);
+    expect(continueBtn.textContent).toBe("Import & Continue");
+  });
+
   it("calls ctx.onError and alerts (does not call onComplete) when prepRecipe rejects", async () => {
     (services.prepRecipe as jest.Mock).mockRejectedValue(new Error("Drive down"));
     globalThis.alert = jest.fn();
