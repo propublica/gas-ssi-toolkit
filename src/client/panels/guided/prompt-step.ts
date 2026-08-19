@@ -21,6 +21,10 @@ export class PromptStep implements Step<PromptStepSavedState> {
   private result: PromptStepResult | null = null;
   private continueButton: AsyncActionButton | null = null;
 
+  /** gemUrl comes from the GEMINI_GEM_URL Script Property (admin-configured,
+   * not sheet/user data) -- omitted from the DOM entirely when unset. */
+  constructor(private readonly gemUrl?: string) {}
+
   getResult(): PromptStepResult | null {
     return this.result;
   }
@@ -30,7 +34,12 @@ export class PromptStep implements Step<PromptStepSavedState> {
   }
 
   mount(container: HTMLElement, ctx: StepContext, savedState?: PromptStepSavedState): void {
+    const gemLink = this.gemUrl
+      ? `<p class="guided-gem-link">Need help writing this? Try our
+          <a href="${this.gemUrl}" target="_blank" rel="noopener noreferrer">Gemini Gem prompt assistant ↗</a></p>`
+      : "";
     container.innerHTML = `
+      ${gemLink}
       <textarea id="gp-prompt-text" class="guided-prompt-textarea"></textarea>
       <button type="button" class="btn-run" id="gp-continue">Import &amp; Continue</button>
     `;

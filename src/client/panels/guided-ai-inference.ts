@@ -4,7 +4,7 @@ import { StepFlow } from "../components/step-flow";
 import { InputsStep } from "./guided/inputs-step";
 import { PromptStep } from "./guided/prompt-step";
 import { RunStep } from "./guided/run-step";
-import { getSheetHeaders } from "../services";
+import { getSheetHeaders, getGeminiGemUrl } from "../services";
 import { PanelLoader } from "../components/panel-loader";
 
 export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedState> {
@@ -29,10 +29,10 @@ export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedSta
     const loader = new PanelLoader(container);
     loader.setState({ status: "loading", message: "Loading columns..." });
 
-    getSheetHeaders()
+    Promise.all([getSheetHeaders(), getGeminiGemUrl().catch(() => undefined)])
       .then(
-        (headers) => {
-          const promptStep = new PromptStep();
+        ([headers, gemUrl]) => {
+          const promptStep = new PromptStep(gemUrl);
           const inputsStep = new InputsStep(headers);
           this.inputsStep = inputsStep;
           const runStep = new RunStep(

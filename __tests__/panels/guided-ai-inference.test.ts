@@ -4,6 +4,7 @@
 
 jest.mock("../../src/client/services", () => ({
   getSheetHeaders: jest.fn(),
+  getGeminiGemUrl: jest.fn().mockResolvedValue(undefined),
   prepRecipe: jest.fn(),
   runBatchAI: jest.fn().mockResolvedValue(undefined),
   getActiveRangeInfo: jest.fn().mockResolvedValue({ start: 2, end: 11 }),
@@ -71,6 +72,31 @@ describe("GuidedAIInferencePanel — mount", () => {
     for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(globalThis.alert).toHaveBeenCalledWith(expect.stringContaining("Network error"));
     expect(mockNav.back).toHaveBeenCalled();
+  });
+
+  it("passes the fetched Gemini Gem URL through to Step 2", async () => {
+    (services.getGeminiGemUrl as jest.Mock).mockResolvedValue(
+      "https://gemini.google.com/gem/abc123",
+    );
+    const { container } = await mountAndLoad();
+
+    // Step 2 doesn't mount (and render the link) until Step 1 completes.
+    container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+    container.querySelector<HTMLElement>(".token-add-btn")!.click();
+    container.querySelector<HTMLElement>('.token-option[data-value="NoteCol"]')!.click();
+    container.querySelector<HTMLButtonElement>("#gi-continue")!.click();
+    await Promise.resolve();
+
+    const link = container.querySelector<HTMLAnchorElement>(".guided-gem-link a");
+    expect(link?.href).toBe("https://gemini.google.com/gem/abc123");
+  });
+
+  it("still loads the panel normally if getGeminiGemUrl() rejects (link just omitted)", async () => {
+    (services.getGeminiGemUrl as jest.Mock).mockRejectedValue(new Error("props error"));
+    const { container } = await mountAndLoad();
+
+    expect(container.querySelectorAll(".step-row")).toHaveLength(3);
+    expect(container.querySelector(".guided-gem-link")).toBeNull();
   });
 });
 

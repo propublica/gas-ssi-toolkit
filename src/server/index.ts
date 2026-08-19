@@ -86,6 +86,13 @@ export function getSheetHeaders(): string[] {
   return sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
 }
 
+/** Configurable via a GEMINI_GEM_URL Script Property (Project Settings > Script
+ * Properties) -- not a secret, so it's read directly here rather than through
+ * gemini-auth.ts, which is the sole reader of the Gemini API credential. */
+export function getGeminiGemUrl(): string | null {
+  return PropertiesService.getScriptProperties().getProperty("GEMINI_GEM_URL");
+}
+
 export function showSidebar(): void {
   const html = HtmlService.createTemplateFromFile("Sidebar");
   const output = html.evaluate().setTitle("SSI Toolkit").setWidth(300);

@@ -531,6 +531,22 @@
             line-height: 1.4;
         }
 
+        .guided-gem-link {
+            font-size: var(--font-size-200);
+            color: var(--text-secondary);
+            margin: 0 0 8px 0;
+            line-height: 1.4;
+        }
+
+        .guided-gem-link a {
+            color: var(--primary-blue);
+            text-decoration: none;
+        }
+
+        .guided-gem-link a:hover {
+            text-decoration: underline;
+        }
+
         .recipe-intro {
             font-size: var(--font-size-200);
             color: var(--text-secondary);

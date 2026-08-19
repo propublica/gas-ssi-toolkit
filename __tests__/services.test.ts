@@ -6,6 +6,7 @@ const mockRun = {
   withSuccessHandler: jest.fn().mockReturnThis(),
   withFailureHandler: jest.fn().mockReturnThis(),
   getSheetHeaders: jest.fn(),
+  getGeminiGemUrl: jest.fn(),
   getActiveRangeInfo: jest.fn(),
   getDefaultRowRange: jest.fn(),
   runBatchAI: jest.fn(),
@@ -100,6 +101,30 @@ describe("getSheetHeaders", () => {
     const promise = services.getSheetHeaders();
     handlers.reject(new Error("sheet error"));
     await expect(promise).rejects.toThrow("sheet error");
+  });
+});
+
+describe("getGeminiGemUrl", () => {
+  it("calls google.script.run.getGeminiGemUrl and resolves with the URL", async () => {
+    const handlers = captureHandlers();
+    const promise = services.getGeminiGemUrl();
+    handlers.resolve("https://gemini.google.com/gem/abc123");
+    await expect(promise).resolves.toBe("https://gemini.google.com/gem/abc123");
+    expect(mockRun.getGeminiGemUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it("normalizes a null result (property unset) to undefined", async () => {
+    const handlers = captureHandlers();
+    const promise = services.getGeminiGemUrl();
+    handlers.resolve(null);
+    await expect(promise).resolves.toBeUndefined();
+  });
+
+  it("rejects with the error on failure", async () => {
+    const handlers = captureHandlers();
+    const promise = services.getGeminiGemUrl();
+    handlers.reject(new Error("props error"));
+    await expect(promise).rejects.toThrow("props error");
   });
 });
 

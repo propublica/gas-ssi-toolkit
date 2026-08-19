@@ -64,8 +64,14 @@ const mockHtmlService = {
   createTemplateFromFile: mockCreateTemplateFromFile,
 };
 
+const mockGetProperty = jest.fn();
+const mockPropertiesService = {
+  getScriptProperties: jest.fn().mockReturnValue({ getProperty: mockGetProperty }),
+};
+
 (globalThis as any).SpreadsheetApp = mockSpreadsheetApp;
 (globalThis as any).HtmlService = mockHtmlService;
+(globalThis as any).PropertiesService = mockPropertiesService;
 
 // ── Import after mocks ─────────────────────────────────────────
 
@@ -75,6 +81,7 @@ import {
   runTool,
   importDriveLinks,
   getDefaultRowRange,
+  getGeminiGemUrl,
   prepRecipe,
 } from "../src/server/index";
 
@@ -195,6 +202,23 @@ describe("getDefaultRowRange", () => {
   it("returns null for a completely empty sheet", () => {
     mockActiveSheet.getLastRow.mockReturnValue(0);
     expect(getDefaultRowRange()).toBeNull();
+  });
+});
+
+describe("getGeminiGemUrl", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("returns the GEMINI_GEM_URL script property", () => {
+    mockGetProperty.mockReturnValue("https://gemini.google.com/gem/abc123");
+    expect(getGeminiGemUrl()).toBe("https://gemini.google.com/gem/abc123");
+    expect(mockGetProperty).toHaveBeenCalledWith("GEMINI_GEM_URL");
+  });
+
+  it("returns null when the property is unset", () => {
+    mockGetProperty.mockReturnValue(null);
+    expect(getGeminiGemUrl()).toBeNull();
   });
 });
 

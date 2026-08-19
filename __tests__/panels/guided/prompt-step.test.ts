@@ -27,6 +27,28 @@ beforeEach(() => {
   globalThis.alert = jest.fn();
 });
 
+describe("PromptStep — Gemini Gem link", () => {
+  it("renders the link when a gemUrl is provided", () => {
+    const container = makeContainer();
+    const step = new PromptStep("https://gemini.google.com/gem/abc123");
+    step.mount(container, makeCtx());
+
+    const link = container.querySelector<HTMLAnchorElement>(".guided-gem-link a");
+    expect(link).not.toBeNull();
+    expect(link!.href).toBe("https://gemini.google.com/gem/abc123");
+    expect(link!.target).toBe("_blank");
+    expect(link!.rel).toContain("noopener");
+  });
+
+  it("omits the link entirely when no gemUrl is provided", () => {
+    const container = makeContainer();
+    const step = new PromptStep();
+    step.mount(container, makeCtx());
+
+    expect(container.querySelector(".guided-gem-link")).toBeNull();
+  });
+});
+
 describe("PromptStep — required prompt", () => {
   it("alerts and does not call prepRecipe when the prompt is empty", () => {
     const container = makeContainer();
