@@ -165,6 +165,7 @@ export class InputsStep implements Step<InputsStepSavedState> {
     );
 
     const finish = (): void => {
+      this.continueButton!.setIdle();
       this.result = { promptCols: rows.map((r) => ({ col: r.colTitle, kind: "auto" as const })) };
       ctx.onComplete();
     };

@@ -101,6 +101,23 @@ describe("InputsStep — drive-folder rows", () => {
     expect(step.getResult()?.promptCols).toEqual([{ col: "Drive Link", kind: "auto" }]);
   });
 
+  it("reverts the continue button to idle on success too -- StepFlow can re-expand this step's DOM later without a mount(), so a leftover loading state would otherwise stay stuck", async () => {
+    (services.prepRecipe as jest.Mock).mockResolvedValue({ rowRange: { start: 2, end: 5 } });
+    const container = makeContainer();
+    const step = new InputsStep([]);
+    step.mount(container, makeCtx());
+
+    container.querySelector<HTMLButtonElement>("#gi-add-folder")!.click();
+    container.querySelector<HTMLInputElement>(".guided-input-folder-url")!.value =
+      "https://drive.google.com/x";
+    const continueBtn = container.querySelector<HTMLButtonElement>("#gi-continue")!;
+    continueBtn.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(continueBtn.disabled).toBe(false);
+    expect(continueBtn.textContent).toBe("Import & Continue");
+  });
+
   it("shows a loading state on the continue button while prepRecipe is in flight, then reverts to idle on failure", async () => {
     let rejectPrepRecipe!: (err: Error) => void;
     (services.prepRecipe as jest.Mock).mockReturnValue(

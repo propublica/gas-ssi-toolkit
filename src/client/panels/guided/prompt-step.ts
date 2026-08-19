@@ -69,6 +69,7 @@ export class PromptStep implements Step<PromptStepSavedState> {
       inputValues: {},
     }).then(
       () => {
+        this.continueButton!.setIdle();
         this.result = { systemPromptCol: SYSTEM_PROMPT_COLUMN_TITLE };
         ctx.onComplete();
       },
