@@ -40,7 +40,7 @@ export class RunStep implements Step<RunStepSavedState> {
         ...this.getPromptFields(),
         outputCol: GUIDED_OUTPUT_COLUMN_TITLE,
         wrapPromptsInTags: undefined,
-        applyMarkdown: undefined,
+        applyMarkdown: true,
       }),
       onRunSucceeded: (): void => ctx.onComplete(),
       savedState: savedState?.runControls,

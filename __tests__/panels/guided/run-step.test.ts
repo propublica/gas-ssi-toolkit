@@ -57,6 +57,24 @@ describe("RunStep — mount and Run AI", () => {
     );
   });
 
+  it("defaults applyMarkdown to true, matching wrapPromptsInTags' on-by-default behavior", async () => {
+    const container = makeContainer();
+    const step = new RunStep(
+      () => ({ promptCols: [{ col: "a", kind: "auto" as const }] }),
+      jest.fn(),
+    );
+    step.mount(container, makeCtx());
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(services.runBatchAI).toHaveBeenCalledWith(
+      expect.objectContaining({ applyMarkdown: true }),
+      expect.any(String),
+    );
+  });
+
   it("calls ctx.onComplete after a successful Run AI, not after Test", async () => {
     const ctx = makeCtx();
     const container = makeContainer();
