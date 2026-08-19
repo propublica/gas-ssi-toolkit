@@ -15,7 +15,10 @@ export type AsyncButtonState = "idle" | "loading" | "done";
 export interface AsyncActionButtonConfig {
   idleLabel: string;
   loadingLabel: string;
-  doneLabel: string;
+  /** Defaults to idleLabel. Omit when a consumer never calls setDone() (e.g.
+   * a commit button whose success collapses the whole step, leaving no
+   * "done" state to display). */
+  doneLabel?: string;
 }
 
 export class AsyncActionButton {
@@ -52,7 +55,7 @@ export class AsyncActionButton {
     if (this.state === "loading") {
       this.button.innerHTML = `<span class="btn-spinner"></span>${this.config.loadingLabel}`;
     } else if (this.state === "done") {
-      this.button.textContent = this.config.doneLabel;
+      this.button.textContent = this.config.doneLabel ?? this.config.idleLabel;
     } else {
       this.button.textContent = this.config.idleLabel;
     }

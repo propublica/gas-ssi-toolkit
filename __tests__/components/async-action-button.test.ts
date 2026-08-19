@@ -79,6 +79,18 @@ describe("AsyncActionButton", () => {
     });
   });
 
+  describe("doneLabel omitted", () => {
+    it("falls back to idleLabel for the done state", () => {
+      const noDoneBtn = makeButton();
+      const noDoneAsyncBtn = new AsyncActionButton(noDoneBtn, {
+        idleLabel: "Import & Continue",
+        loadingLabel: "Importing...",
+      });
+      noDoneAsyncBtn.setDone();
+      expect(noDoneBtn.textContent).toBe("Import & Continue");
+    });
+  });
+
   describe("setIdle()", () => {
     it("re-enables the button and shows the idle label", () => {
       asyncBtn.setLoading();

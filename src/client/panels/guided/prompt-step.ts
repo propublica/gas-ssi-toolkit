@@ -38,11 +38,7 @@ export class PromptStep implements Step<PromptStepSavedState> {
     this.textarea.value = savedState?.promptText ?? "";
     this.continueButton = new AsyncActionButton(
       container.querySelector<HTMLButtonElement>("#gp-continue")!,
-      {
-        idleLabel: "Import & Continue",
-        loadingLabel: "Importing...",
-        doneLabel: "Import & Continue",
-      },
+      { idleLabel: "Import & Continue", loadingLabel: "Importing..." },
     );
 
     container.querySelector<HTMLButtonElement>("#gp-continue")!.addEventListener("click", () => {
@@ -63,7 +59,7 @@ export class PromptStep implements Step<PromptStepSavedState> {
       globalThis.alert("Please describe what the AI should do.");
       return;
     }
-    this.continueButton?.setLoading();
+    this.continueButton!.setLoading();
     prepRecipe({
       cols: [
         {
@@ -80,7 +76,7 @@ export class PromptStep implements Step<PromptStepSavedState> {
       (err: Error) => {
         globalThis.alert("Error saving prompt: " + err.message);
         ctx.onError();
-        this.continueButton?.setIdle();
+        this.continueButton!.setIdle();
       },
     );
   }

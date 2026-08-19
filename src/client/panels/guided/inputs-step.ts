@@ -57,11 +57,7 @@ export class InputsStep implements Step<InputsStepSavedState> {
     this.nextFolderNumber = this.computeNextFolderNumber();
     this.continueButton = new AsyncActionButton(
       container.querySelector<HTMLButtonElement>("#gi-continue")!,
-      {
-        idleLabel: "Import & Continue",
-        loadingLabel: "Importing...",
-        doneLabel: "Import & Continue",
-      },
+      { idleLabel: "Import & Continue", loadingLabel: "Importing..." },
     );
 
     container.querySelector<HTMLButtonElement>("#gi-add-column")!.addEventListener("click", () => {
@@ -187,11 +183,11 @@ export class InputsStep implements Step<InputsStepSavedState> {
     const inputValues: Record<string, string> = {};
     folderRows.forEach((r, i) => (inputValues[`driveFolder_${i}`] = r.url));
 
-    this.continueButton?.setLoading();
+    this.continueButton!.setLoading();
     prepRecipe({ cols, inputValues }).then(finish, (err: Error) => {
       globalThis.alert("Error importing Drive folder: " + err.message);
       ctx.onError();
-      this.continueButton?.setIdle();
+      this.continueButton!.setIdle();
     });
   }
 }
