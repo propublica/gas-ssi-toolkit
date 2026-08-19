@@ -1,4 +1,7 @@
 import type { Step, StepContext, StepFlowSavedState } from "../types";
+import { truncate } from "../format";
+
+const SUMMARY_MAX_LENGTH = 60;
 
 export class StepFlow {
   private readonly container: HTMLElement;
@@ -92,7 +95,7 @@ export class StepFlow {
 
     const summaryEl = row.querySelector<HTMLElement>(".step-summary")!;
     summaryEl.hidden = !collapsedNonTerminalComplete;
-    summaryEl.textContent = this.savedByIndex[index]?.summary ?? "";
+    summaryEl.textContent = truncate(this.savedByIndex[index]?.summary ?? "", SUMMARY_MAX_LENGTH);
 
     const expanded = status !== "locked" && !collapsedNonTerminalComplete;
     const flavorEl = row.querySelector<HTMLElement>(".step-flavor-text")!;

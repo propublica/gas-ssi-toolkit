@@ -1,9 +1,6 @@
 import type { Step, StepContext } from "../../types";
 import { AsyncActionButton } from "../../components/async-action-button";
-import { truncate } from "../../format";
 import { prepRecipe } from "../../services";
-
-const SUMMARY_MAX_LENGTH = 60;
 
 export const SYSTEM_PROMPT_COLUMN_TITLE = "System Prompt";
 
@@ -52,10 +49,7 @@ export class PromptStep implements Step<PromptStepSavedState> {
   unmount(): { savedState: PromptStepSavedState; summary: string } | undefined {
     if (!this.textarea) return undefined;
     const promptText = this.textarea.value;
-    return {
-      savedState: { promptText },
-      summary: truncate(`Prompt: ${promptText}`, SUMMARY_MAX_LENGTH),
-    };
+    return { savedState: { promptText }, summary: `Prompt: ${promptText}` };
   }
 
   private handleContinue(ctx: StepContext): void {

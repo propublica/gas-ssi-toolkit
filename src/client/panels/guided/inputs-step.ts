@@ -2,10 +2,7 @@ import type { Step, StepContext } from "../../types";
 import type { PrepColSpec, PromptColumnSpec } from "../../../shared/types";
 import { TokenInput } from "../../components/token-input";
 import { AsyncActionButton } from "../../components/async-action-button";
-import { truncate } from "../../format";
 import { prepRecipe } from "../../services";
-
-const SUMMARY_MAX_LENGTH = 60;
 
 export type InputRow =
   | { kind: "column"; colTitle: string }
@@ -79,9 +76,7 @@ export class InputsStep implements Step<InputsStepSavedState> {
     const rows = this.currentRows();
     const colTitles = rows.map((r) => r.colTitle).filter(Boolean);
     const summary =
-      colTitles.length > 0
-        ? truncate(`Columns: ${colTitles.join(", ")}`, SUMMARY_MAX_LENGTH)
-        : "No inputs selected";
+      colTitles.length > 0 ? `Columns: ${colTitles.join(", ")}` : "No inputs selected";
     return { savedState: { rows }, summary };
   }
 

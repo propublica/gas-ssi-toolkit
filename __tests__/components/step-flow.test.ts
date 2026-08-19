@@ -122,6 +122,42 @@ describe("StepFlow — onComplete for the terminal (last) step", () => {
   });
 });
 
+describe("StepFlow — summary truncation", () => {
+  it("truncates a long summary to 60 chars (with ellipsis) when rendering the collapsed step", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b]);
+    const longValue = "x".repeat(80);
+    a.setValue(longValue);
+    a.lastCtx!.onComplete();
+
+    const rendered = container.querySelector(".step-summary")!.textContent;
+    expect(rendered).toBe("x".repeat(60) + "…");
+  });
+
+  it("persists the full, untruncated summary in getValue() -- only rendering truncates", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    const flow = new StepFlow(container, [a, b]);
+    const longValue = "x".repeat(80);
+    a.setValue(longValue);
+    a.lastCtx!.onComplete();
+
+    const saved = flow.getValue();
+    expect(saved.steps[0].saved?.summary).toBe(longValue);
+  });
+
+  it("does not add an ellipsis when the summary is at or under the cap", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b]);
+    a.setValue("short");
+    a.lastCtx!.onComplete();
+
+    expect(container.querySelector(".step-summary")!.textContent).toBe("short");
+  });
+});
+
 describe("StepFlow — onError", () => {
   it("shows ✕ in place of the active step's icon without changing its status", () => {
     const [a] = [new FakeStep("A")];
