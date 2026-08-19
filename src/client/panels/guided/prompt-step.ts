@@ -34,7 +34,7 @@ export class PromptStep implements Step<PromptStepSavedState> {
   }
 
   mount(container: HTMLElement, ctx: StepContext, savedState?: PromptStepSavedState): void {
-    const gemLink = this.gemUrl
+    const gemLink = this.isHttpUrl(this.gemUrl)
       ? `<p class="guided-gem-link">Need help writing this? Try our
           <a href="${this.gemUrl}" target="_blank" rel="noopener noreferrer">Gemini Gem prompt assistant ↗</a></p>`
       : "";
@@ -53,6 +53,14 @@ export class PromptStep implements Step<PromptStepSavedState> {
     container.querySelector<HTMLButtonElement>("#gp-continue")!.addEventListener("click", () => {
       this.handleContinue(ctx);
     });
+  }
+
+  /** Guards against a misconfigured GEMINI_GEM_URL Script Property (e.g. a
+   * pasted javascript: or data: value) becoming a clickable, executing link.
+   * Not a domain allowlist -- the URL is intentionally admin-configurable to
+   * any http(s) destination. */
+  private isHttpUrl(url: string | undefined): url is string {
+    return !!url && /^https?:\/\//i.test(url);
   }
 
   unmount(): { savedState: PromptStepSavedState; summary: string } | undefined {

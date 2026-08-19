@@ -47,6 +47,14 @@ describe("PromptStep — Gemini Gem link", () => {
 
     expect(container.querySelector(".guided-gem-link")).toBeNull();
   });
+
+  it("omits the link for a non-http(s) scheme (e.g. a misconfigured javascript: URL)", () => {
+    const container = makeContainer();
+    const step = new PromptStep("javascript:alert(1)");
+    step.mount(container, makeCtx());
+
+    expect(container.querySelector(".guided-gem-link")).toBeNull();
+  });
 });
 
 describe("PromptStep — required prompt", () => {
