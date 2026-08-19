@@ -39,13 +39,12 @@ export class PromptStep implements Step<PromptStepSavedState> {
       <div id="gp-textarea-slot">
         <textarea id="gp-prompt-text" class="guided-prompt-textarea"></textarea>
       </div>
-      <button type="button" class="link-btn" id="gp-expand-btn">Expand ⤢</button>
+      <button type="button" class="btn-outline guided-expand-btn" id="gp-expand-btn">Expand ⤢</button>
       <button type="button" class="btn-run" id="gp-continue">Import &amp; Continue</button>
 
       <div class="guided-modal-overlay" id="gp-modal-overlay" hidden>
         <div class="guided-modal">
           <div class="guided-modal-header">
-            <span class="guided-modal-title">System prompt</span>
             <button type="button" class="guided-modal-close" id="gp-modal-close">Close</button>
           </div>
           <div id="gp-gem-link-modal"></div>

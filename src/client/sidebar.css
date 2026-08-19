@@ -1065,15 +1065,8 @@
 
         .guided-modal-header {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             margin-bottom: 4px;
-        }
-
-        .guided-modal-title {
-            font-size: var(--font-size-400);
-            font-weight: 500;
-            color: var(--text-main);
         }
 
         .guided-modal-close {
@@ -1091,6 +1084,13 @@
         .guided-modal .guided-prompt-textarea {
             min-height: 240px;
             margin-bottom: 0;
+        }
+
+        .guided-expand-btn {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 8px;
         }
 
         /* ── Switch-to-freeform link (RunStep) ── */
