@@ -158,3 +158,54 @@ describe("RunStep — unmount/mount round trip", () => {
     expect(container.querySelector<HTMLButtonElement>("#test-btn")!.textContent).toBe("Tested ✓");
   });
 });
+
+describe("RunStep — onUpstreamChange", () => {
+  it("flags a previously-fresh test result stale once an earlier step's promptCols change", async () => {
+    const matchingConfig = {
+      promptCols: [{ col: "NoteCol", kind: "auto" as const }],
+      systemPromptCol: undefined,
+      tools: [],
+      wrapPromptsInTags: true,
+      model: "gemini-3.1-flash-lite" as const,
+    };
+    const savedState = {
+      runControls: {
+        lastTest: {
+          stats: {
+            rowCount: 10,
+            totalTimeMs: 4200,
+            totalInputTokens: 500,
+            totalOutputTokens: 300,
+            totalTokenCost: 0.002,
+            totalGroundingQueries: 0,
+            totalGroundingCost: 0,
+            testedAt: 1234567890,
+            config: matchingConfig,
+          },
+          fullRowCount: 10,
+        },
+      },
+    };
+    const container = makeContainer();
+    const getPromptFields = jest.fn().mockReturnValue({ promptCols: matchingConfig.promptCols });
+    const step = new RunStep(getPromptFields, jest.fn());
+    step.mount(container, makeCtx(), savedState);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.textContent).toBe("Tested ✓");
+
+    // Simulate an earlier Guided step being edited and re-committed with a different column.
+    getPromptFields.mockReturnValue({ promptCols: [{ col: "OtherCol", kind: "auto" as const }] });
+    step.onUpstreamChange();
+
+    const results = container.querySelector<HTMLElement>("#test-results")!;
+    expect(results.textContent).toContain("Configuration changed since last test");
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.textContent).not.toBe(
+      "Tested ✓",
+    );
+  });
+
+  it("is a no-op before mount", () => {
+    const step = new RunStep(() => ({ promptCols: [] }), jest.fn());
+    expect(() => step.onUpstreamChange()).not.toThrow();
+  });
+});

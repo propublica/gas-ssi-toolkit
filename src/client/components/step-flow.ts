@@ -9,6 +9,9 @@ export class StepFlow {
   private statuses: Array<"locked" | "active" | "complete">;
   private savedByIndex: Array<{ savedState: unknown; summary: string } | undefined>;
   private hasErrorByIndex: boolean[];
+  /** activeIndex to restore on Cancel, recorded by editStep(); null when the
+   * step isn't currently mid-edit. */
+  private preEditActiveIndex: Array<number | null>;
   private activeIndex: number;
   private rowEls: HTMLElement[] = [];
 
@@ -27,6 +30,7 @@ export class StepFlow {
       this.activeIndex = 0;
     }
     this.hasErrorByIndex = steps.map(() => false);
+    this.preEditActiveIndex = steps.map(() => null);
 
     this.container.innerHTML = "";
     this.rowEls = steps.map((step, i) => this.buildRow(step, i));
@@ -84,6 +88,7 @@ export class StepFlow {
         <span class="step-icon">${this.iconFor(index)}</span>
         <span class="step-title-text">${step.title}</span>
         <button type="button" class="step-edit-btn" hidden>Edit</button>
+        <button type="button" class="step-cancel-btn" hidden>Cancel</button>
       </div>
       <p class="step-summary" hidden></p>
       <p class="step-flavor-text" hidden></p>
@@ -92,6 +97,9 @@ export class StepFlow {
     row
       .querySelector<HTMLButtonElement>(".step-edit-btn")!
       .addEventListener("click", () => this.editStep(index));
+    row
+      .querySelector<HTMLButtonElement>(".step-cancel-btn")!
+      .addEventListener("click", () => this.cancelEdit(index));
     this.applyRowDisplay(row, index, step);
     return row;
   }
@@ -99,8 +107,11 @@ export class StepFlow {
   private applyRowDisplay(row: HTMLElement, index: number, step: Step): void {
     const status = this.statuses[index];
     const collapsedNonTerminalComplete = status === "complete" && !this.isLastStep(index);
+    const editingExistingStep =
+      status === "active" && !this.isLastStep(index) && this.savedByIndex[index] !== undefined;
 
     row.querySelector<HTMLElement>(".step-edit-btn")!.hidden = !collapsedNonTerminalComplete;
+    row.querySelector<HTMLElement>(".step-cancel-btn")!.hidden = !editingExistingStep;
 
     const summaryEl = row.querySelector<HTMLElement>(".step-summary")!;
     summaryEl.hidden = !collapsedNonTerminalComplete;
@@ -144,12 +155,25 @@ export class StepFlow {
     const nextWasLocked = this.statuses[nextIndex] === "locked";
     if (nextWasLocked) this.statuses[nextIndex] = "active";
     this.activeIndex = nextIndex;
-    if (nextWasLocked) this.mountStep(nextIndex);
+    if (nextWasLocked) {
+      this.mountStep(nextIndex);
+    } else {
+      // This wasn't a first-time completion (nextIndex already progressed
+      // past locked) -- it's a re-commit after [Edit]. Downstream steps may
+      // have produced output from the old data; let them re-check it.
+      this.notifyUpstreamChange(index);
+    }
 
     this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
     this.applyRowDisplay(this.rowEls[nextIndex], nextIndex, this.steps[nextIndex]);
     this.updateIcon(index);
     this.updateIcon(nextIndex);
+  }
+
+  private notifyUpstreamChange(fromIndex: number): void {
+    for (let i = fromIndex + 1; i < this.steps.length; i++) {
+      this.steps[i].onUpstreamChange?.();
+    }
   }
 
   private handleError(index: number): void {
@@ -167,6 +191,7 @@ export class StepFlow {
 
   private editStep(index: number): void {
     const previousActive = this.activeIndex;
+    this.preEditActiveIndex[index] = previousActive;
     this.statuses[index] = "active";
     this.activeIndex = index;
     this.mountStep(index);
@@ -175,5 +200,24 @@ export class StepFlow {
     if (previousActive !== index) {
       this.applyRowDisplay(this.rowEls[previousActive], previousActive, this.steps[previousActive]);
     }
+  }
+
+  /** Discards whatever is currently typed in an edited step's form -- no
+   * unmount() call, so the cached savedState/summary from its last real
+   * completion is untouched -- and reverts it to collapsed/complete. An
+   * error icon from a failed commit attempt during this edit is left as-is
+   * (cleared only by a real onComplete()), so it persists as a visible
+   * reminder even though the underlying data reverted to the old good
+   * state. Restoring activeIndex is best-effort: a StepFlow freshly
+   * constructed from a saved state where this step was already active has
+   * no recorded pre-edit index to fall back to, so activeIndex is simply
+   * left as-is rather than skipping the cancel entirely. */
+  private cancelEdit(index: number): void {
+    const restoreIndex = this.preEditActiveIndex[index];
+    this.preEditActiveIndex[index] = null;
+    this.statuses[index] = "complete";
+    if (restoreIndex !== null) this.activeIndex = restoreIndex;
+    this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
+    this.updateIcon(index);
   }
 }

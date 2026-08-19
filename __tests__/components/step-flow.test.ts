@@ -3,7 +3,7 @@
  */
 
 import { StepFlow } from "../../src/client/components/step-flow";
-import type { Step, StepContext } from "../../src/client/types";
+import type { Step, StepContext, StepFlowSavedState } from "../../src/client/types";
 
 function makeContainer(): HTMLElement {
   document.body.innerHTML = '<div id="app"></div>';
@@ -15,6 +15,8 @@ class FakeStep implements Step<{ value: string }> {
   flavorText: string;
   mounted = false;
   mountCallCount = 0;
+  unmountCallCount = 0;
+  upstreamChangeCallCount = 0;
   lastCtx: StepContext | null = null;
   private value = "";
 
@@ -33,12 +35,17 @@ class FakeStep implements Step<{ value: string }> {
 
   unmount(): { savedState: { value: string }; summary: string } | undefined {
     if (!this.mounted) return undefined;
+    this.unmountCallCount++;
     this.mounted = false;
     return { savedState: { value: this.value }, summary: this.value || "empty" };
   }
 
   setValue(v: string): void {
     this.value = v;
+  }
+
+  onUpstreamChange(): void {
+    this.upstreamChangeCallCount++;
   }
 }
 
@@ -280,5 +287,130 @@ describe("StepFlow — getValue()/restore round trip", () => {
     expect(a2.mounted).toBe(false); // collapsed, not re-mounted
     expect(b2.mounted).toBe(true);
     expect(container.querySelector<HTMLInputElement>(".fake-step-input")!.value).toBe("draft");
+  });
+});
+
+describe("StepFlow — onUpstreamChange", () => {
+  it("does not notify downstream steps on a step's first-time completion", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b]);
+    a.lastCtx!.onComplete();
+    expect(b.upstreamChangeCallCount).toBe(0);
+  });
+
+  it("notifies every step after an edited step once it is re-completed", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStep("C")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete(); // a: complete, b: active
+    b.lastCtx!.onComplete(); // b: complete, c: active (terminal)
+
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    a.lastCtx!.onComplete(); // re-complete a
+
+    expect(b.upstreamChangeCallCount).toBe(1);
+    expect(c.upstreamChangeCallCount).toBe(1);
+  });
+});
+
+describe("StepFlow — Cancel", () => {
+  it("does not show Cancel on a step being completed for the first time", () => {
+    const [a] = [new FakeStep("A")];
+    const container = makeContainer();
+    new StepFlow(container, [a]);
+    expect(container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.hidden).toBe(true);
+  });
+
+  it("shows Cancel (and hides Edit) while re-editing a previously-completed step", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b]);
+    a.setValue("col_x");
+    a.lastCtx!.onComplete();
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click();
+
+    const row = container.querySelectorAll(".step-row")[0];
+    expect(row.querySelector<HTMLButtonElement>(".step-cancel-btn")!.hidden).toBe(false);
+    expect(row.querySelector<HTMLButtonElement>(".step-edit-btn")!.hidden).toBe(true);
+  });
+
+  it("discards in-progress edits and collapses back to the old summary, without unmounting or notifying downstream", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b]);
+    a.setValue("col_x");
+    a.lastCtx!.onComplete();
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click();
+    a.setValue("live-uncommitted-edit");
+
+    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+
+    const row = container.querySelectorAll(".step-row")[0];
+    expect(row.querySelector(".step-summary")!.textContent).toBe("col_x");
+    expect(row.querySelector<HTMLElement>(".step-body")!.hidden).toBe(true);
+    expect(container.querySelectorAll(".step-icon")[0].textContent).toBe("✓");
+    // unmount() ran once, for the original completion -- cancel must not add a second call.
+    expect(a.unmountCallCount).toBe(1);
+    expect(b.upstreamChangeCallCount).toBe(0);
+  });
+
+  it("restores activeIndex to what it was before the edit began", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    const flow = new StepFlow(container, [a, b]);
+    a.lastCtx!.onComplete(); // a: complete, b: active -> activeIndex 1
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a -> activeIndex 0
+    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+
+    expect(flow.getValue().activeStepIndex).toBe(1);
+  });
+
+  it("leaves an existing error icon in place after cancel", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b]);
+    a.lastCtx!.onComplete();
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click();
+    a.lastCtx!.onError(); // simulate a failed commit attempt during this edit
+
+    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+
+    expect(container.querySelectorAll(".step-icon")[0].textContent).toBe("✕");
+  });
+
+  it("still collapses correctly when constructed from a saved state with no recorded pre-edit index to restore", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    const restored: StepFlowSavedState = {
+      activeStepIndex: 0,
+      steps: [
+        { status: "active", saved: { savedState: { value: "col_x" }, summary: "col_x" } },
+        { status: "locked", saved: undefined },
+      ],
+    };
+    new StepFlow(container, [a, b], restored);
+
+    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+
+    const row = container.querySelectorAll(".step-row")[0];
+    expect(row.querySelector(".step-summary")!.textContent).toBe("col_x");
+    expect(row.querySelector<HTMLElement>(".step-body")!.hidden).toBe(true);
+  });
+
+  it("does not throw when a downstream step doesn't implement onUpstreamChange", () => {
+    const a = new FakeStep("A");
+    const bareStep: Step = {
+      title: "B",
+      flavorText: "",
+      mount: () => {},
+      unmount: () => undefined,
+    };
+    const container = makeContainer();
+    new StepFlow(container, [a, bareStep]);
+    a.lastCtx!.onComplete(); // a: complete, bareStep: active (first-time -- no notify yet)
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+
+    expect(() => a.lastCtx!.onComplete()).not.toThrow();
   });
 });

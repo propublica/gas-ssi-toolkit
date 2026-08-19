@@ -68,6 +68,13 @@ export interface Step<S = unknown> {
    * is entirely derivable from their own savedState should implement this;
    * omit it if nothing downstream depends on this step's derived state. */
   hydrate?(savedState: S): void;
+  /** Optional. Called by the shell on every step after one that was just
+   * re-completed following an [Edit] (i.e., an upstream step's committed
+   * data changed, so any output here that depends on it may now be stale).
+   * Not called for a step's first-ever completion, since nothing downstream
+   * has produced output yet at that point. Steps with nothing to
+   * invalidate/re-check should omit it. */
+  onUpstreamChange?(): void;
 }
 
 export interface StepFlowSavedState {

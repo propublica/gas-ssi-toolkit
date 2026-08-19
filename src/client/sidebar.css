@@ -922,6 +922,18 @@
 
         .step-edit-btn:hover { text-decoration: underline; }
 
+        .step-cancel-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-family: var(--font-family);
+            font-size: var(--font-size-200);
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .step-cancel-btn:hover { text-decoration: underline; }
+
         .step-summary {
             font-size: var(--font-size-200);
             font-style: italic;
