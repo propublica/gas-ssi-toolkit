@@ -1,4 +1,4 @@
-import { formatDuration } from "../src/client/format";
+import { formatDuration, truncate } from "../src/client/format";
 
 describe("formatDuration", () => {
   it("formats sub-minute durations as seconds with one decimal", () => {
@@ -28,5 +28,20 @@ describe("formatDuration", () => {
     // 119.6s -> naive floor/round-separately math could produce "1m 60s"; must
     // round the total first, then derive minutes/seconds from the rounded value.
     expect(formatDuration(119600)).toBe("2m 0s");
+  });
+});
+
+describe("truncate", () => {
+  it("returns the string unchanged when at or under maxLength", () => {
+    expect(truncate("hello", 5)).toBe("hello");
+    expect(truncate("hi", 5)).toBe("hi");
+  });
+
+  it("cuts to maxLength and appends an ellipsis when over the limit", () => {
+    expect(truncate("hello world", 5)).toBe("hello…");
+  });
+
+  it("counts a prefix baked into the string against the limit, not just the content after it", () => {
+    expect(truncate("Prompt: " + "x".repeat(80), 60)).toBe("Prompt: " + "x".repeat(52) + "…");
   });
 });

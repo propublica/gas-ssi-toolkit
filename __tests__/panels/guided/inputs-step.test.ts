@@ -236,6 +236,30 @@ describe("InputsStep — unmount/mount round trip", () => {
     expect(result?.summary).toBe("No inputs selected");
   });
 
+  it("truncates a long column-list summary (including the 'Columns: ' prefix) to 60 chars", () => {
+    const longHeaders = [
+      "a_very_long_column_name_one",
+      "another_very_long_column_name_two",
+      "yet_another_column_three",
+    ];
+    const container = makeContainer();
+    const step = new InputsStep(longHeaders);
+    step.mount(container, makeCtx());
+    for (const header of longHeaders) {
+      container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+      const rows = container.querySelectorAll(".guided-input-row");
+      const row = rows[rows.length - 1]!;
+      row.querySelector<HTMLElement>(".token-add-btn")!.click();
+      row.querySelector<HTMLElement>(`.token-option[data-value="${header}"]`)!.click();
+    }
+    const result = step.unmount();
+    // truncate() slices to 60 chars, then appends "…" on top -- total length
+    // is 61, not 60.
+    expect(result?.summary.length).toBe(61);
+    expect(result?.summary.endsWith("…")).toBe(true);
+    expect(result?.summary.startsWith("Columns: ")).toBe(true);
+  });
+
   it("unmount() before mount returns undefined", () => {
     const step = new InputsStep([]);
     expect(step.unmount()).toBeUndefined();

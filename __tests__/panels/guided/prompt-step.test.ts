@@ -120,14 +120,15 @@ describe("PromptStep — commit", () => {
 });
 
 describe("PromptStep — unmount/mount round trip", () => {
-  it("unmount() truncates a long prompt to a 60-char summary with an ellipsis", () => {
+  it("unmount() truncates a long summary (including the 'Prompt: ' prefix) to 60 chars with an ellipsis", () => {
     const container = makeContainer();
     const step = new PromptStep();
     step.mount(container, makeCtx());
     const long = "x".repeat(80);
     container.querySelector<HTMLTextAreaElement>("#gp-prompt-text")!.value = long;
     const result = step.unmount();
-    expect(result?.summary).toBe("Prompt: " + "x".repeat(60) + "…");
+    // "Prompt: " (8 chars) counts against the 60-char cap, leaving 52 x's.
+    expect(result?.summary).toBe("Prompt: " + "x".repeat(52) + "…");
     expect(result?.savedState.promptText).toBe(long);
   });
 
