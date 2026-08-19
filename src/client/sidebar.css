@@ -1086,11 +1086,14 @@
             margin-bottom: 0;
         }
 
-        .guided-expand-btn {
-            display: block;
-            width: 100%;
-            box-sizing: border-box;
+        .guided-expand-row {
+            display: flex;
+            justify-content: flex-end;
             margin-bottom: 8px;
+        }
+
+        .guided-expand-row .link-btn {
+            padding-top: 0;
         }
 
         /* ── Switch-to-freeform link (RunStep) ── */
