@@ -116,6 +116,27 @@ describe("RunStep — Switch to Freeform", () => {
       }),
     );
   });
+
+  it("carries forward Guided's fixed applyMarkdown/wrapPromptsInTags settings, matching what RunControls actually ran with", async () => {
+    const onSwitchToFreeform = jest.fn();
+    const container = makeContainer();
+    const step = new RunStep(
+      () => ({ promptCols: [{ col: "a", kind: "auto" as const }] }),
+      onSwitchToFreeform,
+    );
+    step.mount(container, makeCtx());
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    container.querySelector<HTMLButtonElement>("#gr-switch-to-freeform")!.click();
+
+    // objectContaining({wrapPromptsInTags: undefined}) would pass even if the
+    // key were omitted entirely (the exact bug this guards against), so we
+    // assert the key's presence explicitly rather than just its value.
+    const callArg = onSwitchToFreeform.mock.calls[0][0];
+    expect(callArg.applyMarkdown).toBe(true);
+    expect(callArg).toHaveProperty("wrapPromptsInTags");
+    expect(callArg.wrapPromptsInTags).toBeUndefined();
+  });
 });
 
 describe("RunStep — unmount/mount round trip", () => {

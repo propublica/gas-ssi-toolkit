@@ -44,6 +44,13 @@ class FakeStep implements Step<{ value: string }> {
   }
 }
 
+class FakeStepWithDestroy extends FakeStep {
+  destroyCallCount = 0;
+  destroy(): void {
+    this.destroyCallCount++;
+  }
+}
+
 describe("StepFlow — initial render", () => {
   it("mounts only step 0, others locked", () => {
     const [a, b] = [new FakeStep("A"), new FakeStep("B")];
@@ -326,6 +333,27 @@ describe("StepFlow — uncompleting downstream steps on edit", () => {
     const rows = container.querySelectorAll(".step-row");
     expect(container.querySelectorAll(".step-icon")[1].textContent).toBe("●");
     expect(rows[1].querySelector<HTMLElement>(".step-body")!.hidden).toBe(false); // still expanded
+  });
+});
+
+describe("StepFlow — destroy()", () => {
+  it("calls destroy() on every step that implements it, mounted or collapsed", () => {
+    const [a, b] = [new FakeStepWithDestroy("A"), new FakeStepWithDestroy("B")];
+    const container = makeContainer();
+    const flow = new StepFlow(container, [a, b]);
+    a.lastCtx!.onComplete(); // a: complete/collapsed, b: active/mounted
+
+    flow.destroy();
+
+    expect(a.destroyCallCount).toBe(1);
+    expect(b.destroyCallCount).toBe(1);
+  });
+
+  it("does not throw for steps that don't implement destroy()", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    const flow = new StepFlow(container, [a, b]);
+    expect(() => flow.destroy()).not.toThrow();
   });
 });
 

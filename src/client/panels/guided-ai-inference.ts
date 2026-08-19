@@ -10,6 +10,7 @@ import { PanelLoader } from "../components/panel-loader";
 export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedState> {
   private stepFlow: StepFlow | null = null;
   private inputsStep: InputsStep | null = null;
+  private runStep: RunStep | null = null;
   private nav: NavigationContext | null = null;
 
   mount(
@@ -20,6 +21,7 @@ export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedSta
   ): void {
     this.nav = nav;
     this.inputsStep = null;
+    this.runStep = null;
     container.innerHTML = this.template();
     container.querySelector("#back-btn")?.addEventListener("click", () => nav.back());
     container
@@ -42,6 +44,7 @@ export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedSta
             }),
             (config: Partial<RunConfig>) => nav.navigate("configure-ai-run", config),
           );
+          this.runStep = runStep;
           this.stepFlow = new StepFlow(
             container.querySelector("#steps-container")!,
             [inputsStep, promptStep, runStep],
@@ -57,18 +60,23 @@ export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedSta
   }
 
   unmount(): StepFlowSavedState | undefined {
-    return this.stepFlow?.getValue();
+    const value = this.stepFlow?.getValue();
+    this.stepFlow?.destroy();
+    return value;
   }
 
   private handleRefresh(container: HTMLElement): void {
     const btn = container.querySelector<HTMLButtonElement>("#refresh-btn")!;
     btn.classList.add("spinning");
     btn.disabled = true;
-    getSheetHeaders()
-      .then(
+    Promise.all([
+      getSheetHeaders().then(
         (headers) => this.inputsStep?.updateHeaders(headers),
         (err: Error) => globalThis.alert("Error refreshing columns: " + err.message),
-      )
+      ),
+      this.runStep?.refreshRowRange(),
+    ])
+      .then(() => this.runStep?.checkTestStatsFreshness())
       .finally(() => {
         btn.classList.remove("spinning");
         btn.disabled = false;

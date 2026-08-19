@@ -41,6 +41,12 @@ export class StepFlow {
     });
   }
 
+  /** Tears down every step's own resources (see Step.destroy). Call this only
+   * when the flow itself is being discarded, not on every getValue(). */
+  destroy(): void {
+    this.steps.forEach((step) => step.destroy?.());
+  }
+
   getValue(): StepFlowSavedState {
     this.steps.forEach((_, i) => {
       if (this.isMountedState(i)) this.recordUnmount(i, this.steps[i].unmount());

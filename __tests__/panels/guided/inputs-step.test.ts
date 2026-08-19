@@ -317,3 +317,19 @@ describe("InputsStep — unmount/mount round trip", () => {
     expect(step.unmount()).toBeUndefined();
   });
 });
+
+describe("InputsStep — destroy()", () => {
+  it("tears down every row's TokenInput document-level click listener", () => {
+    const container = makeContainer();
+    const step = new InputsStep(["col_a", "col_b"]);
+    step.mount(container, makeCtx());
+    container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+    container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+
+    const removeSpy = jest.spyOn(document, "removeEventListener");
+    step.destroy();
+
+    expect(removeSpy.mock.calls.filter((call) => call[0] === "click")).toHaveLength(2);
+    removeSpy.mockRestore();
+  });
+});

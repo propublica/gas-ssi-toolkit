@@ -64,6 +64,11 @@ export class RunStep implements Step<RunStepSavedState> {
           tools: runControlsValue.tools,
           includeGrounding: runControlsValue.includeGrounding,
           model: runControlsValue.model,
+          // Must match the constants passed to RunControls via getPromptConfig()
+          // above -- Guided AI Inference always runs with markdown formatting on
+          // and no explicit tag-wrapping override.
+          applyMarkdown: true,
+          wrapPromptsInTags: undefined,
         });
       });
   }
@@ -71,5 +76,16 @@ export class RunStep implements Step<RunStepSavedState> {
   unmount(): { savedState: RunStepSavedState; summary: string } | undefined {
     if (!this.runControls) return undefined;
     return { savedState: { runControls: this.runControls.getValue() }, summary: "" };
+  }
+
+  /** Mirrors ConfigureAIRunPanel's refresh behavior for the Run step's own
+   * RunControls. No-op if this step hasn't been mounted yet (e.g. the user
+   * is still on an earlier step) -- there's nothing live to refresh. */
+  refreshRowRange(): Promise<void> {
+    return this.runControls?.refreshRowRange() ?? Promise.resolve();
+  }
+
+  checkTestStatsFreshness(): void {
+    this.runControls?.checkTestStatsFreshness();
   }
 }

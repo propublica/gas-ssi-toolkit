@@ -68,6 +68,12 @@ export interface Step<S = unknown> {
    * is entirely derivable from their own savedState should implement this;
    * omit it if nothing downstream depends on this step's derived state. */
   hydrate?(savedState: S): void;
+  /** Optional. Tears down anything unmount() doesn't (and can't, since
+   * unmount() is also called on steps that remain visibly mounted -- see
+   * StepFlow.getValue()) -- e.g. a step's own TokenInput instances, whose
+   * document-level listeners outlive their container's DOM otherwise.
+   * Called by StepFlow.destroy() when the whole flow is being discarded. */
+  destroy?(): void;
 }
 
 export interface StepFlowSavedState {

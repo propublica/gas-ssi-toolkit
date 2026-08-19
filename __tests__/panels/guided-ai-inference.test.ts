@@ -133,6 +133,51 @@ describe("GuidedAIInferencePanel — refresh columns", () => {
     expect(globalThis.alert).toHaveBeenCalledWith(expect.stringContaining("boom"));
     expect(container.querySelector<HTMLButtonElement>("#refresh-btn")!.disabled).toBe(false);
   });
+
+  it("once Step 3 is reached, refresh also re-fetches its row-range default (mirrors ConfigureAIRunPanel)", async () => {
+    (services.prepRecipe as jest.Mock).mockResolvedValue({ rowRange: { start: 2, end: 5 } });
+    const { container } = await mountAndLoad();
+
+    // Reach Step 3 so RunStep's RunControls actually mounts.
+    container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+    container.querySelector<HTMLElement>(".token-add-btn")!.click();
+    container.querySelector<HTMLElement>('.token-option[data-value="NoteCol"]')!.click();
+    container.querySelector<HTMLButtonElement>("#gi-continue")!.click();
+    await Promise.resolve();
+    container.querySelector<HTMLTextAreaElement>("#gp-prompt-text")!.value = "Summarize this.";
+    container.querySelector<HTMLButtonElement>("#gp-continue")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    const callsBefore = (services.getDefaultRowRange as jest.Mock).mock.calls.length;
+    container.querySelector<HTMLButtonElement>("#refresh-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(services.getDefaultRowRange as jest.Mock).toHaveBeenCalledTimes(callsBefore + 1);
+  });
+
+  it("refresh before Step 3 is reached does not throw (RunStep not yet mounted)", async () => {
+    const { container } = await mountAndLoad();
+    container.querySelector<HTMLButtonElement>("#refresh-btn")!.click();
+    await expect(
+      (async () => {
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+      })(),
+    ).resolves.not.toThrow();
+  });
+});
+
+describe("GuidedAIInferencePanel — unmount cleanup", () => {
+  it("tears down Step 1's TokenInput document-level listeners on unmount", async () => {
+    const { container, panel } = await mountAndLoad();
+    container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+    container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+
+    const removeSpy = jest.spyOn(document, "removeEventListener");
+    panel.unmount();
+
+    expect(removeSpy.mock.calls.filter((call) => call[0] === "click")).toHaveLength(2);
+    removeSpy.mockRestore();
+  });
 });
 
 describe("GuidedAIInferencePanel — end-to-end step progression", () => {
