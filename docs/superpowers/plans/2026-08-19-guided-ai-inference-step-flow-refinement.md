@@ -1184,7 +1184,34 @@ function makeCtx(): StepContext & {
 Run: `npm run typecheck`
 Expected: FAIL — `src/client/components/step-flow.ts`'s `mountStep()` constructs a `StepContext` object literal missing `onBusyChange`, so it no longer satisfies the interface. This is the expected, deliberate failure this step's next part fixes.
 
-- [ ] **Step 3: Wire `onBusyChange` into `StepFlow`**
+- [ ] **Step 3: Write the failing test for Cancel being disabled while busy**
+
+Add to `__tests__/components/step-flow.test.ts`, as a new top-level `describe` block:
+
+```ts
+describe("StepFlow — Cancel disabled while busy", () => {
+  it("disables Cancel while the step reports itself busy, and re-enables it once idle", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b]);
+    a.lastCtx!.onComplete(); // a: complete, b: active
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+
+    a.lastCtx!.onBusyChange(true);
+    expect(container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.disabled).toBe(true);
+
+    a.lastCtx!.onBusyChange(false);
+    expect(container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.disabled).toBe(false);
+  });
+});
+```
+
+- [ ] **Step 4: Run it to verify it fails**
+
+Run: `npx jest __tests__/components/step-flow.test.ts -t "Cancel disabled while busy"`
+Expected: FAIL — `a.lastCtx!.onBusyChange is not a function` (the real `StepContext` built by `mountStep()` doesn't supply it yet).
+
+- [ ] **Step 5: Wire `onBusyChange` into `StepFlow`**
 
 In `src/client/components/step-flow.ts`, add a field right after `private hasErrorByIndex: boolean[];`:
 
@@ -1244,36 +1271,12 @@ to:
     cancelBtn.disabled = this.busyByIndex[index];
 ```
 
-- [ ] **Step 4: Write the failing test for Cancel being disabled while busy**
-
-Add to `__tests__/components/step-flow.test.ts`, as a new top-level `describe` block:
-
-```ts
-describe("StepFlow — Cancel disabled while busy", () => {
-  it("disables Cancel while the step reports itself busy, and re-enables it once idle", () => {
-    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
-    const container = makeContainer();
-    new StepFlow(container, [a, b]);
-    a.lastCtx!.onComplete(); // a: complete, b: active
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
-
-    a.lastCtx!.onBusyChange(true);
-    expect(container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.disabled).toBe(true);
-
-    a.lastCtx!.onBusyChange(false);
-    expect(container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.disabled).toBe(false);
-  });
-});
-```
-
-- [ ] **Step 5: Run it to verify it fails, then run the full suite to verify it now passes**
+- [ ] **Step 6: Run it to verify it passes**
 
 Run: `npx jest __tests__/components/step-flow.test.ts -v`
-Expected: first run (before Step 3's implementation) FAILs with `onBusyChange is not a function`; after Step 3's implementation, PASS.
+Expected: PASS — all tests, including every test from Tasks 1-3.
 
-(If executing this plan strictly TDD-by-task rather than TDD-by-file, write this test immediately before Step 3's implementation instead — either ordering is fine as long as the test is proven to fail against the pre-Step-3 code once.)
-
-- [ ] **Step 6: Write the failing tests for `InputsStep`/`PromptStep` calling `onBusyChange`**
+- [ ] **Step 7: Write the failing tests for `InputsStep`/`PromptStep` calling `onBusyChange`**
 
 Add to `__tests__/panels/guided/inputs-step.test.ts`, as a new top-level `describe` block:
 
@@ -1373,12 +1376,12 @@ describe("PromptStep — onBusyChange", () => {
 });
 ```
 
-- [ ] **Step 7: Run the new tests to verify they fail**
+- [ ] **Step 8: Run the new tests to verify they fail**
 
 Run: `npx jest __tests__/panels/guided/inputs-step.test.ts __tests__/panels/guided/prompt-step.test.ts -t "onBusyChange"`
 Expected: FAIL — neither step calls `ctx.onBusyChange` anywhere yet.
 
-- [ ] **Step 8: Implement `onBusyChange` calls in `InputsStep.handleContinue`**
+- [ ] **Step 9: Implement `onBusyChange` calls in `InputsStep.handleContinue`**
 
 In `src/client/panels/guided/inputs-step.ts`, replace the `handleContinue` method:
 
@@ -1466,7 +1469,7 @@ with:
   }
 ```
 
-- [ ] **Step 9: Implement `onBusyChange` calls in `PromptStep.handleContinue`**
+- [ ] **Step 10: Implement `onBusyChange` calls in `PromptStep.handleContinue`**
 
 In `src/client/panels/guided/prompt-step.ts`, replace the `handleContinue` method:
 
@@ -1537,12 +1540,12 @@ with:
   }
 ```
 
-- [ ] **Step 10: Run the new tests to verify they pass**
+- [ ] **Step 11: Run the new tests to verify they pass**
 
 Run: `npx jest __tests__/panels/guided/inputs-step.test.ts __tests__/panels/guided/prompt-step.test.ts -v`
 Expected: PASS.
 
-- [ ] **Step 11: Add `:disabled` styling for `.step-cancel-btn`**
+- [ ] **Step 12: Add `:disabled` styling for `.step-cancel-btn`**
 
 In `src/client/sidebar.css`, right after the existing `.step-cancel-btn:hover { text-decoration: underline; }` rule, add:
 
@@ -1550,7 +1553,7 @@ In `src/client/sidebar.css`, right after the existing `.step-cancel-btn:hover { 
 .step-cancel-btn:disabled { opacity: 0.4; cursor: default; }
 ```
 
-- [ ] **Step 12: Run the full suite (including typecheck) and commit**
+- [ ] **Step 13: Run the full suite (including typecheck) and commit**
 
 Run: `npm run typecheck && npm test`
 Expected: PASS (both).
