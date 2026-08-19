@@ -220,12 +220,20 @@ describe("InputsStep — unmount/mount round trip", () => {
     container.querySelector<HTMLElement>('.token-option[data-value="col_a"]')!.click();
 
     const result = step.unmount();
-    expect(result?.summary).toBe("col_a");
+    expect(result?.summary).toBe("Columns: col_a");
     expect(result?.savedState.rows).toEqual([{ kind: "column", colTitle: "col_a" }]);
 
     const step2 = new InputsStep(["col_a"]);
     step2.mount(container, makeCtx(), result?.savedState);
     expect(container.querySelectorAll(".guided-input-row")).toHaveLength(1);
+  });
+
+  it("unmount() summary reads 'No inputs selected' (unprefixed) when no rows are filled in", () => {
+    const container = makeContainer();
+    const step = new InputsStep(["col_a"]);
+    step.mount(container, makeCtx());
+    const result = step.unmount();
+    expect(result?.summary).toBe("No inputs selected");
   });
 
   it("unmount() before mount returns undefined", () => {

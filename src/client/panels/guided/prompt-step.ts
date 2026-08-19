@@ -49,8 +49,8 @@ export class PromptStep implements Step<PromptStepSavedState> {
   unmount(): { savedState: PromptStepSavedState; summary: string } | undefined {
     if (!this.textarea) return undefined;
     const promptText = this.textarea.value;
-    const summary = promptText.length > 60 ? promptText.slice(0, 60) + "…" : promptText;
-    return { savedState: { promptText }, summary };
+    const truncated = promptText.length > 60 ? promptText.slice(0, 60) + "…" : promptText;
+    return { savedState: { promptText }, summary: `Prompt: ${truncated}` };
   }
 
   private handleContinue(ctx: StepContext): void {

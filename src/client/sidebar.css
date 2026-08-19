@@ -924,6 +924,7 @@
 
         .step-summary {
             font-size: var(--font-size-200);
+            font-style: italic;
             color: var(--text-secondary);
             margin: 4px 0 0 28px;
         }

@@ -74,11 +74,9 @@ export class InputsStep implements Step<InputsStepSavedState> {
   unmount(): { savedState: InputsStepSavedState; summary: string } | undefined {
     if (!this.container) return undefined;
     const rows = this.currentRows();
+    const colTitles = rows.map((r) => r.colTitle).filter(Boolean);
     const summary =
-      rows
-        .map((r) => r.colTitle)
-        .filter(Boolean)
-        .join(", ") || "No inputs selected";
+      colTitles.length > 0 ? `Columns: ${colTitles.join(", ")}` : "No inputs selected";
     return { savedState: { rows }, summary };
   }
 

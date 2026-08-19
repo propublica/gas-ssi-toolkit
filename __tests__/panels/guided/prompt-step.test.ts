@@ -127,7 +127,7 @@ describe("PromptStep — unmount/mount round trip", () => {
     const long = "x".repeat(80);
     container.querySelector<HTMLTextAreaElement>("#gp-prompt-text")!.value = long;
     const result = step.unmount();
-    expect(result?.summary).toBe("x".repeat(60) + "…");
+    expect(result?.summary).toBe("Prompt: " + "x".repeat(60) + "…");
     expect(result?.savedState.promptText).toBe(long);
   });
 
