@@ -159,9 +159,10 @@ export class StepFlow {
       this.mountStep(nextIndex);
     } else {
       // This wasn't a first-time completion (nextIndex already progressed
-      // past locked) -- it's a re-commit after [Edit]. Downstream steps may
-      // have produced output from the old data; let them re-check it.
-      this.notifyUpstreamChange(index);
+      // past locked) -- it's a re-commit after [Edit]. A downstream step's
+      // "complete" status is no longer trustworthy once something it
+      // depends on has changed underneath it.
+      this.uncompleteDownstreamSteps(index);
     }
 
     this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
@@ -170,9 +171,18 @@ export class StepFlow {
     this.updateIcon(nextIndex);
   }
 
-  private notifyUpstreamChange(fromIndex: number): void {
+  /** Reverts every already-complete step after fromIndex back to "active" --
+   * a downstream step's completion no longer means anything once something
+   * it depends on has been recommitted. For a non-terminal step this
+   * re-expands it (the same mounted DOM/state it left off with, not a fresh
+   * mount); for the terminal step, which never collapses, it only flips the
+   * checklist icon. */
+  private uncompleteDownstreamSteps(fromIndex: number): void {
     for (let i = fromIndex + 1; i < this.steps.length; i++) {
-      this.steps[i].onUpstreamChange?.();
+      if (this.statuses[i] !== "complete") continue;
+      this.statuses[i] = "active";
+      this.applyRowDisplay(this.rowEls[i], i, this.steps[i]);
+      this.updateIcon(i);
     }
   }
 

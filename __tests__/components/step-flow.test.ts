@@ -16,7 +16,6 @@ class FakeStep implements Step<{ value: string }> {
   mounted = false;
   mountCallCount = 0;
   unmountCallCount = 0;
-  upstreamChangeCallCount = 0;
   lastCtx: StepContext | null = null;
   private value = "";
 
@@ -42,10 +41,6 @@ class FakeStep implements Step<{ value: string }> {
 
   setValue(v: string): void {
     this.value = v;
-  }
-
-  onUpstreamChange(): void {
-    this.upstreamChangeCallCount++;
   }
 }
 
@@ -290,27 +285,47 @@ describe("StepFlow — getValue()/restore round trip", () => {
   });
 });
 
-describe("StepFlow — onUpstreamChange", () => {
-  it("does not notify downstream steps on a step's first-time completion", () => {
+describe("StepFlow — uncompleting downstream steps on edit", () => {
+  it("does not affect anything on a step's first-time completion", () => {
     const [a, b] = [new FakeStep("A"), new FakeStep("B")];
     const container = makeContainer();
     new StepFlow(container, [a, b]);
-    a.lastCtx!.onComplete();
-    expect(b.upstreamChangeCallCount).toBe(0);
+    a.lastCtx!.onComplete(); // a: complete, b: active (nothing downstream was ever complete)
+
+    expect(container.querySelectorAll(".step-icon")[1].textContent).toBe("●");
   });
 
-  it("notifies every step after an edited step once it is re-completed", () => {
+  it("reverts a downstream non-terminal step from complete back to active, re-expanding it", () => {
     const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStep("C")];
     const container = makeContainer();
     new StepFlow(container, [a, b, c]);
     a.lastCtx!.onComplete(); // a: complete, b: active
+    b.setValue("b-value");
     b.lastCtx!.onComplete(); // b: complete, c: active (terminal)
 
     container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
     a.lastCtx!.onComplete(); // re-complete a
 
-    expect(b.upstreamChangeCallCount).toBe(1);
-    expect(c.upstreamChangeCallCount).toBe(1);
+    const rows = container.querySelectorAll(".step-row");
+    expect(container.querySelectorAll(".step-icon")[1].textContent).toBe("●");
+    expect(rows[1].querySelector<HTMLElement>(".step-body")!.hidden).toBe(false);
+    expect(rows[1].querySelector<HTMLElement>(".step-summary")!.hidden).toBe(true);
+  });
+
+  it("flips the terminal step's icon back to in-progress without collapsing it", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b]);
+    a.lastCtx!.onComplete(); // a: complete, b: active (terminal)
+    b.lastCtx!.onComplete(); // b: complete (terminal, stays expanded)
+    expect(container.querySelectorAll(".step-icon")[1].textContent).toBe("✓");
+
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    a.lastCtx!.onComplete(); // re-complete a
+
+    const rows = container.querySelectorAll(".step-row");
+    expect(container.querySelectorAll(".step-icon")[1].textContent).toBe("●");
+    expect(rows[1].querySelector<HTMLElement>(".step-body")!.hidden).toBe(false); // still expanded
   });
 });
 
@@ -335,10 +350,10 @@ describe("StepFlow — Cancel", () => {
     expect(row.querySelector<HTMLButtonElement>(".step-edit-btn")!.hidden).toBe(true);
   });
 
-  it("discards in-progress edits and collapses back to the old summary, without unmounting or notifying downstream", () => {
+  it("discards in-progress edits and collapses back to the old summary, without unmounting or affecting downstream", () => {
     const [a, b] = [new FakeStep("A"), new FakeStep("B")];
     const container = makeContainer();
-    new StepFlow(container, [a, b]);
+    const flow = new StepFlow(container, [a, b]);
     a.setValue("col_x");
     a.lastCtx!.onComplete();
     container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click();
@@ -352,7 +367,7 @@ describe("StepFlow — Cancel", () => {
     expect(container.querySelectorAll(".step-icon")[0].textContent).toBe("✓");
     // unmount() ran once, for the original completion -- cancel must not add a second call.
     expect(a.unmountCallCount).toBe(1);
-    expect(b.upstreamChangeCallCount).toBe(0);
+    expect(flow.getValue().steps[1].status).toBe("active"); // b untouched by a's cancel
   });
 
   it("restores activeIndex to what it was before the edit began", () => {
@@ -396,21 +411,5 @@ describe("StepFlow — Cancel", () => {
     const row = container.querySelectorAll(".step-row")[0];
     expect(row.querySelector(".step-summary")!.textContent).toBe("col_x");
     expect(row.querySelector<HTMLElement>(".step-body")!.hidden).toBe(true);
-  });
-
-  it("does not throw when a downstream step doesn't implement onUpstreamChange", () => {
-    const a = new FakeStep("A");
-    const bareStep: Step = {
-      title: "B",
-      flavorText: "",
-      mount: () => {},
-      unmount: () => undefined,
-    };
-    const container = makeContainer();
-    new StepFlow(container, [a, bareStep]);
-    a.lastCtx!.onComplete(); // a: complete, bareStep: active (first-time -- no notify yet)
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
-
-    expect(() => a.lastCtx!.onComplete()).not.toThrow();
   });
 });

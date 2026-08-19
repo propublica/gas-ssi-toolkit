@@ -72,8 +72,4 @@ export class RunStep implements Step<RunStepSavedState> {
     if (!this.runControls) return undefined;
     return { savedState: { runControls: this.runControls.getValue() }, summary: "" };
   }
-
-  onUpstreamChange(): void {
-    this.runControls?.checkTestStatsFreshness();
-  }
 }
