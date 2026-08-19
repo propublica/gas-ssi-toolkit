@@ -112,18 +112,26 @@ export class StepFlow {
 
   private applyRowDisplay(row: HTMLElement, index: number, step: Step): void {
     const status = this.statuses[index];
-    const collapsedNonTerminalComplete = status === "complete" && !this.isLastStep(index);
+    const expanded = this.isMountedState(index);
+    // Only a genuinely "complete" step offers [Edit] -- a relocked step must
+    // be reached by walking forward through the intervening locked steps,
+    // not jumped to directly.
+    const isEditable = status === "complete" && !this.isLastStep(index);
+    // Independent of isEditable: any collapsed, non-terminal step with
+    // cached data shows its summary, whether that's because it's complete
+    // OR because it relocked with its old data still intact.
+    const hasSummary =
+      !expanded && !this.isLastStep(index) && this.savedByIndex[index] !== undefined;
     const editingExistingStep =
       status === "active" && !this.isLastStep(index) && this.savedByIndex[index] !== undefined;
 
-    row.querySelector<HTMLElement>(".step-edit-btn")!.hidden = !collapsedNonTerminalComplete;
+    row.querySelector<HTMLElement>(".step-edit-btn")!.hidden = !isEditable;
     row.querySelector<HTMLElement>(".step-cancel-btn")!.hidden = !editingExistingStep;
 
     const summaryEl = row.querySelector<HTMLElement>(".step-summary")!;
-    summaryEl.hidden = !collapsedNonTerminalComplete;
+    summaryEl.hidden = !hasSummary;
     summaryEl.textContent = this.savedByIndex[index]?.summary ?? "";
 
-    const expanded = status !== "locked" && !collapsedNonTerminalComplete;
     const flavorEl = row.querySelector<HTMLElement>(".step-flavor-text")!;
     flavorEl.hidden = !expanded || step.flavorText === "";
     flavorEl.textContent = step.flavorText;
@@ -159,17 +167,15 @@ export class StepFlow {
 
     const nextIndex = index + 1;
     const nextWasLocked = this.statuses[nextIndex] === "locked";
-    if (nextWasLocked) this.statuses[nextIndex] = "active";
+    // One rule regardless of whether this is a first-time completion or a
+    // recommit after [Edit]: the immediate next step becomes active, and
+    // everything after that relocks -- its prior status (complete, or even
+    // still-active/uncommitted for the terminal step) no longer means
+    // anything once something it depends on has changed underneath it.
+    this.relockStepsAfter(nextIndex);
+    this.statuses[nextIndex] = "active";
     this.activeIndex = nextIndex;
-    if (nextWasLocked) {
-      this.mountStep(nextIndex);
-    } else {
-      // This wasn't a first-time completion (nextIndex already progressed
-      // past locked) -- it's a re-commit after [Edit]. A downstream step's
-      // "complete" status is no longer trustworthy once something it
-      // depends on has changed underneath it.
-      this.uncompleteDownstreamSteps(index);
-    }
+    if (nextWasLocked) this.mountStep(nextIndex);
 
     this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
     this.applyRowDisplay(this.rowEls[nextIndex], nextIndex, this.steps[nextIndex]);
@@ -177,16 +183,21 @@ export class StepFlow {
     this.updateIcon(nextIndex);
   }
 
-  /** Reverts every already-complete step after fromIndex back to "active" --
-   * a downstream step's completion no longer means anything once something
-   * it depends on has been recommitted. For a non-terminal step this
-   * re-expands it (the same mounted DOM/state it left off with, not a fresh
-   * mount); for the terminal step, which never collapses, it only flips the
-   * checklist icon. */
-  private uncompleteDownstreamSteps(fromIndex: number): void {
+  /** Reverts every step after fromIndex back to "locked" -- regardless of
+   * whether it was previously "complete" or (for the terminal step, which
+   * never collapses on its own completion) still "active" -- since a
+   * downstream step's prior status no longer means anything once something
+   * it depends on has been recommitted. Captures live state via unmount()
+   * only for a step that was actually mounted; an already-collapsed
+   * complete step's cached savedByIndex entry is already correct and is
+   * left untouched. Either way the cached data survives, so walking
+   * forward to the step again later resumes from where it was rather than
+   * starting over. */
+  private relockStepsAfter(fromIndex: number): void {
     for (let i = fromIndex + 1; i < this.steps.length; i++) {
-      if (this.statuses[i] !== "complete") continue;
-      this.statuses[i] = "active";
+      if (this.statuses[i] === "locked") continue;
+      if (this.isMountedState(i)) this.recordUnmount(i, this.steps[i].unmount());
+      this.statuses[i] = "locked";
       this.applyRowDisplay(this.rowEls[i], i, this.steps[i]);
       this.updateIcon(i);
     }

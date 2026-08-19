@@ -336,6 +336,76 @@ describe("StepFlow — uncompleting downstream steps on edit", () => {
   });
 });
 
+describe("StepFlow — relocking steps two or more hops downstream", () => {
+  it("relocks (does not reactivate) a non-terminal step two hops past the recommitted one, keeping its summary but hiding its body and [Edit]", () => {
+    const [a, b, c, d] = [
+      new FakeStep("A"),
+      new FakeStep("B"),
+      new FakeStep("C"),
+      new FakeStep("D"),
+    ];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c, d]);
+    a.lastCtx!.onComplete(); // a: complete, b: active
+    b.setValue("b-value");
+    b.lastCtx!.onComplete(); // b: complete, c: active
+    c.setValue("c-value");
+    c.lastCtx!.onComplete(); // c: complete, d: active (terminal)
+
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    a.lastCtx!.onComplete(); // re-complete a
+
+    const rows = container.querySelectorAll(".step-row");
+    // b: immediate next -- becomes active/expanded, unchanged from before.
+    expect(container.querySelectorAll(".step-icon")[1].textContent).toBe("●");
+    expect(rows[1].querySelector<HTMLElement>(".step-body")!.hidden).toBe(false);
+
+    // c: two hops downstream -- relocks instead of reactivating.
+    expect(container.querySelectorAll(".step-icon")[2].textContent).toBe("○");
+    expect(rows[2].querySelector<HTMLElement>(".step-body")!.hidden).toBe(true);
+    expect(rows[2].querySelector<HTMLElement>(".step-summary")!.hidden).toBe(false);
+    expect(rows[2].querySelector<HTMLElement>(".step-summary")!.textContent).toBe("c-value");
+    expect(rows[2].querySelector<HTMLButtonElement>(".step-edit-btn")!.hidden).toBe(true);
+  });
+
+  it("relocks the terminal step when it's two or more hops downstream, and never shows a summary for it", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStep("C")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete(); // a: complete, b: active
+    b.setValue("b-value");
+    b.lastCtx!.onComplete(); // b: complete, c: active (terminal)
+    c.setValue("c-value");
+    c.lastCtx!.onComplete(); // c: complete (terminal, stays expanded per its own completion)
+
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    a.lastCtx!.onComplete(); // re-complete a -- b becomes active, c (terminal) relocks
+
+    const rows = container.querySelectorAll(".step-row");
+    expect(container.querySelectorAll(".step-icon")[2].textContent).toBe("○");
+    expect(rows[2].querySelector<HTMLElement>(".step-body")!.hidden).toBe(true);
+    expect(rows[2].querySelector<HTMLElement>(".step-summary")!.hidden).toBe(true); // terminal never shows one
+  });
+
+  it("captures a relocked step's live in-progress state, not just an already-complete step's", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStep("C")];
+    const container = makeContainer();
+    const flow = new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete(); // a: complete, b: active
+    b.setValue("b-value");
+    b.lastCtx!.onComplete(); // b: complete, c: active (terminal, never collapses on its own)
+    c.setValue("live-uncommitted-c"); // c is still "active" (never completed) at this point
+
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    a.lastCtx!.onComplete(); // re-complete a -- c relocks while still uncompleted
+
+    expect(flow.getValue().steps[2]).toEqual({
+      status: "locked",
+      saved: { savedState: { value: "live-uncommitted-c" }, summary: "live-uncommitted-c" },
+    });
+  });
+});
+
 describe("StepFlow — destroy()", () => {
   it("calls destroy() on every step that implements it, mounted or collapsed", () => {
     const [a, b] = [new FakeStepWithDestroy("A"), new FakeStepWithDestroy("B")];
