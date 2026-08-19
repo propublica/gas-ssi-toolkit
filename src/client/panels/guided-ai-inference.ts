@@ -9,6 +9,7 @@ import { PanelLoader } from "../components/panel-loader";
 
 export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedState> {
   private stepFlow: StepFlow | null = null;
+  private inputsStep: InputsStep | null = null;
   private nav: NavigationContext | null = null;
 
   mount(
@@ -18,8 +19,12 @@ export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedSta
     savedState?: StepFlowSavedState,
   ): void {
     this.nav = nav;
+    this.inputsStep = null;
     container.innerHTML = this.template();
     container.querySelector("#back-btn")?.addEventListener("click", () => nav.back());
+    container
+      .querySelector("#refresh-btn")
+      ?.addEventListener("click", () => this.handleRefresh(container));
 
     const loader = new PanelLoader(container);
     loader.setState({ status: "loading", message: "Loading columns..." });
@@ -29,6 +34,7 @@ export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedSta
         (headers) => {
           const promptStep = new PromptStep();
           const inputsStep = new InputsStep(headers);
+          this.inputsStep = inputsStep;
           const runStep = new RunStep(
             () => ({
               promptCols: inputsStep.getResult()?.promptCols ?? [],
@@ -54,11 +60,27 @@ export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedSta
     return this.stepFlow?.getValue();
   }
 
+  private handleRefresh(container: HTMLElement): void {
+    const btn = container.querySelector<HTMLButtonElement>("#refresh-btn")!;
+    btn.classList.add("spinning");
+    btn.disabled = true;
+    getSheetHeaders()
+      .then(
+        (headers) => this.inputsStep?.updateHeaders(headers),
+        (err: Error) => globalThis.alert("Error refreshing columns: " + err.message),
+      )
+      .finally(() => {
+        btn.classList.remove("spinning");
+        btn.disabled = false;
+      });
+  }
+
   private template(): string {
     return `
       <div class="panel-header">
         <button id="back-btn" class="back-btn">← Back</button>
         <span class="panel-title">🧭 Guided AI Inference</span>
+        <button id="refresh-btn" class="refresh-btn" title="Refresh columns">↻</button>
       </div>
       <p class="recipe-intro">Walk through each stage of Spreadsheet Inference.</p>
       <div id="panel-loader" class="panel-loader" hidden>

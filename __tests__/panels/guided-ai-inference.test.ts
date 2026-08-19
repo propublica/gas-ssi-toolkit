@@ -74,6 +74,41 @@ describe("GuidedAIInferencePanel — mount", () => {
   });
 });
 
+describe("GuidedAIInferencePanel — refresh columns", () => {
+  it("re-fetches headers and updates Step 1's column picker, spinning the button meanwhile", async () => {
+    const { container } = await mountAndLoad(["NoteCol"]);
+
+    container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+    container.querySelector<HTMLElement>(".token-add-btn")!.click();
+    container.querySelector<HTMLElement>('.token-option[data-value="NoteCol"]')!.click();
+
+    (services.getSheetHeaders as jest.Mock).mockResolvedValue(["NoteCol", "NewCol"]);
+    const btn = container.querySelector<HTMLButtonElement>("#refresh-btn")!;
+    btn.click();
+    expect(btn.classList.contains("spinning")).toBe(true);
+    expect(btn.disabled).toBe(true);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(services.getSheetHeaders).toHaveBeenCalledTimes(2);
+    expect(btn.classList.contains("spinning")).toBe(false);
+    expect(btn.disabled).toBe(false);
+    // Selection survives the refresh.
+    expect(container.querySelector(".guided-input-col-picker")!.textContent).toContain("NoteCol");
+  });
+
+  it("alerts (without crashing) when the refresh fetch fails", async () => {
+    const { container } = await mountAndLoad();
+    globalThis.alert = jest.fn();
+    (services.getSheetHeaders as jest.Mock).mockRejectedValue(new Error("boom"));
+
+    container.querySelector<HTMLButtonElement>("#refresh-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(globalThis.alert).toHaveBeenCalledWith(expect.stringContaining("boom"));
+    expect(container.querySelector<HTMLButtonElement>("#refresh-btn")!.disabled).toBe(false);
+  });
+});
+
 describe("GuidedAIInferencePanel — end-to-end step progression", () => {
   it("completing Step 1 and Step 2 unlocks Step 3, which assembles a RunConfig from both", async () => {
     (services.prepRecipe as jest.Mock).mockResolvedValue({ rowRange: { start: 2, end: 5 } });

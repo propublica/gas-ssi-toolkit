@@ -27,6 +27,45 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
+describe("InputsStep — updateHeaders", () => {
+  it("updates a column row's available options while preserving its current selection", () => {
+    const container = makeContainer();
+    const step = new InputsStep(["col_a", "col_b"]);
+    step.mount(container, makeCtx());
+
+    container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+    container.querySelector<HTMLElement>(".token-add-btn")!.click();
+    container.querySelector<HTMLElement>('.token-option[data-value="col_a"]')!.click();
+
+    step.updateHeaders(["col_a", "col_c"]);
+
+    const tokenInput = container.querySelector(".guided-input-col-picker")!;
+    expect(tokenInput.querySelectorAll(".token-chip")).toHaveLength(1);
+    expect(tokenInput.textContent).toContain("col_a");
+
+    container.querySelector<HTMLElement>(".token-add-btn")!.click();
+    const optionValues = Array.from(container.querySelectorAll(".token-option")).map((el) =>
+      el.getAttribute("data-value"),
+    );
+    expect(optionValues).toContain("col_c");
+    expect(optionValues).not.toContain("col_b"); // no longer a real header
+  });
+
+  it("does not affect drive-folder rows", () => {
+    const container = makeContainer();
+    const step = new InputsStep(["col_a"]);
+    step.mount(container, makeCtx());
+    container.querySelector<HTMLButtonElement>("#gi-add-folder")!.click();
+    container.querySelector<HTMLInputElement>(".guided-input-folder-url")!.value =
+      "https://drive.google.com/x";
+
+    expect(() => step.updateHeaders(["col_b"])).not.toThrow();
+    expect(container.querySelector<HTMLInputElement>(".guided-input-folder-url")!.value).toBe(
+      "https://drive.google.com/x",
+    );
+  });
+});
+
 describe("InputsStep — column rows", () => {
   it("adding a column row and continuing calls onComplete with no RPC", async () => {
     const container = makeContainer();

@@ -20,7 +20,7 @@ export class InputsStep implements Step<InputsStepSavedState> {
   readonly title = "Gather your inputs";
   readonly flavorText = "The content the AI works on, one row at a time.";
 
-  private readonly headers: string[];
+  private headers: string[];
   private container: HTMLElement | null = null;
   private rows: Array<{ row: InputRow; el: HTMLElement; tokenInput?: TokenInput }> = [];
   private result: InputsStepResult | null = null;
@@ -33,6 +33,26 @@ export class InputsStep implements Step<InputsStepSavedState> {
 
   getResult(): InputsStepResult | null {
     return this.result;
+  }
+
+  /** Refreshes the available columns in every existing column-picker row
+   * in place, preserving each row's current selection -- mirrors the
+   * "Refresh columns" behavior in ConfigureAIRunPanel/ImportDriveLinksPanel/
+   * ExtractTextPanel. Drive-folder rows don't use headers and are untouched.
+   * Safe to call while this step is collapsed (mounted but hidden). */
+  updateHeaders(headers: string[]): void {
+    this.headers = headers;
+    for (const entry of this.rows) {
+      if (entry.row.kind !== "column") continue;
+      const pickerWrap = entry.el.querySelector<HTMLElement>(".guided-input-col-picker");
+      if (!pickerWrap) continue;
+      const selected = entry.tokenInput?.getValue()[0];
+      entry.tokenInput?.destroy();
+      entry.tokenInput = new TokenInput(pickerWrap, headers, {
+        multi: false,
+        selected: selected ? [selected] : [],
+      });
+    }
   }
 
   hydrate(savedState: InputsStepSavedState): void {
