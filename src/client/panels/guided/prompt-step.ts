@@ -34,15 +34,35 @@ export class PromptStep implements Step<PromptStepSavedState> {
   }
 
   mount(container: HTMLElement, ctx: StepContext, savedState?: PromptStepSavedState): void {
-    const gemLink = this.isHttpUrl(this.gemUrl)
-      ? `<p class="guided-gem-link">Need help writing this? Try our
-          <a href="${this.gemUrl}" target="_blank" rel="noopener noreferrer">Gemini Gem prompt assistant ↗</a></p>`
-      : "";
     container.innerHTML = `
-      ${gemLink}
-      <textarea id="gp-prompt-text" class="guided-prompt-textarea"></textarea>
+      <div id="gp-gem-link-inline"></div>
+      <div id="gp-textarea-slot">
+        <textarea id="gp-prompt-text" class="guided-prompt-textarea"></textarea>
+      </div>
+      <button type="button" class="link-btn" id="gp-expand-btn">Expand ⤢</button>
       <button type="button" class="btn-run" id="gp-continue">Import &amp; Continue</button>
+
+      <div class="guided-modal-overlay" id="gp-modal-overlay" hidden>
+        <div class="guided-modal">
+          <div class="guided-modal-header">
+            <span class="guided-modal-title">System prompt</span>
+            <button type="button" class="guided-modal-close" id="gp-modal-close">Close</button>
+          </div>
+          <div id="gp-gem-link-modal"></div>
+          <div id="gp-modal-textarea-slot"></div>
+        </div>
+      </div>
     `;
+    // Built via DOM APIs (not string-interpolated into innerHTML) so gemUrl's
+    // value is only ever assigned to the href *property* -- never parsed as
+    // markup, so an embedded quote character can't break out of the
+    // attribute and inject a new one (e.g. a value like
+    // `https://x" onclick="evil()`).
+    const inlineGemLink = this.buildGemLink();
+    if (inlineGemLink) container.querySelector("#gp-gem-link-inline")!.appendChild(inlineGemLink);
+    const modalGemLink = this.buildGemLink();
+    if (modalGemLink) container.querySelector("#gp-gem-link-modal")!.appendChild(modalGemLink);
+
     this.textarea = container.querySelector<HTMLTextAreaElement>("#gp-prompt-text")!;
     this.textarea.value = savedState?.promptText ?? "";
     this.continueButton = new AsyncActionButton(
@@ -53,6 +73,37 @@ export class PromptStep implements Step<PromptStepSavedState> {
     container.querySelector<HTMLButtonElement>("#gp-continue")!.addEventListener("click", () => {
       this.handleContinue(ctx);
     });
+
+    this.wireExpandModal(container);
+  }
+
+  /** Moves the single textarea node between the inline slot and the modal --
+   * never two separate elements to keep in sync, so "autosave" is automatic
+   * and closing the modal at any point loses nothing (per the wireframe). */
+  private wireExpandModal(container: HTMLElement): void {
+    const inlineSlot = container.querySelector<HTMLElement>("#gp-textarea-slot")!;
+    const modalSlot = container.querySelector<HTMLElement>("#gp-modal-textarea-slot")!;
+    const overlay = container.querySelector<HTMLElement>("#gp-modal-overlay")!;
+
+    const openModal = (): void => {
+      modalSlot.appendChild(this.textarea!);
+      overlay.hidden = false;
+      this.textarea!.focus();
+    };
+    const closeModal = (): void => {
+      inlineSlot.appendChild(this.textarea!);
+      overlay.hidden = true;
+    };
+
+    container
+      .querySelector<HTMLButtonElement>("#gp-expand-btn")!
+      .addEventListener("click", openModal);
+    container
+      .querySelector<HTMLButtonElement>("#gp-modal-close")!
+      .addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeModal();
+    });
   }
 
   /** Guards against a misconfigured GEMINI_GEM_URL Script Property (e.g. a
@@ -61,6 +112,20 @@ export class PromptStep implements Step<PromptStepSavedState> {
    * any http(s) destination. */
   private isHttpUrl(url: string | undefined): url is string {
     return !!url && /^https?:\/\//i.test(url);
+  }
+
+  private buildGemLink(): HTMLElement | null {
+    if (!this.isHttpUrl(this.gemUrl)) return null;
+    const p = document.createElement("p");
+    p.className = "guided-gem-link";
+    p.append("Need help writing this? Try our ");
+    const a = document.createElement("a");
+    a.href = this.gemUrl;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = "Gemini Gem prompt assistant ↗";
+    p.appendChild(a);
+    return p;
   }
 
   unmount(): { savedState: PromptStepSavedState; summary: string } | undefined {

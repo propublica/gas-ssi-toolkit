@@ -55,6 +55,91 @@ describe("PromptStep — Gemini Gem link", () => {
 
     expect(container.querySelector(".guided-gem-link")).toBeNull();
   });
+
+  it("cannot break out of the href attribute via an embedded quote (built via DOM APIs, not string-templated HTML)", () => {
+    const container = makeContainer();
+    const step = new PromptStep(`https://example.com" onclick="evil()`);
+    step.mount(container, makeCtx());
+
+    const link = container.querySelector<HTMLAnchorElement>(".guided-gem-link a");
+    expect(link).not.toBeNull();
+    // No separate onclick attribute was created -- the embedded quote
+    // ended up safely escaped inside the single href value instead.
+    expect(link!.getAttribute("onclick")).toBeNull();
+    expect(link!.attributes).toHaveLength(3); // href, target, rel -- nothing extra
+  });
+
+  it("appears in both the inline flavor area and the expanded modal", () => {
+    const container = makeContainer();
+    const step = new PromptStep("https://gemini.google.com/gem/abc123");
+    step.mount(container, makeCtx());
+
+    expect(container.querySelectorAll(".guided-gem-link a")).toHaveLength(2);
+  });
+});
+
+describe("PromptStep — Expand modal", () => {
+  it("moves the textarea into the modal and reveals it on Expand", () => {
+    const container = makeContainer();
+    const step = new PromptStep();
+    step.mount(container, makeCtx());
+    container.querySelector<HTMLTextAreaElement>("#gp-prompt-text")!.value = "Draft text";
+
+    container.querySelector<HTMLButtonElement>("#gp-expand-btn")!.click();
+
+    expect(container.querySelector<HTMLElement>("#gp-modal-overlay")!.hidden).toBe(false);
+    expect(
+      container
+        .querySelector("#gp-modal-textarea-slot")!
+        .contains(container.querySelector("#gp-prompt-text")),
+    ).toBe(true);
+    // Same element, not a copy -- value survives the move automatically.
+    expect(container.querySelector<HTMLTextAreaElement>("#gp-prompt-text")!.value).toBe(
+      "Draft text",
+    );
+  });
+
+  it("moves the textarea back and hides the modal on Close, keeping the edited value", () => {
+    const container = makeContainer();
+    const step = new PromptStep();
+    step.mount(container, makeCtx());
+    container.querySelector<HTMLButtonElement>("#gp-expand-btn")!.click();
+    container.querySelector<HTMLTextAreaElement>("#gp-prompt-text")!.value = "Edited in modal";
+
+    container.querySelector<HTMLButtonElement>("#gp-modal-close")!.click();
+
+    expect(container.querySelector<HTMLElement>("#gp-modal-overlay")!.hidden).toBe(true);
+    expect(
+      container
+        .querySelector("#gp-textarea-slot")!
+        .contains(container.querySelector("#gp-prompt-text")),
+    ).toBe(true);
+    expect(container.querySelector<HTMLTextAreaElement>("#gp-prompt-text")!.value).toBe(
+      "Edited in modal",
+    );
+  });
+
+  it("closes when the backdrop (not the modal box itself) is clicked", () => {
+    const container = makeContainer();
+    const step = new PromptStep();
+    step.mount(container, makeCtx());
+    container.querySelector<HTMLButtonElement>("#gp-expand-btn")!.click();
+
+    container.querySelector<HTMLElement>("#gp-modal-overlay")!.click();
+
+    expect(container.querySelector<HTMLElement>("#gp-modal-overlay")!.hidden).toBe(true);
+  });
+
+  it("does not close when clicking inside the modal box itself", () => {
+    const container = makeContainer();
+    const step = new PromptStep();
+    step.mount(container, makeCtx());
+    container.querySelector<HTMLButtonElement>("#gp-expand-btn")!.click();
+
+    container.querySelector<HTMLElement>(".guided-modal")!.click();
+
+    expect(container.querySelector<HTMLElement>("#gp-modal-overlay")!.hidden).toBe(false);
+  });
 });
 
 describe("PromptStep — required prompt", () => {
