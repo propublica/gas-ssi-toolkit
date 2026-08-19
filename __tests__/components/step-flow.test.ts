@@ -123,7 +123,7 @@ describe("StepFlow — onComplete for the terminal (last) step", () => {
 });
 
 describe("StepFlow — summary truncation", () => {
-  it("truncates a long summary to 60 chars (with ellipsis) when rendering the collapsed step", () => {
+  it("truncates a long summary to 60 chars (with ellipsis) once the step completes", () => {
     const [a, b] = [new FakeStep("A"), new FakeStep("B")];
     const container = makeContainer();
     new StepFlow(container, [a, b]);
@@ -135,7 +135,7 @@ describe("StepFlow — summary truncation", () => {
     expect(rendered).toBe("x".repeat(60) + "…");
   });
 
-  it("persists the full, untruncated summary in getValue() -- only rendering truncates", () => {
+  it("stores the already-truncated summary -- truncation happens once, at unmount time, not on every render", () => {
     const [a, b] = [new FakeStep("A"), new FakeStep("B")];
     const container = makeContainer();
     const flow = new StepFlow(container, [a, b]);
@@ -144,7 +144,7 @@ describe("StepFlow — summary truncation", () => {
     a.lastCtx!.onComplete();
 
     const saved = flow.getValue();
-    expect(saved.steps[0].saved?.summary).toBe(longValue);
+    expect(saved.steps[0].saved?.summary).toBe("x".repeat(60) + "…");
   });
 
   it("does not add an ellipsis when the summary is at or under the cap", () => {

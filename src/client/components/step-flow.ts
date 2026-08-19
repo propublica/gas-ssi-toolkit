@@ -39,15 +39,24 @@ export class StepFlow {
 
   getValue(): StepFlowSavedState {
     this.steps.forEach((_, i) => {
-      if (this.isMountedState(i)) {
-        const result = this.steps[i].unmount();
-        if (result) this.savedByIndex[i] = result;
-      }
+      if (this.isMountedState(i)) this.recordUnmount(i, this.steps[i].unmount());
     });
     return {
       activeStepIndex: this.activeIndex,
       steps: this.statuses.map((status, i) => ({ status, saved: this.savedByIndex[i] })),
     };
+  }
+
+  /** The single place an unmount() result is ever stored. Truncates the
+   * summary here, once, at the moment a step hands over its final data --
+   * not on every render, since a collapsed step's summary never changes
+   * again after this point. */
+  private recordUnmount(
+    index: number,
+    result: { savedState: unknown; summary: string } | undefined,
+  ): void {
+    if (!result) return;
+    this.savedByIndex[index] = { ...result, summary: truncate(result.summary, SUMMARY_MAX_LENGTH) };
   }
 
   private isLastStep(index: number): boolean {
@@ -95,7 +104,7 @@ export class StepFlow {
 
     const summaryEl = row.querySelector<HTMLElement>(".step-summary")!;
     summaryEl.hidden = !collapsedNonTerminalComplete;
-    summaryEl.textContent = truncate(this.savedByIndex[index]?.summary ?? "", SUMMARY_MAX_LENGTH);
+    summaryEl.textContent = this.savedByIndex[index]?.summary ?? "";
 
     const expanded = status !== "locked" && !collapsedNonTerminalComplete;
     const flavorEl = row.querySelector<HTMLElement>(".step-flavor-text")!;
@@ -128,8 +137,7 @@ export class StepFlow {
       return;
     }
 
-    const result = this.steps[index].unmount();
-    if (result) this.savedByIndex[index] = result;
+    this.recordUnmount(index, this.steps[index].unmount());
     this.statuses[index] = "complete";
 
     const nextIndex = index + 1;
