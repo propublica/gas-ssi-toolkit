@@ -1038,11 +1038,18 @@
             bottom: 0;
             background: rgba(0, 0, 0, 0.4);
             z-index: 200;
-            display: flex;
             align-items: center;
             justify-content: center;
             padding: 16px;
             box-sizing: border-box;
+        }
+
+        /* [hidden] and .guided-modal-overlay both have (0,1,0) specificity, so
+           without this guard an unconditional `display: flex` above would
+           beat the browser's built-in `[hidden] { display: none; }` rule and
+           the overlay would never actually hide. */
+        .guided-modal-overlay:not([hidden]) {
+            display: flex;
         }
 
         .guided-modal {
