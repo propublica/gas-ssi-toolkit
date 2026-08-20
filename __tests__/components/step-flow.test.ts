@@ -517,6 +517,66 @@ describe("StepFlow — editing exclusivity", () => {
   });
 });
 
+describe("StepFlow — a step's own busy action holds the exclusivity gate too", () => {
+  it("disables every other complete step's [Edit] button while the terminal step reports itself busy (e.g. Test/Run AI in flight)", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStepWithInteractive("C")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete(); // a: complete, b: active
+    b.lastCtx!.onComplete(); // b: complete, c: active (terminal)
+
+    c.lastCtx!.onBusyChange(true); // simulates Test/Run AI in flight on the terminal step
+
+    const rows = container.querySelectorAll(".step-row");
+    expect(rows[0].querySelector<HTMLButtonElement>(".step-edit-btn")!.disabled).toBe(true);
+    expect(rows[1].querySelector<HTMLButtonElement>(".step-edit-btn")!.disabled).toBe(true);
+  });
+
+  it("re-enables other complete steps' [Edit] buttons once the busy action settles", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStep("C")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete();
+    b.lastCtx!.onComplete();
+    c.lastCtx!.onBusyChange(true);
+
+    c.lastCtx!.onBusyChange(false);
+
+    const rows = container.querySelectorAll(".step-row");
+    expect(rows[0].querySelector<HTMLButtonElement>(".step-edit-btn")!.disabled).toBe(false);
+    expect(rows[1].querySelector<HTMLButtonElement>(".step-edit-btn")!.disabled).toBe(false);
+  });
+
+  it("never shows a Cancel button on the terminal step, even while its own busy action holds the gate", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStep("C")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete();
+    b.lastCtx!.onComplete();
+
+    c.lastCtx!.onBusyChange(true);
+
+    const rows = container.querySelectorAll(".step-row");
+    expect(rows[2].querySelector<HTMLButtonElement>(".step-cancel-btn")!.hidden).toBe(true);
+  });
+
+  it("does not disable a genuinely different edit-in-progress step's own buttons a second time, or release it early", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStepWithInteractive("C")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete(); // a: complete, b: active
+    b.lastCtx!.onComplete(); // b: complete, c: active (terminal)
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a -- editingIndex = 0
+
+    // c's own busy signal must not steal the gate while a real edit is open.
+    c.lastCtx!.onBusyChange(true);
+    c.lastCtx!.onBusyChange(false);
+
+    const rows = container.querySelectorAll(".step-row");
+    expect(rows[0].querySelector<HTMLButtonElement>(".step-cancel-btn")!.hidden).toBe(false); // a's edit is still open
+  });
+});
+
 describe("StepFlow — destroy()", () => {
   it("calls destroy() on every step that implements it, mounted or collapsed", () => {
     const [a, b] = [new FakeStepWithDestroy("A"), new FakeStepWithDestroy("B")];
@@ -700,7 +760,8 @@ describe("StepFlow — a relocked step renders plain", () => {
     new StepFlow(container, [a, b, c, d]);
     a.lastCtx!.onComplete(); // b: active
     b.lastCtx!.onComplete(); // c: active
-    c.lastCtx!.onBusyChange(true); // c's own commit is in flight
+    c.lastCtx!.onBusyChange(true); // c's own commit is in flight -- holds the gate
+    c.lastCtx!.onBusyChange(false); // ...and releases it, but leaves busyByIndex[2] stale
 
     container.querySelectorAll<HTMLButtonElement>(".step-edit-btn")[0].click(); // edit a
     a.lastCtx!.onComplete(); // recommit a -- b reactivates, c and d relock

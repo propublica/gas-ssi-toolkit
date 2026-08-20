@@ -154,8 +154,14 @@ export class StepFlow {
     // "active" WITH cached data without anyone having clicked its [Edit], and
     // offering Cancel there used to strand the panel with no step expanded at
     // all (cancelEdit would collapse it while everything downstream stayed
-    // locked).
-    cancelBtn.hidden = this.editingIndex !== index;
+    // locked). Also excludes: the terminal step (never offers Cancel, even
+    // while its own Test/Run holds editingIndex -- see handleBusyChange) and a
+    // step with no cached data yet (editingIndex can now be held by a step's
+    // OWN first-time-completion request, which has nothing to cancel back to).
+    cancelBtn.hidden =
+      this.editingIndex !== index ||
+      this.isLastStep(index) ||
+      this.savedByIndex[index] === undefined;
     cancelBtn.disabled = this.busyByIndex[index];
 
     const summaryEl = row.querySelector<HTMLElement>(".step-summary")!;
@@ -186,9 +192,35 @@ export class StepFlow {
     this.steps[index].setInteractive?.(this.isStepInteractive(index));
   }
 
+  /** A step's own busy request holds the SAME editing-exclusivity gate an
+   * [Edit] session does -- e.g. RunStep's Test/Run AI are real, billed
+   * actions against the sheet, and nothing should be able to start editing
+   * an earlier step out from under them while they're in flight. Reuses
+   * `editingIndex` itself (rather than a parallel concept) so every existing
+   * consumer -- isStepInteractive, the [Edit]-button disable, Refresh-button
+   * gating -- picks this up for free.
+   *
+   * Guarded so this can never override or prematurely release a REAL [Edit]
+   * session: `preEditActiveIndex[index] !== null` means editStep() is what
+   * opened the gate for this index, and only that session's own resolution
+   * (Cancel or a successful recommit) may close it -- a busy signal from the
+   * same step's own recommit request (editingIndex already === index) just
+   * falls through to the plain per-row refresh below. */
   private handleBusyChange(index: number, isBusy: boolean): void {
     this.busyByIndex[index] = isBusy;
-    this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
+    if (isBusy && this.editingIndex === null) {
+      this.editingIndex = index;
+      this.applyEditingGate();
+      this.refreshAllRowDisplays();
+      this.onEditingChange?.(true);
+    } else if (!isBusy && this.editingIndex === index && this.preEditActiveIndex[index] === null) {
+      this.editingIndex = null;
+      this.applyEditingGate();
+      this.refreshAllRowDisplays();
+      this.onEditingChange?.(false);
+    } else {
+      this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
+    }
   }
 
   private handleComplete(index: number): void {
@@ -203,8 +235,12 @@ export class StepFlow {
       this.statuses[index] = "complete";
       this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
       this.updateIcon(index);
-      // Unreachable today, kept for symmetry: the terminal step never shows an
-      // [Edit] button, so it can never be the step holding the gate.
+      // Reachable: a successful Run AI holds the gate via handleBusyChange()
+      // (its own onBusyChange(true) call) for as long as it's in flight, and
+      // ctx.onComplete() fires before that same action's onBusyChange(false)
+      // -- so releasing it here, rather than waiting for the busy signal to
+      // clear moments later, is what re-enables every other step immediately
+      // once the run actually lands.
       this.releaseEditingGate(index);
       return;
     }

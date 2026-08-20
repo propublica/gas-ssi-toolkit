@@ -38,6 +38,12 @@ export interface RunControlsSavedState {
 export interface RunControlsConfig {
   getPromptConfig: () => PromptConfig;
   onRunSucceeded?: () => void;
+  /** Called around Test and Run AI (true when either starts, false once it
+   * settles) -- both are real, billed actions against the sheet. Optional:
+   * only Guided AI Inference's RunStep supplies this, forwarding its own
+   * StepContext.onBusyChange so the shell can hold the editing-exclusivity
+   * gate for the duration; ConfigureAIRunPanel has no such gate to hold. */
+  onBusyChange?: (isBusy: boolean) => void;
   savedState?: RunControlsSavedState;
 }
 
@@ -317,6 +323,7 @@ export class RunControls {
       ? Promise.resolve(config.rowRange)
       : getActiveRangeInfo();
 
+    this.config.onBusyChange?.(true);
     resolveRange
       .then((range) => {
         if (!range) {
@@ -331,7 +338,9 @@ export class RunControls {
 
         const jobId = `batch-ai-${Date.now()}`;
         const chunks = computeChunks(sanitized, CHUNK_SIZE);
-        jobStore
+        // Returned (not fired-and-forgotten): onBusyChange(false) below must
+        // wait for the actual run to finish, not just for it to be kicked off.
+        return jobStore
           .dispatch(jobId, "Batch AI Run", this.runChunks(jobId, config, chunks))
           .then(() => this.config.onRunSucceeded?.())
           .catch((err: Error) => {
@@ -340,7 +349,8 @@ export class RunControls {
       })
       .catch((err: Error) => {
         globalThis.alert("Error: " + err.message);
-      });
+      })
+      .finally(() => this.config.onBusyChange?.(false));
   }
 
   private confirmUntestedRun(range: RowRangeValue): boolean {
@@ -378,6 +388,7 @@ export class RunControls {
 
     const jobId = `test-ai-${Date.now()}`;
     this.testButton?.setLoading();
+    this.config.onBusyChange?.(true);
 
     const resolveRange: Promise<RowRangeValue | undefined> = config.rowRange
       ? Promise.resolve(config.rowRange)
@@ -413,7 +424,8 @@ export class RunControls {
       .catch((err: Error) => {
         globalThis.alert("Error: " + err.message);
         this.testButton?.setIdle();
-      });
+      })
+      .finally(() => this.config.onBusyChange?.(false));
   }
 
   private renderTestStats(test: TestRunDisplay): void {

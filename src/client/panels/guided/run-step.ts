@@ -43,6 +43,7 @@ export class RunStep implements Step<RunStepSavedState> {
         applyMarkdown: true,
       }),
       onRunSucceeded: (): void => ctx.onComplete(),
+      onBusyChange: ctx.onBusyChange,
       savedState: savedState?.runControls,
     });
     // RunControls no longer checks test-result freshness on its own (Task 1

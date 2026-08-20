@@ -186,6 +186,68 @@ describe("RunControls — Run AI", () => {
   });
 });
 
+describe("RunControls — onBusyChange", () => {
+  it("reports busy true when Run starts and false only after the run truly settles", async () => {
+    (services.getActiveRangeInfo as jest.Mock).mockResolvedValue({ start: 2, end: 11 });
+    let resolveRun!: (v: unknown) => void;
+    (services.runBatchAI as jest.Mock).mockReturnValue(
+      new Promise((res) => {
+        resolveRun = res;
+      }),
+    );
+    const onBusyChange = jest.fn();
+    const { container } = await mountAndSettle({ onBusyChange });
+
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(onBusyChange).toHaveBeenCalledWith(true);
+    expect(onBusyChange).not.toHaveBeenCalledWith(false);
+
+    resolveRun(undefined);
+    // More hops than the usual 5: handleRun()'s success path returns the
+    // dispatched job promise from inside a .then() callback (so the outer
+    // .finally() can await it, not just its kickoff), and that flattening
+    // itself costs an extra microtask turn beyond a flat chain.
+    for (let i = 0; i < 15; i++) await Promise.resolve();
+
+    expect(onBusyChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("reports busy false even when Run fails", async () => {
+    (services.getActiveRangeInfo as jest.Mock).mockResolvedValue({ start: 2, end: 11 });
+    (services.runBatchAI as jest.Mock).mockRejectedValue(new Error("boom"));
+    globalThis.alert = jest.fn();
+    const onBusyChange = jest.fn();
+    const { container } = await mountAndSettle({ onBusyChange });
+
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 15; i++) await Promise.resolve();
+
+    expect(onBusyChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("reports busy true when Test starts and false once it settles", async () => {
+    (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
+    const onBusyChange = jest.fn();
+    const { container } = await mountAndSettle({ onBusyChange });
+
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    expect(onBusyChange).toHaveBeenNthCalledWith(1, true);
+
+    for (let i = 0; i < 15; i++) await Promise.resolve();
+
+    expect(onBusyChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("does not require onBusyChange to be set (ConfigureAIRunPanel has no gate to hold)", async () => {
+    (services.getActiveRangeInfo as jest.Mock).mockResolvedValue({ start: 2, end: 11 });
+    (services.runBatchAI as jest.Mock).mockResolvedValue(undefined);
+    const { container } = await mountAndSettle();
+    expect(() => container.querySelector<HTMLButtonElement>("#run-btn")!.click()).not.toThrow();
+  });
+});
+
 describe("RunControls — Test AI and getValue()", () => {
   it("shows test results and includes them in getValue().lastTest", async () => {
     (services.runBatchAI as jest.Mock).mockResolvedValue(TEST_STATS);
