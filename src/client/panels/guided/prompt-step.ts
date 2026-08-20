@@ -15,7 +15,7 @@ export interface PromptStepResult {
 export class PromptStep implements Step<PromptStepSavedState> {
   readonly title = "Tell the AI what to do";
   readonly flavorText =
-    "Set the AI's role and behavior — what it should do and how it should respond.";
+    "Set the AI's role and behavior — what it should do and how it should respond — one row at a time.";
 
   private textarea: HTMLTextAreaElement | null = null;
   private result: PromptStepResult | null = null;
