@@ -130,5 +130,28 @@ describe("AsyncActionButton", () => {
       asyncBtn.setInteractive(true);
       expect(btn.disabled).toBe(true);
     });
+
+    it("survives every later state change -- disabled is recomputed, never clobbered", () => {
+      asyncBtn.setInteractive(false);
+
+      asyncBtn.setDone();
+      expect(btn.disabled).toBe(true);
+      expect(btn.textContent).toBe("Tested ✓"); // the label still updates
+
+      asyncBtn.setIdle();
+      expect(btn.disabled).toBe(true);
+
+      asyncBtn.setLoading();
+      expect(btn.disabled).toBe(true);
+    });
+
+    it("re-enables after a load finishes when it was re-enabled mid-load", () => {
+      asyncBtn.setLoading();
+      asyncBtn.setInteractive(true); // ignored for now: still loading
+      expect(btn.disabled).toBe(true);
+
+      asyncBtn.setIdle();
+      expect(btn.disabled).toBe(false); // the true must not have been dropped
+    });
   });
 });

@@ -290,6 +290,10 @@ describe("PromptStep — setInteractive", () => {
     step.setInteractive(true);
     expect(container.querySelector<HTMLButtonElement>("#gp-continue")!.disabled).toBe(false);
   });
+
+  it("is a no-op before mount -- StepFlow re-asserts the gate at mount time, so a still-locked step can legitimately be told its state first", () => {
+    expect(() => new PromptStep().setInteractive(false)).not.toThrow();
+  });
 });
 
 describe("PromptStep — onBusyChange", () => {

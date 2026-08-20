@@ -60,6 +60,12 @@ export class RunControls {
   private rowRangeComp: RowRange | null = null;
   private lastTest: TestRunDisplay | undefined;
   private testButton: AsyncActionButton | null = null;
+  /** Externally-imposed enablement (the editing-exclusivity gate). Persisted
+   * rather than pushed straight onto the buttons, because #test-btn doesn't
+   * exist yet until the getDefaultRowRange() fetch behind `ready` settles --
+   * a gate that opened before then has to still be honored once the button
+   * is finally constructed. */
+  private interactive = true;
 
   constructor(container: HTMLElement, config: RunControlsConfig) {
     this.container = container;
@@ -119,14 +125,19 @@ export class RunControls {
   /** Disables/enables Test and Run while a DIFFERENT step is mid-edit
    * (Guided AI Inference's terminal step is the only caller today).
    * Respects each button's own busy state on re-enable: Test won't be
-   * force-enabled mid-request (AsyncActionButton.setInteractive() already
-   * guards this); Run has no comparable busy state of its own (the job
-   * strip communicates progress, not a disabled Run button), so it's a
+   * force-enabled mid-request (AsyncActionButton keeps a loading button
+   * disabled regardless); Run has no comparable busy state of its own (the
+   * job strip communicates progress, not a disabled Run button), so it's a
    * plain flip. */
   setInteractive(enabled: boolean): void {
+    this.interactive = enabled;
+    this.applyInteractive();
+  }
+
+  private applyInteractive(): void {
     const runBtn = this.container.querySelector<HTMLButtonElement>("#run-btn");
-    if (runBtn) runBtn.disabled = !enabled;
-    this.testButton?.setInteractive(enabled);
+    if (runBtn) runBtn.disabled = !this.interactive;
+    this.testButton?.setInteractive(this.interactive);
   }
 
   destroy(): void {
@@ -226,6 +237,11 @@ export class RunControls {
     this.container
       .querySelector<HTMLButtonElement>("#test-btn")!
       .addEventListener("click", () => this.handleTest());
+    // The gate may have opened while this fetch was still in flight, when
+    // there was no #test-btn AsyncActionButton to disable yet. Re-assert it
+    // now that both buttons exist, so a Test button can never be constructed
+    // enabled underneath an open gate.
+    this.applyInteractive();
   }
 
   private applyToolsExpandState(): void {

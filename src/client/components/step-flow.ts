@@ -143,14 +143,19 @@ export class StepFlow {
     // OR because it relocked with its old data still intact.
     const hasSummary =
       !expanded && !this.isLastStep(index) && this.savedByIndex[index] !== undefined;
-    const editingExistingStep =
-      status === "active" && !this.isLastStep(index) && this.savedByIndex[index] !== undefined;
 
     const editBtn = row.querySelector<HTMLButtonElement>(".step-edit-btn")!;
     editBtn.hidden = !isEditable;
     editBtn.disabled = this.editingIndex !== null && this.editingIndex !== index;
     const cancelBtn = row.querySelector<HTMLButtonElement>(".step-cancel-btn")!;
-    cancelBtn.hidden = !editingExistingStep;
+    // Keyed on editingIndex -- the authoritative "this step is actually being
+    // edited" signal -- NOT on the old "active && has cached data" heuristic.
+    // After a recommit's relock cascade the immediate-next step is legitimately
+    // "active" WITH cached data without anyone having clicked its [Edit], and
+    // offering Cancel there used to strand the panel with no step expanded at
+    // all (cancelEdit would collapse it while everything downstream stayed
+    // locked).
+    cancelBtn.hidden = this.editingIndex !== index;
     cancelBtn.disabled = this.busyByIndex[index];
 
     const summaryEl = row.querySelector<HTMLElement>(".step-summary")!;
@@ -171,6 +176,14 @@ export class StepFlow {
       onBusyChange: (isBusy: boolean) => this.handleBusyChange(index, isBusy),
     };
     this.steps[index].mount(body, ctx, this.savedByIndex[index]?.savedState);
+    // The editing-exclusivity gate is an invariant, not a paired open/close
+    // event: a step can mount for the first time WHILE a gate is already open
+    // (e.g. an in-flight Continue resolves after [Edit] was clicked elsewhere,
+    // advancing the flow and mounting the next step). Telling every step its
+    // correct state at mount time is what keeps such a step from coming up
+    // enabled and letting the user fire a real AI run against a half-edited
+    // upstream config.
+    this.steps[index].setInteractive?.(this.isStepInteractive(index));
   }
 
   private handleBusyChange(index: number, isBusy: boolean): void {
@@ -190,6 +203,8 @@ export class StepFlow {
       this.statuses[index] = "complete";
       this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
       this.updateIcon(index);
+      // Unreachable today, kept for symmetry: the terminal step never shows an
+      // [Edit] button, so it can never be the step holding the gate.
       this.releaseEditingGate(index);
       return;
     }
@@ -225,12 +240,18 @@ export class StepFlow {
    * complete step's cached savedByIndex entry is already correct and is
    * left untouched. Either way the cached data survives, so walking
    * forward to the step again later resumes from where it was rather than
-   * starting over. */
+   * starting over. A relocked step renders plain: its transient per-step flags
+   * (a ✕ from a failed commit, a busy flag from a request that was in flight)
+   * are cleared alongside the status flip, so it can't come back showing an
+   * error icon or a stuck-disabled Cancel button for an attempt that no longer
+   * has any bearing on it. */
   private relockStepsAfter(fromIndex: number): void {
     for (let i = fromIndex + 1; i < this.steps.length; i++) {
       if (this.statuses[i] === "locked") continue;
       if (this.isMountedState(i)) this.recordUnmount(i, this.steps[i].unmount());
       this.statuses[i] = "locked";
+      this.hasErrorByIndex[i] = false;
+      this.busyByIndex[i] = false;
       this.applyRowDisplay(this.rowEls[i], i, this.steps[i]);
       this.updateIcon(i);
     }
@@ -249,12 +270,28 @@ export class StepFlow {
     }
   }
 
-  private setStepInteractive(index: number, enabled: boolean): void {
-    this.steps[index].setInteractive?.(enabled);
+  /** The interactive state step `index` must be in RIGHT NOW, derived purely
+   * from the gate: everything is interactive when no edit is open; while one
+   * is, only the step being edited. Deriving it (rather than remembering which
+   * single step was disabled when the gate opened) is what makes the gate hold
+   * for steps that mount, relock, or otherwise change shape mid-edit. */
+  private isStepInteractive(index: number): boolean {
+    return this.editingIndex === null || this.editingIndex === index;
+  }
+
+  /** Re-asserts the gate across every currently-mounted step. Skipping
+   * unmounted steps is deliberate: a step that relockStepsAfter() just
+   * relocked has been torn down and will be told its state again by
+   * mountStep() if it's ever walked forward to, so re-enabling it here would
+   * only touch a discarded instance. */
+  private applyEditingGate(): void {
+    this.steps.forEach((step, i) => {
+      if (this.isMountedState(i)) step.setInteractive?.(this.isStepInteractive(i));
+    });
   }
 
   /** Re-applies every row's display -- needed whenever editingIndex changes,
-   * since an [[Edit]] button's disabled state (distinct from its hidden
+   * since an [Edit] button's disabled state (distinct from its hidden
    * state) depends on whether ANY other step is currently mid-edit, not
    * just this row's own status. */
   private refreshAllRowDisplays(): void {
@@ -269,9 +306,10 @@ export class StepFlow {
     this.activeIndex = index;
     this.mountStep(index);
     this.updateIcon(index);
-    if (previousActive !== index) {
-      this.setStepInteractive(previousActive, false);
-    }
+    // Still needed on top of mountStep()'s own call: the steps this gate has
+    // to disable are already mounted, so nothing would otherwise tell them the
+    // gate just opened.
+    this.applyEditingGate();
     this.refreshAllRowDisplays();
     this.onEditingChange?.(true);
   }
@@ -303,15 +341,20 @@ export class StepFlow {
    * being edited (a no-op for a plain first-time completion, or for a step
    * restored directly into "active" from saved state that was never
    * actually edited this session -- in either case there's no gate to
-   * release). Re-enables whichever other step's buttons were disabled when
-   * the edit began, and refreshes every row's [Edit]-disabled state.
-   * Returns the index to restore activeIndex to, or null. */
+   * release). Re-enables every still-mounted step's buttons and refreshes
+   * every row's [Edit]-disabled state. Returns the index to restore
+   * activeIndex to, or null. */
   private releaseEditingGate(index: number): number | null {
     if (this.editingIndex !== index) return null;
     this.editingIndex = null;
     const restoreIndex = this.preEditActiveIndex[index];
     this.preEditActiveIndex[index] = null;
-    if (restoreIndex !== null) this.setStepInteractive(restoreIndex, true);
+    // Re-derived from the (now-closed) gate across all mounted steps rather
+    // than un-disabling the one step recorded at open time: by the time an
+    // edit resolves, that step may have completed and collapsed, or relocked,
+    // while some OTHER step advanced into place and is the one now needing to
+    // be re-enabled.
+    this.applyEditingGate();
     this.refreshAllRowDisplays();
     this.onEditingChange?.(false);
     return restoreIndex;

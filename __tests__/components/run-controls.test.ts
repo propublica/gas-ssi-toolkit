@@ -258,4 +258,39 @@ describe("RunControls — setInteractive", () => {
     expect(container.querySelector<HTMLButtonElement>("#run-btn")!.disabled).toBe(false);
     expect(container.querySelector<HTMLButtonElement>("#test-btn")!.disabled).toBe(false);
   });
+
+  it("honors a gate opened before `ready` resolves -- the Test button is constructed disabled", async () => {
+    let resolveRange!: (v: undefined) => void;
+    (services.getDefaultRowRange as jest.Mock).mockReturnValue(
+      new Promise((res) => {
+        resolveRange = res;
+      }),
+    );
+    const container = makeContainer();
+    const rc = new RunControls(container, { getPromptConfig: basicPromptConfig });
+
+    // #test-btn's AsyncActionButton does not exist yet at this point.
+    rc.setInteractive(false);
+    expect(container.querySelector<HTMLButtonElement>("#run-btn")!.disabled).toBe(true);
+
+    resolveRange(undefined);
+    await rc.ready;
+
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.disabled).toBe(true);
+    (services.getDefaultRowRange as jest.Mock).mockResolvedValue(undefined);
+  });
+
+  it("keeps the Test button disabled across a checkTestStatsFreshness() state change", async () => {
+    const { container, rc } = await mountAndSettle({
+      savedState: { lastTest: { stats: TEST_STATS, fullRowCount: 100 } },
+    });
+
+    rc.setInteractive(false);
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.disabled).toBe(true);
+
+    // setIdle()/setDone() from here used to clobber the gate's disabled flag.
+    rc.checkTestStatsFreshness();
+
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.disabled).toBe(true);
+  });
 });

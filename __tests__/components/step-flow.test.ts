@@ -423,7 +423,9 @@ describe("StepFlow — editing exclusivity", () => {
 
     container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
 
-    expect(c.interactiveCalls).toEqual([false]);
+    // The leading `true` is c's own mount, which asserts the (then-closed)
+    // gate as an invariant rather than waiting for an edit event.
+    expect(c.interactiveCalls).toEqual([true, false]);
   });
 
   it("re-enables it when the edit is canceled", () => {
@@ -436,10 +438,10 @@ describe("StepFlow — editing exclusivity", () => {
 
     container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
 
-    expect(c.interactiveCalls).toEqual([false, true]);
+    expect(c.interactiveCalls).toEqual([true, false, true]); // mount, gate opens, gate closes
   });
 
-  it("re-enables it when the edit is recommitted successfully", () => {
+  it("does not re-enable a step the same recommit just relocked -- its next mount re-asserts the gate instead", () => {
     const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStepWithInteractive("C")];
     const container = makeContainer();
     new StepFlow(container, [a, b, c]);
@@ -447,7 +449,40 @@ describe("StepFlow — editing exclusivity", () => {
     b.lastCtx!.onComplete();
     container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
 
-    a.lastCtx!.onComplete(); // re-complete a
+    a.lastCtx!.onComplete(); // re-complete a -- b reactivates, c relocks
+
+    // c was unmounted by the relock cascade in this very call: re-enabling it
+    // would only touch a discarded instance. (The leading `true` is c's own
+    // original mount, before any edit began.)
+    expect(c.interactiveCalls).toEqual([true, false]);
+
+    b.lastCtx!.onComplete(); // walk forward -- c mounts afresh, gate now closed
+
+    expect(c.interactiveCalls).toEqual([true, false, true]);
+  });
+
+  it("gates a step that mounts for the first time WHILE another step is mid-edit", () => {
+    // Reachable sequence: Continue clicked on the middle step (RPC in flight),
+    // [Edit] clicked on the first step before it resolves, then the RPC
+    // resolves and advances the flow -- mounting the terminal step under an
+    // already-open gate.
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStepWithInteractive("C")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete(); // a: complete, b: active, c: locked (never mounted)
+
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    expect(c.interactiveCalls).toEqual([]); // nothing to gate yet -- c isn't mounted
+
+    b.lastCtx!.onComplete(); // b's in-flight commit resolves under the open gate
+
+    expect(c.mounted).toBe(true);
+    expect(c.interactiveCalls).toEqual([false]); // mounted disabled, not enabled
+    // The gate is still open on a -- b completing is not a's edit resolving.
+    const rows = container.querySelectorAll(".step-row");
+    expect(rows[0].querySelector<HTMLButtonElement>(".step-cancel-btn")!.hidden).toBe(false);
+
+    rows[0].querySelector<HTMLButtonElement>(".step-cancel-btn")!.click(); // resolve the edit
 
     expect(c.interactiveCalls).toEqual([false, true]);
   });
@@ -580,11 +615,106 @@ describe("StepFlow — Cancel", () => {
     };
     new StepFlow(container, [a, b], restored);
 
+    // No gate was opened this session, so no Cancel is offered -- the step is
+    // expanded and usable, and a restored draft is committed by completing it,
+    // not by cancelling out of it. Dispatched directly to keep covering
+    // cancelEdit()'s "nothing to restore activeIndex to" path.
+    expect(container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.hidden).toBe(true);
     container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
 
     const row = container.querySelectorAll(".step-row")[0];
     expect(row.querySelector(".step-summary")!.textContent).toBe("col_x");
     expect(row.querySelector<HTMLElement>(".step-body")!.hidden).toBe(true);
+  });
+
+  it("offers no Cancel on the frontier step a recommit's relock cascade re-activated", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStep("C")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c]);
+    a.setValue("a-value");
+    a.lastCtx!.onComplete(); // a: complete, b: active
+    b.setValue("b-value");
+    b.lastCtx!.onComplete(); // b: complete, c: active (terminal)
+
+    container.querySelectorAll<HTMLButtonElement>(".step-edit-btn")[0].click(); // edit a
+    a.lastCtx!.onComplete(); // recommit a -- b reactivates WITH cached data, c relocks
+
+    // b is "active" with a cached summary but nobody clicked ITS [Edit], so it
+    // must not offer Cancel: cancelEdit(1) there used to collapse b while
+    // everything downstream stayed locked, leaving no step expanded at all.
+    const cancelBtns = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(".step-cancel-btn"),
+    );
+    expect(cancelBtns.filter((btn) => !btn.hidden)).toHaveLength(0);
+  });
+
+  it("leaves a step expanded after the complete/complete/edit/recommit/cancel sequence", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStep("C")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete(); // 1. complete step 1
+    b.lastCtx!.onComplete(); // 2. complete step 2 (terminal step 3 now active)
+    container.querySelectorAll<HTMLButtonElement>(".step-edit-btn")[0].click(); // 3. edit step 1
+    a.lastCtx!.onComplete(); // 4. recommit step 1
+
+    // 5. click whatever Cancel the user can actually reach at this point.
+    Array.from(container.querySelectorAll<HTMLButtonElement>(".step-cancel-btn"))
+      .filter((btn) => !btn.hidden)
+      .forEach((btn) => btn.click());
+
+    const expandedBodies = Array.from(container.querySelectorAll<HTMLElement>(".step-body")).filter(
+      (el) => !el.hidden,
+    );
+    expect(expandedBodies).toHaveLength(1);
+    const rows = container.querySelectorAll(".step-row");
+    expect(rows[1].querySelector<HTMLElement>(".step-body")!.hidden).toBe(false);
+  });
+});
+
+describe("StepFlow — a relocked step renders plain", () => {
+  it("clears a relocked step's error icon", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStep("C")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete();
+    b.lastCtx!.onComplete(); // c: active (terminal)
+    c.lastCtx!.onError(); // c's own commit failed
+    expect(container.querySelectorAll(".step-icon")[2].textContent).toBe("✕");
+
+    container.querySelectorAll<HTMLButtonElement>(".step-edit-btn")[0].click(); // edit a
+    a.lastCtx!.onComplete(); // recommit a -- c relocks
+
+    const icon = container.querySelectorAll(".step-icon")[2];
+    expect(icon.textContent).toBe("○");
+    expect(icon.classList.contains("step-icon--error")).toBe(false);
+  });
+
+  it("clears a relocked step's busy flag, so a later re-edit's Cancel isn't stuck disabled", () => {
+    const [a, b, c, d] = [
+      new FakeStep("A"),
+      new FakeStep("B"),
+      new FakeStep("C"),
+      new FakeStep("D"),
+    ];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c, d]);
+    a.lastCtx!.onComplete(); // b: active
+    b.lastCtx!.onComplete(); // c: active
+    c.lastCtx!.onBusyChange(true); // c's own commit is in flight
+
+    container.querySelectorAll<HTMLButtonElement>(".step-edit-btn")[0].click(); // edit a
+    a.lastCtx!.onComplete(); // recommit a -- b reactivates, c and d relock
+
+    // Walk forward to c again and complete it, then re-edit it.
+    b.lastCtx!.onComplete(); // c: active, mounted afresh
+    c.lastCtx!.onComplete(); // c: complete, d: active
+    container.querySelectorAll<HTMLButtonElement>(".step-edit-btn")[2].click(); // edit c
+
+    const cCancel = container
+      .querySelectorAll(".step-row")[2]
+      .querySelector<HTMLButtonElement>(".step-cancel-btn")!;
+    expect(cCancel.hidden).toBe(false);
+    expect(cCancel.disabled).toBe(false);
   });
 });
 

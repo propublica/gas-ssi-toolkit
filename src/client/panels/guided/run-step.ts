@@ -79,8 +79,12 @@ export class RunStep implements Step<RunStepSavedState> {
   }
 
   /** Mirrors ConfigureAIRunPanel's refresh behavior for the Run step's own
-   * RunControls. No-op if this step hasn't been mounted yet (e.g. the user
-   * is still on an earlier step) -- there's nothing live to refresh. */
+   * RunControls. No-op before this step's first mount -- there's nothing live
+   * to refresh. After a relock (this step can be unmounted and walked back to,
+   * per StepFlow.relockStepsAfter), `runControls` is non-null but points at a
+   * discarded instance whose DOM is no longer displayed; refreshing it is
+   * harmless, since the next mount() builds a fresh RunControls from saved
+   * state and discards this one. Same for checkTestStatsFreshness() below. */
   refreshRowRange(): Promise<void> {
     return this.runControls?.refreshRowRange() ?? Promise.resolve();
   }

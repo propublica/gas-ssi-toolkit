@@ -221,4 +221,46 @@ describe("RunStep — setInteractive", () => {
     expect(container.querySelector<HTMLButtonElement>("#run-btn")!.disabled).toBe(false);
     expect(container.querySelector<HTMLButtonElement>("#test-btn")!.disabled).toBe(false);
   });
+
+  it("stays disabled when gated immediately after mount, before RunControls' row-range fetch settles", async () => {
+    // The reachable case StepFlow's mount-time gate produces: this step mounts
+    // while an earlier step is mid-edit, so setInteractive(false) lands while
+    // #test-btn's AsyncActionButton doesn't exist yet, and mount()'s own
+    // ready.then(checkTestStatsFreshness) fires a state change afterwards.
+    const container = makeContainer();
+    const step = new RunStep(
+      () => ({ promptCols: [{ col: "NoteCol", kind: "auto" as const }] }),
+      jest.fn(),
+    );
+    step.mount(container, makeCtx(), {
+      runControls: {
+        lastTest: {
+          stats: {
+            rowCount: 10,
+            totalTimeMs: 4200,
+            totalInputTokens: 500,
+            totalOutputTokens: 300,
+            totalTokenCost: 0.002,
+            totalGroundingQueries: 0,
+            totalGroundingCost: 0,
+            testedAt: 1234567890,
+            config: {
+              promptCols: [{ col: "Other", kind: "text" as const }],
+              systemPromptCol: undefined,
+              tools: [],
+              wrapPromptsInTags: true,
+              model: "gemini-3.1-flash-lite" as const,
+            },
+          },
+          fullRowCount: 10,
+        },
+      },
+    });
+
+    step.setInteractive(false);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(container.querySelector<HTMLButtonElement>("#run-btn")!.disabled).toBe(true);
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.disabled).toBe(true);
+  });
 });

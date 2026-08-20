@@ -22,6 +22,11 @@ export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedSta
     savedState?: StepFlowSavedState,
   ): void {
     this.nav = nav;
+    // Every per-mount field is reset here, this one included: the StepFlow is
+    // rebuilt asynchronously once headers load, and a leftover instance from a
+    // previous mount would otherwise be the one unmount() reads from if the
+    // panel is torn down before the fetch settles.
+    this.stepFlow = null;
     this.inputsStep = null;
     this.runStep = null;
     this.isEditingGuardActive = false;
