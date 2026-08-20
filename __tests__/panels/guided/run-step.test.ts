@@ -25,8 +25,12 @@ function makeContainer(): HTMLElement {
   return document.getElementById("app")!;
 }
 
-function makeCtx(): StepContext & { onComplete: jest.Mock; onError: jest.Mock } {
-  return { onComplete: jest.fn(), onError: jest.fn() };
+function makeCtx(): StepContext & {
+  onComplete: jest.Mock;
+  onError: jest.Mock;
+  onBusyChange: jest.Mock;
+} {
+  return { onComplete: jest.fn(), onError: jest.fn(), onBusyChange: jest.fn() };
 }
 
 beforeEach(() => {

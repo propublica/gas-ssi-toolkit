@@ -17,6 +17,7 @@ export class StepFlow {
   private statuses: Array<"locked" | "active" | "complete">;
   private savedByIndex: Array<{ savedState: unknown; summary: string } | undefined>;
   private hasErrorByIndex: boolean[];
+  private busyByIndex: boolean[];
   /** activeIndex to restore on Cancel, recorded by editStep(); null when the
    * step isn't currently mid-edit. */
   private preEditActiveIndex: Array<number | null>;
@@ -49,6 +50,7 @@ export class StepFlow {
       this.activeIndex = 0;
     }
     this.hasErrorByIndex = steps.map(() => false);
+    this.busyByIndex = steps.map(() => false);
     this.preEditActiveIndex = steps.map(() => null);
 
     this.container.innerHTML = "";
@@ -147,7 +149,9 @@ export class StepFlow {
     const editBtn = row.querySelector<HTMLButtonElement>(".step-edit-btn")!;
     editBtn.hidden = !isEditable;
     editBtn.disabled = this.editingIndex !== null && this.editingIndex !== index;
-    row.querySelector<HTMLElement>(".step-cancel-btn")!.hidden = !editingExistingStep;
+    const cancelBtn = row.querySelector<HTMLButtonElement>(".step-cancel-btn")!;
+    cancelBtn.hidden = !editingExistingStep;
+    cancelBtn.disabled = this.busyByIndex[index];
 
     const summaryEl = row.querySelector<HTMLElement>(".step-summary")!;
     summaryEl.hidden = !hasSummary;
@@ -164,8 +168,14 @@ export class StepFlow {
     const ctx: StepContext = {
       onComplete: () => this.handleComplete(index),
       onError: () => this.handleError(index),
+      onBusyChange: (isBusy: boolean) => this.handleBusyChange(index, isBusy),
     };
     this.steps[index].mount(body, ctx, this.savedByIndex[index]?.savedState);
+  }
+
+  private handleBusyChange(index: number, isBusy: boolean): void {
+    this.busyByIndex[index] = isBusy;
+    this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
   }
 
   private handleComplete(index: number): void {

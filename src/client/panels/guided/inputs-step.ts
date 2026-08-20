@@ -206,11 +206,19 @@ export class InputsStep implements Step<InputsStepSavedState> {
     const inputValues: Record<string, string> = {};
     folderRows.forEach((r, i) => (inputValues[`driveFolder_${i}`] = r.url));
 
+    ctx.onBusyChange(true);
     this.continueButton!.setLoading();
-    prepRecipe({ cols, inputValues }).then(finish, (err: Error) => {
-      globalThis.alert("Error importing Drive folder: " + err.message);
-      ctx.onError();
-      this.continueButton!.setIdle();
-    });
+    prepRecipe({ cols, inputValues }).then(
+      () => {
+        ctx.onBusyChange(false);
+        finish();
+      },
+      (err: Error) => {
+        ctx.onBusyChange(false);
+        globalThis.alert("Error importing Drive folder: " + err.message);
+        ctx.onError();
+        this.continueButton!.setIdle();
+      },
+    );
   }
 }

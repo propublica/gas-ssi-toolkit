@@ -145,6 +145,7 @@ export class PromptStep implements Step<PromptStepSavedState> {
       globalThis.alert("Please describe what the AI should do.");
       return;
     }
+    ctx.onBusyChange(true);
     this.continueButton!.setLoading();
     prepRecipe({
       cols: [
@@ -156,11 +157,13 @@ export class PromptStep implements Step<PromptStepSavedState> {
       inputValues: {},
     }).then(
       () => {
+        ctx.onBusyChange(false);
         this.continueButton!.setIdle();
         this.result = { systemPromptCol: SYSTEM_PROMPT_COLUMN_TITLE };
         ctx.onComplete();
       },
       (err: Error) => {
+        ctx.onBusyChange(false);
         globalThis.alert("Error saving prompt: " + err.message);
         ctx.onError();
         this.continueButton!.setIdle();

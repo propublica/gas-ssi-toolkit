@@ -53,6 +53,14 @@ export interface StepContext {
    * in this codebase reports errors. The shell only ever renders the icon,
    * never message text. */
   onError(): void;
+  /** Called by the step whenever its own committing action starts (true) or
+   * finishes (false) -- successfully or not. Gates the shell's own Cancel
+   * button for this step while a request is in flight, closing a race
+   * where Cancel reverts this row to "complete" and a still-in-flight
+   * request later calls onComplete()/onError() against a row that's
+   * already moved on. A step with no async commit action may simply never
+   * call it. */
+  onBusyChange(isBusy: boolean): void;
 }
 
 export interface Step<S = unknown> {

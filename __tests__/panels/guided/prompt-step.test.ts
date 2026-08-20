@@ -18,8 +18,12 @@ function makeContainer(): HTMLElement {
   return document.getElementById("app")!;
 }
 
-function makeCtx(): StepContext & { onComplete: jest.Mock; onError: jest.Mock } {
-  return { onComplete: jest.fn(), onError: jest.fn() };
+function makeCtx(): StepContext & {
+  onComplete: jest.Mock;
+  onError: jest.Mock;
+  onBusyChange: jest.Mock;
+} {
+  return { onComplete: jest.fn(), onError: jest.fn(), onBusyChange: jest.fn() };
 }
 
 beforeEach(() => {
@@ -285,5 +289,40 @@ describe("PromptStep — setInteractive", () => {
 
     step.setInteractive(true);
     expect(container.querySelector<HTMLButtonElement>("#gp-continue")!.disabled).toBe(false);
+  });
+});
+
+describe("PromptStep — onBusyChange", () => {
+  it("reports busy true before the request and false after it resolves", async () => {
+    (services.prepRecipe as jest.Mock).mockResolvedValue(undefined);
+    const container = makeContainer();
+    const step = new PromptStep();
+    const ctx = makeCtx();
+    step.mount(container, ctx);
+    container.querySelector<HTMLTextAreaElement>("#gp-prompt-text")!.value = "Summarize this.";
+
+    container.querySelector<HTMLButtonElement>("#gp-continue")!.click();
+    expect(ctx.onBusyChange).toHaveBeenNthCalledWith(1, true);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(ctx.onBusyChange).toHaveBeenNthCalledWith(2, false);
+  });
+
+  it("reports busy false after a failed request", async () => {
+    (services.prepRecipe as jest.Mock).mockRejectedValue(new Error("boom"));
+    const container = makeContainer();
+    const step = new PromptStep();
+    const ctx = makeCtx();
+    step.mount(container, ctx);
+    container.querySelector<HTMLTextAreaElement>("#gp-prompt-text")!.value = "Summarize this.";
+
+    container.querySelector<HTMLButtonElement>("#gp-continue")!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(ctx.onBusyChange).toHaveBeenLastCalledWith(false);
+    expect(ctx.onError).toHaveBeenCalled();
   });
 });

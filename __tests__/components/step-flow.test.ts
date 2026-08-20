@@ -627,3 +627,19 @@ describe("StepFlow — onEditingChange option", () => {
     expect(onEditingChange).not.toHaveBeenCalled();
   });
 });
+
+describe("StepFlow — Cancel disabled while busy", () => {
+  it("disables Cancel while the step reports itself busy, and re-enables it once idle", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b]);
+    a.lastCtx!.onComplete(); // a: complete, b: active
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+
+    a.lastCtx!.onBusyChange(true);
+    expect(container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.disabled).toBe(true);
+
+    a.lastCtx!.onBusyChange(false);
+    expect(container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.disabled).toBe(false);
+  });
+});

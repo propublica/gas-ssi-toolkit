@@ -19,8 +19,12 @@ function makeContainer(): HTMLElement {
   return document.getElementById("app")!;
 }
 
-function makeCtx(): StepContext & { onComplete: jest.Mock; onError: jest.Mock } {
-  return { onComplete: jest.fn(), onError: jest.fn() };
+function makeCtx(): StepContext & {
+  onComplete: jest.Mock;
+  onError: jest.Mock;
+  onBusyChange: jest.Mock;
+} {
+  return { onComplete: jest.fn(), onError: jest.fn(), onBusyChange: jest.fn() };
 }
 
 beforeEach(() => {
@@ -345,5 +349,60 @@ describe("InputsStep — setInteractive", () => {
 
     step.setInteractive(true);
     expect(container.querySelector<HTMLButtonElement>("#gi-continue")!.disabled).toBe(false);
+  });
+});
+
+describe("InputsStep — onBusyChange", () => {
+  it("reports busy true before the Drive-folder request and false after it resolves", async () => {
+    (services.prepRecipe as jest.Mock).mockResolvedValue(undefined);
+    const container = makeContainer();
+    const step = new InputsStep(["col_a"]);
+    const ctx = makeCtx();
+    step.mount(container, ctx);
+    container.querySelector<HTMLButtonElement>("#gi-add-folder")!.click();
+    container.querySelector<HTMLInputElement>(".guided-input-folder-url")!.value =
+      "https://drive.google.com/x";
+
+    container.querySelector<HTMLButtonElement>("#gi-continue")!.click();
+    expect(ctx.onBusyChange).toHaveBeenNthCalledWith(1, true);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(ctx.onBusyChange).toHaveBeenNthCalledWith(2, false);
+  });
+
+  it("reports busy false after a failed request", async () => {
+    (services.prepRecipe as jest.Mock).mockRejectedValue(new Error("boom"));
+    globalThis.alert = jest.fn();
+    const container = makeContainer();
+    const step = new InputsStep(["col_a"]);
+    const ctx = makeCtx();
+    step.mount(container, ctx);
+    container.querySelector<HTMLButtonElement>("#gi-add-folder")!.click();
+    container.querySelector<HTMLInputElement>(".guided-input-folder-url")!.value =
+      "https://drive.google.com/x";
+
+    container.querySelector<HTMLButtonElement>("#gi-continue")!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(ctx.onBusyChange).toHaveBeenLastCalledWith(false);
+    expect(ctx.onError).toHaveBeenCalled();
+  });
+
+  it("never reports busy when there are no Drive-folder rows (no RPC needed)", () => {
+    const container = makeContainer();
+    const step = new InputsStep(["col_a"]);
+    const ctx = makeCtx();
+    step.mount(container, ctx);
+    container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+    container.querySelector<HTMLElement>(".token-add-btn")!.click();
+    container.querySelector<HTMLElement>('.token-option[data-value="col_a"]')!.click();
+
+    container.querySelector<HTMLButtonElement>("#gi-continue")!.click();
+
+    expect(ctx.onBusyChange).not.toHaveBeenCalled();
+    expect(ctx.onComplete).toHaveBeenCalled();
   });
 });
