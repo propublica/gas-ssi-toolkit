@@ -3,6 +3,14 @@ import { truncate } from "../format";
 
 const SUMMARY_MAX_LENGTH = 60;
 
+export interface StepFlowOptions {
+  /** Called whenever the editing-exclusivity gate opens or closes (Edit
+   * clicked on a step, or that edit resolving via Cancel or a successful
+   * recommit) -- lets the host panel disable its own chrome (e.g. a
+   * "Refresh columns" button) while an edit is unresolved elsewhere. */
+  onEditingChange?: (isEditing: boolean) => void;
+}
+
 export class StepFlow {
   private readonly container: HTMLElement;
   private readonly steps: Step[];
@@ -16,13 +24,20 @@ export class StepFlow {
    * by Cancel or a successful recommit), or null when nothing is being
    * edited. At most one step is ever mid-edit at a time. */
   private editingIndex: number | null = null;
+  private readonly onEditingChange?: (isEditing: boolean) => void;
   private activeIndex: number;
   private rowEls: HTMLElement[] = [];
 
-  constructor(container: HTMLElement, steps: Step[], savedState?: StepFlowSavedState) {
+  constructor(
+    container: HTMLElement,
+    steps: Step[],
+    savedState?: StepFlowSavedState,
+    options?: StepFlowOptions,
+  ) {
     if (steps.length === 0) throw new Error("StepFlow requires at least one step");
     this.container = container;
     this.steps = steps;
+    this.onEditingChange = options?.onEditingChange;
 
     if (savedState) {
       this.statuses = savedState.steps.map((s) => s.status);
@@ -248,6 +263,7 @@ export class StepFlow {
       this.setStepInteractive(previousActive, false);
     }
     this.refreshAllRowDisplays();
+    this.onEditingChange?.(true);
   }
 
   /** Discards whatever is currently typed in an edited step's form -- no
@@ -287,6 +303,7 @@ export class StepFlow {
     this.preEditActiveIndex[index] = null;
     if (restoreIndex !== null) this.setStepInteractive(restoreIndex, true);
     this.refreshAllRowDisplays();
+    this.onEditingChange?.(false);
     return restoreIndex;
   }
 }

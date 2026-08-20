@@ -12,6 +12,8 @@ export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedSta
   private inputsStep: InputsStep | null = null;
   private runStep: RunStep | null = null;
   private nav: NavigationContext | null = null;
+  private isEditingGuardActive = false;
+  private isRefreshing = false;
 
   mount(
     container: HTMLElement,
@@ -49,6 +51,12 @@ export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedSta
             container.querySelector("#steps-container")!,
             [inputsStep, promptStep, runStep],
             savedState,
+            {
+              onEditingChange: (isEditing) => {
+                this.isEditingGuardActive = isEditing;
+                this.updateRefreshButtonState(container);
+              },
+            },
           );
         },
         (err: Error) => {
@@ -65,10 +73,16 @@ export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedSta
     return value;
   }
 
+  private updateRefreshButtonState(container: HTMLElement): void {
+    const btn = container.querySelector<HTMLButtonElement>("#refresh-btn")!;
+    btn.disabled = this.isRefreshing || this.isEditingGuardActive;
+  }
+
   private handleRefresh(container: HTMLElement): void {
     const btn = container.querySelector<HTMLButtonElement>("#refresh-btn")!;
     btn.classList.add("spinning");
-    btn.disabled = true;
+    this.isRefreshing = true;
+    this.updateRefreshButtonState(container);
     Promise.all([
       getSheetHeaders().then(
         (headers) => this.inputsStep?.updateHeaders(headers),
@@ -79,7 +93,8 @@ export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedSta
       .then(() => this.runStep?.checkTestStatsFreshness())
       .finally(() => {
         btn.classList.remove("spinning");
-        btn.disabled = false;
+        this.isRefreshing = false;
+        this.updateRefreshButtonState(container);
       });
   }
 

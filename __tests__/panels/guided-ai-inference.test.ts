@@ -166,6 +166,23 @@ describe("GuidedAIInferencePanel — refresh columns", () => {
   });
 });
 
+describe("GuidedAIInferencePanel — refresh disabled while editing", () => {
+  it("disables the refresh button while an earlier step is being re-edited, and re-enables it on Cancel", async () => {
+    const { container } = await mountAndLoad(["NoteCol"]);
+    container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+    container.querySelector<HTMLElement>(".token-add-btn")!.click();
+    container.querySelector<HTMLElement>('.token-option[data-value="NoteCol"]')!.click();
+    container.querySelector<HTMLButtonElement>("#gi-continue")!.click();
+    await Promise.resolve();
+
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // re-edit Step 1
+    expect(container.querySelector<HTMLButtonElement>("#refresh-btn")!.disabled).toBe(true);
+
+    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+    expect(container.querySelector<HTMLButtonElement>("#refresh-btn")!.disabled).toBe(false);
+  });
+});
+
 describe("GuidedAIInferencePanel — unmount cleanup", () => {
   it("tears down Step 1's TokenInput document-level listeners on unmount", async () => {
     const { container, panel } = await mountAndLoad();

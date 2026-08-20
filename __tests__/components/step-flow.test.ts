@@ -587,3 +587,43 @@ describe("StepFlow — Cancel", () => {
     expect(row.querySelector<HTMLElement>(".step-body")!.hidden).toBe(true);
   });
 });
+
+describe("StepFlow — onEditingChange option", () => {
+  it("fires true when an edit begins and false when it's canceled", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    const onEditingChange = jest.fn();
+    new StepFlow(container, [a, b], undefined, { onEditingChange });
+    a.lastCtx!.onComplete(); // a: complete, b: active
+
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    expect(onEditingChange).toHaveBeenLastCalledWith(true);
+
+    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+    expect(onEditingChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("fires false when the edit resolves via a successful recommit", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    const onEditingChange = jest.fn();
+    new StepFlow(container, [a, b], undefined, { onEditingChange });
+    a.lastCtx!.onComplete();
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+
+    a.lastCtx!.onComplete(); // re-complete a
+
+    expect(onEditingChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("is never called for a plain, non-edit completion", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    const onEditingChange = jest.fn();
+    new StepFlow(container, [a, b], undefined, { onEditingChange });
+
+    a.lastCtx!.onComplete();
+
+    expect(onEditingChange).not.toHaveBeenCalled();
+  });
+});
