@@ -11,6 +11,18 @@ export interface StepFlowOptions {
   onEditingChange?: (isEditing: boolean) => void;
 }
 
+/** A row's DOM parts, captured once at build time so later renders read/write
+ * them directly instead of re-querying the row's subtree on every update. */
+interface RowRefs {
+  icon: HTMLElement;
+  /** Edit and Cancel share one slot -- see applyRowDisplay for why a row
+   * never needs both at once. */
+  actionBtn: HTMLButtonElement;
+  summary: HTMLElement;
+  flavor: HTMLElement;
+  body: HTMLElement;
+}
+
 export class StepFlow {
   private readonly container: HTMLElement;
   private readonly steps: Step[];
@@ -34,6 +46,7 @@ export class StepFlow {
   private readonly onEditingChange?: (isEditing: boolean) => void;
   private activeIndex: number;
   private rowEls: HTMLElement[] = [];
+  private rowRefs: RowRefs[] = [];
 
   constructor(
     container: HTMLElement,
@@ -121,40 +134,42 @@ export class StepFlow {
       <div class="step-header">
         <span class="step-icon">${this.iconFor(index)}</span>
         <span class="step-title-text">${step.title}</span>
-        <button type="button" class="step-edit-btn" hidden>Edit</button>
-        <button type="button" class="step-cancel-btn" hidden>Cancel</button>
+        <button type="button" class="step-action-btn" hidden></button>
       </div>
       <p class="step-summary" hidden></p>
       <p class="step-flavor-text" hidden></p>
       <div class="step-body" hidden></div>
     `;
-    row
-      .querySelector<HTMLButtonElement>(".step-edit-btn")!
-      .addEventListener("click", () => this.editStep(index));
-    row
-      .querySelector<HTMLButtonElement>(".step-cancel-btn")!
-      .addEventListener("click", () => this.cancelEdit(index));
-    this.applyRowDisplay(row, index, step);
+    const refs: RowRefs = {
+      icon: row.querySelector<HTMLElement>(".step-icon")!,
+      actionBtn: row.querySelector<HTMLButtonElement>(".step-action-btn")!,
+      summary: row.querySelector<HTMLElement>(".step-summary")!,
+      flavor: row.querySelector<HTMLElement>(".step-flavor-text")!,
+      body: row.querySelector<HTMLElement>(".step-body")!,
+    };
+    // Dispatches on the button's own current mode rather than a fixed
+    // handler -- Edit and Cancel are never both on offer for a row (see
+    // applyRowDisplay), so whichever the button is showing is what a click
+    // means.
+    refs.actionBtn.addEventListener("click", () => {
+      if (refs.actionBtn.dataset.mode === "cancel") this.cancelEdit(index);
+      else this.editStep(index);
+    });
+    this.rowRefs[index] = refs;
+    this.applyRowDisplay(index);
     return row;
   }
 
-  private applyRowDisplay(row: HTMLElement, index: number, step: Step): void {
+  private applyRowDisplay(index: number): void {
+    const step = this.steps[index];
     const status = this.statuses[index];
     const expanded = this.isMountedState(index);
+    const refs = this.rowRefs[index];
+
     // Only a genuinely "complete" step offers [Edit] -- a relocked step must
     // be reached by walking forward through the intervening locked steps,
     // not jumped to directly.
-    const isEditable = status === "complete" && !this.isLastStep(index);
-    // Independent of isEditable: any collapsed, non-terminal step with
-    // cached data shows its summary, whether that's because it's complete
-    // OR because it relocked with its old data still intact.
-    const hasSummary =
-      !expanded && !this.isLastStep(index) && this.savedByIndex[index] !== undefined;
-
-    const editBtn = row.querySelector<HTMLButtonElement>(".step-edit-btn")!;
-    editBtn.hidden = !isEditable;
-    editBtn.disabled = this.editingIndex !== null && this.editingIndex !== index;
-    const cancelBtn = row.querySelector<HTMLButtonElement>(".step-cancel-btn")!;
+    const showEdit = status === "complete" && !this.isLastStep(index);
     // Keyed on editingIndex -- the authoritative "this step is actually being
     // edited" signal -- NOT on the old "active && has cached data" heuristic.
     // After a recommit's relock cascade the immediate-next step is legitimately
@@ -165,24 +180,40 @@ export class StepFlow {
     // while its own Test/Run holds editingIndex -- see handleBusyChange) and a
     // step with no cached data yet (editingIndex can now be held by a step's
     // OWN first-time-completion request, which has nothing to cancel back to).
-    cancelBtn.hidden =
-      this.editingIndex !== index ||
-      this.isLastStep(index) ||
-      this.savedByIndex[index] === undefined;
-    cancelBtn.disabled = this.busyByIndex[index];
+    const showCancel =
+      this.editingIndex === index &&
+      !this.isLastStep(index) &&
+      this.savedByIndex[index] !== undefined;
+    // showEdit and showCancel are mutually exclusive: editingIndex === index
+    // only while that row's own status is "active" (set by editStep() /
+    // handleBusyChange()), never "complete" -- so a row is never asked to
+    // show both, and one <button> can serve as both slots.
+    refs.actionBtn.hidden = !showEdit && !showCancel;
+    if (showCancel) {
+      refs.actionBtn.textContent = "Cancel";
+      refs.actionBtn.dataset.mode = "cancel";
+      refs.actionBtn.disabled = this.busyByIndex[index];
+    } else if (showEdit) {
+      refs.actionBtn.textContent = "Edit";
+      refs.actionBtn.dataset.mode = "edit";
+      refs.actionBtn.disabled = this.editingIndex !== null && this.editingIndex !== index;
+    }
 
-    const summaryEl = row.querySelector<HTMLElement>(".step-summary")!;
-    summaryEl.hidden = !hasSummary;
-    summaryEl.textContent = this.savedByIndex[index]?.summary ?? "";
+    // Independent of showEdit/showCancel: any collapsed, non-terminal step
+    // with cached data shows its summary, whether that's because it's
+    // complete OR because it relocked with its old data still intact.
+    const hasSummary =
+      !expanded && !this.isLastStep(index) && this.savedByIndex[index] !== undefined;
+    refs.summary.hidden = !hasSummary;
+    refs.summary.textContent = this.savedByIndex[index]?.summary ?? "";
 
-    const flavorEl = row.querySelector<HTMLElement>(".step-flavor-text")!;
-    flavorEl.hidden = !expanded || step.flavorText === "";
-    flavorEl.textContent = step.flavorText;
-    row.querySelector<HTMLElement>(".step-body")!.hidden = !expanded;
+    refs.flavor.hidden = !expanded || step.flavorText === "";
+    refs.flavor.textContent = step.flavorText;
+    refs.body.hidden = !expanded;
   }
 
   private mountStep(index: number): void {
-    const body = this.rowEls[index].querySelector<HTMLElement>(".step-body")!;
+    const body = this.rowRefs[index].body;
     const ctx: StepContext = {
       onComplete: () => this.handleComplete(index),
       onError: () => this.handleError(index),
@@ -226,7 +257,7 @@ export class StepFlow {
       this.refreshAllRowDisplays();
       this.onEditingChange?.(false);
     } else {
-      this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
+      this.applyRowDisplay(index);
     }
   }
 
@@ -240,7 +271,7 @@ export class StepFlow {
       // savedState/summary are refreshed lazily by getValue() when the panel
       // is actually torn down, not eagerly here.
       this.statuses[index] = "complete";
-      this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
+      this.applyRowDisplay(index);
       this.updateIcon(index);
       // Reachable: a successful Run AI holds the gate via handleBusyChange()
       // (its own onBusyChange(true) call) for as long as it's in flight, and
@@ -267,8 +298,8 @@ export class StepFlow {
     this.activeIndex = nextIndex;
     if (nextWasLocked) this.mountStep(nextIndex);
 
-    this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
-    this.applyRowDisplay(this.rowEls[nextIndex], nextIndex, this.steps[nextIndex]);
+    this.applyRowDisplay(index);
+    this.applyRowDisplay(nextIndex);
     this.updateIcon(index);
     this.updateIcon(nextIndex);
     this.releaseEditingGate(index);
@@ -295,7 +326,7 @@ export class StepFlow {
       this.statuses[i] = "locked";
       this.hasErrorByIndex[i] = false;
       this.busyByIndex[i] = false;
-      this.applyRowDisplay(this.rowEls[i], i, this.steps[i]);
+      this.applyRowDisplay(i);
       this.updateIcon(i);
     }
   }
@@ -306,15 +337,13 @@ export class StepFlow {
   }
 
   private updateIcon(index: number): void {
-    const row = this.rowEls[index];
-    const icon = row.querySelector<HTMLElement>(".step-icon");
-    if (icon) {
-      icon.textContent = this.iconFor(index);
-      icon.classList.toggle("step-icon--error", this.hasErrorByIndex[index]);
-    }
+    const { icon } = this.rowRefs[index];
+    icon.textContent = this.iconFor(index);
+    icon.classList.toggle("step-icon--error", this.hasErrorByIndex[index]);
     // The badge fill and the rail segment leading into the next badge are
     // both driven by this same row-level status class -- see .step-row--*
     // in sidebar.css.
+    const row = this.rowEls[index];
     row.classList.remove("step-row--locked", "step-row--active", "step-row--complete");
     row.classList.add(`step-row--${this.statuses[index]}`);
   }
@@ -344,7 +373,7 @@ export class StepFlow {
    * state) depends on whether ANY other step is currently mid-edit, not
    * just this row's own status. */
   private refreshAllRowDisplays(): void {
-    this.steps.forEach((step, i) => this.applyRowDisplay(this.rowEls[i], i, step));
+    this.steps.forEach((_, i) => this.applyRowDisplay(i));
   }
 
   private editStep(index: number): void {
@@ -365,7 +394,7 @@ export class StepFlow {
       this.statuses[previousActive] = "locked";
       this.hasErrorByIndex[previousActive] = false;
       this.busyByIndex[previousActive] = false;
-      this.applyRowDisplay(this.rowEls[previousActive], previousActive, this.steps[previousActive]);
+      this.applyRowDisplay(previousActive);
       this.updateIcon(previousActive);
     }
     this.editingIndex = index;

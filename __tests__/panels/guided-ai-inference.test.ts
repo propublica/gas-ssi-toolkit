@@ -175,10 +175,10 @@ describe("GuidedAIInferencePanel — refresh disabled while editing", () => {
     container.querySelector<HTMLButtonElement>("#gi-continue")!.click();
     await Promise.resolve();
 
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // re-edit Step 1
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // re-edit Step 1
     expect(container.querySelector<HTMLButtonElement>("#refresh-btn")!.disabled).toBe(true);
 
-    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click();
     expect(container.querySelector<HTMLButtonElement>("#refresh-btn")!.disabled).toBe(false);
   });
 
@@ -196,7 +196,7 @@ describe("GuidedAIInferencePanel — refresh disabled while editing", () => {
     await Promise.resolve();
 
     // Click [Edit] on Step 1 — sets isEditingGuardActive = true.
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click();
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click();
     expect(container.querySelector<HTMLButtonElement>("#refresh-btn")!.disabled).toBe(true);
 
     // Click Back without resolving the edit (unmount).
@@ -351,7 +351,7 @@ describe("GuidedAIInferencePanel — persistence", () => {
     // (only one step is ever open at a time) and stays collapsed across the
     // unmount/remount below, since nothing resolved the edit.
     const promptRow = container.querySelector('.step-row[data-step-index="1"]')!;
-    promptRow.querySelector<HTMLButtonElement>(".step-edit-btn")!.click();
+    promptRow.querySelector<HTMLButtonElement>(".step-action-btn")!.click();
 
     const saved = panel.unmount();
 

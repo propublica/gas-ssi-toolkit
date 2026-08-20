@@ -991,8 +991,11 @@ h3 {
 /* ── Guided AI Inference — step shell ── */
 
 .step-row {
+  --step-row-gap: 14px; /* vertical padding between rows */
+  --step-badge-size: 18px; /* icon/badge diameter */
+  --step-indent: 26px; /* left indent for summary/flavor/body, under the badge */
   border-top: 1px solid var(--border-color);
-  padding: 14px 0;
+  padding: var(--step-row-gap) 0;
   position: relative;
 }
 
@@ -1008,21 +1011,22 @@ h3 {
 /* The advancing progress rail -- each row draws the segment from its own
    badge down into the next row's badge. The segment turns green once THIS
    step is complete, so the green line grows downward as the user works
-   through the flow (ported from the wireframe's .gstep::after; math: 14px
-   row padding + 9px to the badge center). */
+   through the flow (ported from the wireframe's .gstep::after). Offsets are
+   computed from the row's own gap/badge-size instead of hardcoded, so the
+   relationship stays correct if either variable changes. */
 .step-row::after {
   content: "";
   position: absolute;
   left: 8px;
   width: 2px;
-  top: 23px;
-  bottom: -23px;
+  top: calc(var(--step-row-gap) + var(--step-badge-size) / 2);
+  bottom: calc(-1 * (var(--step-row-gap) + var(--step-badge-size) / 2));
   background: var(--border-color);
   border-radius: 1px;
 }
 
 .step-row:first-child::after {
-  top: 9px;
+  top: calc(var(--step-badge-size) / 2);
 }
 .step-row:last-child::after {
   display: none;
@@ -1040,9 +1044,9 @@ h3 {
 .step-icon {
   position: relative;
   z-index: 1; /* sits on top of the rail line */
-  flex: 0 0 18px;
-  width: 18px;
-  height: 18px;
+  flex: 0 0 var(--step-badge-size);
+  width: var(--step-badge-size);
+  height: var(--step-badge-size);
   margin-top: 1px;
   border-radius: 50%;
   display: flex;
@@ -1091,7 +1095,10 @@ h3 {
   flex: 1;
 }
 
-.step-edit-btn {
+/* Edit and Cancel are two labels for one action slot -- a row is only ever
+   in one of the two modes at a time (see StepFlow.applyRowDisplay), so they
+   share one button element and this ruleset, distinguished only by color. */
+.step-action-btn {
   background: none;
   border: none;
   color: var(--primary-blue);
@@ -1101,51 +1108,37 @@ h3 {
   padding: 0;
 }
 
-.step-edit-btn:hover {
+.step-action-btn[data-mode="cancel"] {
+  color: var(--text-secondary);
+}
+
+.step-action-btn:hover {
   text-decoration: underline;
 }
-.step-edit-btn:disabled {
+
+.step-action-btn:disabled {
   opacity: 0.4;
   cursor: default;
   text-decoration: none;
-}
-
-.step-cancel-btn {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-family: var(--font-family);
-  font-size: var(--font-size-200);
-  cursor: pointer;
-  padding: 0;
-}
-
-.step-cancel-btn:hover {
-  text-decoration: underline;
-}
-
-.step-cancel-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 .step-summary {
   font-size: var(--font-size-100);
   font-style: italic;
   color: var(--text-secondary);
-  margin: 4px 0 0 26px;
+  margin: 4px 0 0 var(--step-indent);
   line-height: 1.4;
 }
 
 .step-flavor-text {
   font-size: var(--font-size-200);
   color: var(--text-secondary);
-  margin: 4px 0 12px 26px;
+  margin: 4px 0 12px var(--step-indent);
   line-height: 1.45;
 }
 
 .step-body {
-  margin-left: 26px;
+  margin-left: var(--step-indent);
 }
 
 /* ── Guided input rows (InputsStep) ── */

@@ -92,7 +92,9 @@ describe("StepFlow — onComplete for a non-terminal step", () => {
     expect(icons[0].textContent).toBe("✓");
     expect(icons[1].textContent).toBe("●");
     expect(container.querySelector(".step-summary")!.textContent).toBe("col_x");
-    expect(container.querySelector<HTMLButtonElement>(".step-edit-btn")!.hidden).toBe(false);
+    const actionBtn = container.querySelector<HTMLButtonElement>(".step-action-btn")!;
+    expect(actionBtn.hidden).toBe(false);
+    expect(actionBtn.dataset.mode).toBe("edit");
   });
 
   it("calling onComplete again on an already-complete non-terminal step is a no-op", () => {
@@ -124,7 +126,7 @@ describe("StepFlow — onComplete for the terminal (last) step", () => {
     const lastIcon = rows[1].querySelector(".step-icon")!;
     expect(lastIcon.textContent).toBe("✓");
     expect(rows[1].querySelector<HTMLElement>(".step-body")!.hidden).toBe(false);
-    expect(rows[1].querySelector<HTMLButtonElement>(".step-edit-btn")!.hidden).toBe(true);
+    expect(rows[1].querySelector<HTMLButtonElement>(".step-action-btn")!.hidden).toBe(true);
   });
 
   it("calling onComplete again on an already-complete terminal step is a no-op", () => {
@@ -207,7 +209,7 @@ describe("StepFlow — [Edit]", () => {
     a.setValue("col_x");
     a.lastCtx!.onComplete(); // a: complete/collapsed, b: active
 
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click();
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click();
 
     expect(a.mounted).toBe(true);
     expect(container.querySelector<HTMLInputElement>(".fake-step-input")!.value).toBe("col_x");
@@ -221,7 +223,7 @@ describe("StepFlow — [Edit]", () => {
     a.lastCtx!.onComplete();
     b.lastCtx!.onComplete(); // b: terminal, complete, expanded
 
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a
 
     expect(b.mounted).toBe(false);
     const rows = container.querySelectorAll(".step-row");
@@ -234,7 +236,7 @@ describe("StepFlow — [Edit]", () => {
     const flow = new StepFlow(container, [a, b, c]);
     a.lastCtx!.onComplete(); // a: complete/collapsed, b: active
     b.setValue("in-progress-b");
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a
     expect(a.mounted).toBe(true);
     expect(b.mounted).toBe(false); // only one step is ever open at a time
     const saved = flow.getValue();
@@ -249,7 +251,7 @@ describe("StepFlow — [Edit]", () => {
     a.lastCtx!.onComplete(); // a: complete, b: active
     b.setValue("in-progress-b");
     expect(b.mountCallCount).toBe(1);
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a; b collapses
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a; b collapses
     expect(b.mounted).toBe(false);
     a.lastCtx!.onComplete(); // re-complete a
     expect(b.mounted).toBe(true); // b remounts
@@ -265,10 +267,10 @@ describe("StepFlow — [Edit]", () => {
     const flow = new StepFlow(container, [a, b]);
     a.lastCtx!.onComplete(); // a: complete, b: active
     b.setValue("in-progress-b");
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a; b collapses
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a; b collapses
     expect(b.mounted).toBe(false);
 
-    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click(); // cancel a's edit
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // cancel a's edit
 
     expect(b.mounted).toBe(true);
     expect(b.mountCallCount).toBe(2);
@@ -284,10 +286,10 @@ describe("StepFlow — [Edit]", () => {
     const flow = new StepFlow(container, [a, b]);
     a.lastCtx!.onComplete();
     b.lastCtx!.onComplete(); // b: terminal, complete, expanded
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a; b collapses
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a; b collapses
     expect(b.mounted).toBe(false);
 
-    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click();
 
     expect(b.mounted).toBe(true);
     expect(flow.getValue().steps[1].status).toBe("complete");
@@ -357,7 +359,7 @@ describe("StepFlow — uncompleting downstream steps on edit", () => {
     b.setValue("b-value");
     b.lastCtx!.onComplete(); // b: complete, c: active (terminal)
 
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a
     a.lastCtx!.onComplete(); // re-complete a
 
     const rows = container.querySelectorAll(".step-row");
@@ -374,7 +376,7 @@ describe("StepFlow — uncompleting downstream steps on edit", () => {
     b.lastCtx!.onComplete(); // b: complete (terminal, stays expanded)
     expect(container.querySelectorAll(".step-icon")[1].textContent).toBe("✓");
 
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a
     a.lastCtx!.onComplete(); // re-complete a
 
     const rows = container.querySelectorAll(".step-row");
@@ -399,7 +401,7 @@ describe("StepFlow — relocking steps two or more hops downstream", () => {
     c.setValue("c-value");
     c.lastCtx!.onComplete(); // c: complete, d: active (terminal)
 
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a
     a.lastCtx!.onComplete(); // re-complete a
 
     const rows = container.querySelectorAll(".step-row");
@@ -412,7 +414,7 @@ describe("StepFlow — relocking steps two or more hops downstream", () => {
     expect(rows[2].querySelector<HTMLElement>(".step-body")!.hidden).toBe(true);
     expect(rows[2].querySelector<HTMLElement>(".step-summary")!.hidden).toBe(false);
     expect(rows[2].querySelector<HTMLElement>(".step-summary")!.textContent).toBe("c-value");
-    expect(rows[2].querySelector<HTMLButtonElement>(".step-edit-btn")!.hidden).toBe(true);
+    expect(rows[2].querySelector<HTMLButtonElement>(".step-action-btn")!.hidden).toBe(true);
   });
 
   it("relocks the terminal step when it's two or more hops downstream, and never shows a summary for it", () => {
@@ -425,7 +427,7 @@ describe("StepFlow — relocking steps two or more hops downstream", () => {
     c.setValue("c-value");
     c.lastCtx!.onComplete(); // c: complete (terminal, stays expanded per its own completion)
 
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a
     a.lastCtx!.onComplete(); // re-complete a -- b becomes active, c (terminal) relocks
 
     const rows = container.querySelectorAll(".step-row");
@@ -443,7 +445,7 @@ describe("StepFlow — relocking steps two or more hops downstream", () => {
     b.lastCtx!.onComplete(); // b: complete, c: active (terminal, never collapses on its own)
     c.setValue("live-uncommitted-c"); // c is still "active" (never completed) at this point
 
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a
     a.lastCtx!.onComplete(); // re-complete a -- c relocks while still uncompleted
 
     expect(flow.getValue().steps[2]).toEqual({
@@ -461,7 +463,7 @@ describe("StepFlow — editing exclusivity", () => {
     a.lastCtx!.onComplete(); // a: complete, b: active
     b.lastCtx!.onComplete(); // b: complete, c: active (terminal)
 
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a
 
     expect(c.mounted).toBe(false);
     // Only its original mount -- no separate "disabled but still visible"
@@ -475,9 +477,9 @@ describe("StepFlow — editing exclusivity", () => {
     new StepFlow(container, [a, b, c]);
     a.lastCtx!.onComplete();
     b.lastCtx!.onComplete();
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a; c collapses
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a; c collapses
 
-    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click();
 
     expect(c.mounted).toBe(true);
     expect(c.mountCallCount).toBe(2);
@@ -490,7 +492,7 @@ describe("StepFlow — editing exclusivity", () => {
     new StepFlow(container, [a, b, c]);
     a.lastCtx!.onComplete();
     b.lastCtx!.onComplete();
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a -- c collapses immediately
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a -- c collapses immediately
 
     a.lastCtx!.onComplete(); // re-complete a -- b reactivates, c stays locked
 
@@ -514,7 +516,7 @@ describe("StepFlow — editing exclusivity", () => {
     new StepFlow(container, [a, b, c]);
     a.lastCtx!.onComplete(); // a: complete, b: active, c: locked (never mounted)
 
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a
     expect(c.interactiveCalls).toEqual([]); // nothing to gate yet -- c isn't mounted
 
     b.lastCtx!.onComplete(); // b's in-flight commit resolves under the open gate
@@ -523,9 +525,11 @@ describe("StepFlow — editing exclusivity", () => {
     expect(c.interactiveCalls).toEqual([false]); // mounted disabled, not enabled
     // The gate is still open on a -- b completing is not a's edit resolving.
     const rows = container.querySelectorAll(".step-row");
-    expect(rows[0].querySelector<HTMLButtonElement>(".step-cancel-btn")!.hidden).toBe(false);
+    const aActionBtn = rows[0].querySelector<HTMLButtonElement>(".step-action-btn")!;
+    expect(aActionBtn.hidden).toBe(false);
+    expect(aActionBtn.dataset.mode).toBe("cancel");
 
-    rows[0].querySelector<HTMLButtonElement>(".step-cancel-btn")!.click(); // resolve the edit
+    aActionBtn.click(); // resolve the edit
 
     expect(c.interactiveCalls).toEqual([false, true]);
   });
@@ -537,12 +541,13 @@ describe("StepFlow — editing exclusivity", () => {
     a.lastCtx!.onComplete(); // a: complete, b: active
     b.lastCtx!.onComplete(); // b: complete, c: active (terminal)
 
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a (first [Edit] in DOM order)
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a (first [Edit] in DOM order)
 
     const rows = container.querySelectorAll(".step-row");
-    const bEditBtn = rows[1].querySelector<HTMLButtonElement>(".step-edit-btn")!;
-    expect(bEditBtn.hidden).toBe(false); // b is still complete -- still shown
-    expect(bEditBtn.disabled).toBe(true); // but not clickable while a different edit is open
+    const bActionBtn = rows[1].querySelector<HTMLButtonElement>(".step-action-btn")!;
+    expect(bActionBtn.hidden).toBe(false); // b is still complete -- still shown
+    expect(bActionBtn.dataset.mode).toBe("edit");
+    expect(bActionBtn.disabled).toBe(true); // but not clickable while a different edit is open
   });
 
   it("re-enables other complete steps' [Edit] buttons once the edit resolves", () => {
@@ -551,12 +556,12 @@ describe("StepFlow — editing exclusivity", () => {
     new StepFlow(container, [a, b, c]);
     a.lastCtx!.onComplete();
     b.lastCtx!.onComplete();
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a
 
-    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click();
 
     const rows = container.querySelectorAll(".step-row");
-    expect(rows[1].querySelector<HTMLButtonElement>(".step-edit-btn")!.disabled).toBe(false);
+    expect(rows[1].querySelector<HTMLButtonElement>(".step-action-btn")!.disabled).toBe(false);
   });
 });
 
@@ -571,8 +576,8 @@ describe("StepFlow — a step's own busy action holds the exclusivity gate too",
     c.lastCtx!.onBusyChange(true); // simulates Test/Run AI in flight on the terminal step
 
     const rows = container.querySelectorAll(".step-row");
-    expect(rows[0].querySelector<HTMLButtonElement>(".step-edit-btn")!.disabled).toBe(true);
-    expect(rows[1].querySelector<HTMLButtonElement>(".step-edit-btn")!.disabled).toBe(true);
+    expect(rows[0].querySelector<HTMLButtonElement>(".step-action-btn")!.disabled).toBe(true);
+    expect(rows[1].querySelector<HTMLButtonElement>(".step-action-btn")!.disabled).toBe(true);
   });
 
   it("re-enables other complete steps' [Edit] buttons once the busy action settles", () => {
@@ -586,8 +591,8 @@ describe("StepFlow — a step's own busy action holds the exclusivity gate too",
     c.lastCtx!.onBusyChange(false);
 
     const rows = container.querySelectorAll(".step-row");
-    expect(rows[0].querySelector<HTMLButtonElement>(".step-edit-btn")!.disabled).toBe(false);
-    expect(rows[1].querySelector<HTMLButtonElement>(".step-edit-btn")!.disabled).toBe(false);
+    expect(rows[0].querySelector<HTMLButtonElement>(".step-action-btn")!.disabled).toBe(false);
+    expect(rows[1].querySelector<HTMLButtonElement>(".step-action-btn")!.disabled).toBe(false);
   });
 
   it("never shows a Cancel button on the terminal step, even while its own busy action holds the gate", () => {
@@ -600,7 +605,7 @@ describe("StepFlow — a step's own busy action holds the exclusivity gate too",
     c.lastCtx!.onBusyChange(true);
 
     const rows = container.querySelectorAll(".step-row");
-    expect(rows[2].querySelector<HTMLButtonElement>(".step-cancel-btn")!.hidden).toBe(true);
+    expect(rows[2].querySelector<HTMLButtonElement>(".step-action-btn")!.hidden).toBe(true);
   });
 
   it("does not disable a genuinely different edit-in-progress step's own buttons a second time, or release it early", () => {
@@ -609,14 +614,16 @@ describe("StepFlow — a step's own busy action holds the exclusivity gate too",
     new StepFlow(container, [a, b, c]);
     a.lastCtx!.onComplete(); // a: complete, b: active
     b.lastCtx!.onComplete(); // b: complete, c: active (terminal)
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a -- editingIndex = 0
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a -- editingIndex = 0
 
     // c's own busy signal must not steal the gate while a real edit is open.
     c.lastCtx!.onBusyChange(true);
     c.lastCtx!.onBusyChange(false);
 
     const rows = container.querySelectorAll(".step-row");
-    expect(rows[0].querySelector<HTMLButtonElement>(".step-cancel-btn")!.hidden).toBe(false); // a's edit is still open
+    const aActionBtn = rows[0].querySelector<HTMLButtonElement>(".step-action-btn")!;
+    expect(aActionBtn.hidden).toBe(false); // a's edit is still open
+    expect(aActionBtn.dataset.mode).toBe("cancel");
   });
 });
 
@@ -646,7 +653,7 @@ describe("StepFlow — Cancel", () => {
     const [a] = [new FakeStep("A")];
     const container = makeContainer();
     new StepFlow(container, [a]);
-    expect(container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.hidden).toBe(true);
+    expect(container.querySelector<HTMLButtonElement>(".step-action-btn")!.hidden).toBe(true);
   });
 
   it("shows Cancel (and hides Edit) while re-editing a previously-completed step", () => {
@@ -655,11 +662,12 @@ describe("StepFlow — Cancel", () => {
     new StepFlow(container, [a, b]);
     a.setValue("col_x");
     a.lastCtx!.onComplete();
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click();
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click();
 
     const row = container.querySelectorAll(".step-row")[0];
-    expect(row.querySelector<HTMLButtonElement>(".step-cancel-btn")!.hidden).toBe(false);
-    expect(row.querySelector<HTMLButtonElement>(".step-edit-btn")!.hidden).toBe(true);
+    const actionBtn = row.querySelector<HTMLButtonElement>(".step-action-btn")!;
+    expect(actionBtn.hidden).toBe(false);
+    expect(actionBtn.dataset.mode).toBe("cancel"); // Edit and Cancel share one slot -- showing Cancel means Edit isn't shown
   });
 
   it("discards in-progress edits and collapses back to the old summary, without unmounting or affecting downstream", () => {
@@ -668,10 +676,10 @@ describe("StepFlow — Cancel", () => {
     const flow = new StepFlow(container, [a, b]);
     a.setValue("col_x");
     a.lastCtx!.onComplete();
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click();
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click();
     a.setValue("live-uncommitted-edit");
 
-    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click();
 
     const row = container.querySelectorAll(".step-row")[0];
     expect(row.querySelector(".step-summary")!.textContent).toBe("col_x");
@@ -687,8 +695,8 @@ describe("StepFlow — Cancel", () => {
     const container = makeContainer();
     const flow = new StepFlow(container, [a, b]);
     a.lastCtx!.onComplete(); // a: complete, b: active -> activeIndex 1
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a -> activeIndex 0
-    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a -> activeIndex 0
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click();
 
     expect(flow.getValue().activeStepIndex).toBe(1);
   });
@@ -698,10 +706,10 @@ describe("StepFlow — Cancel", () => {
     const container = makeContainer();
     new StepFlow(container, [a, b]);
     a.lastCtx!.onComplete();
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click();
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click();
     a.lastCtx!.onError(); // simulate a failed commit attempt during this edit
 
-    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click();
 
     expect(container.querySelectorAll(".step-icon")[0].textContent).toBe("✕");
   });
@@ -716,14 +724,17 @@ describe("StepFlow — Cancel", () => {
         { status: "locked", saved: undefined },
       ],
     };
-    new StepFlow(container, [a, b], restored);
+    const flow = new StepFlow(container, [a, b], restored);
 
     // No gate was opened this session, so no Cancel is offered -- the step is
     // expanded and usable, and a restored draft is committed by completing it,
-    // not by cancelling out of it. Dispatched directly to keep covering
-    // cancelEdit()'s "nothing to restore activeIndex to" path.
-    expect(container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.hidden).toBe(true);
-    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+    // not by cancelling out of it. The merged action button has no click path
+    // to cancelEdit() here (its mode is only ever "cancel" once a real edit
+    // opens the gate, which never happens for a step restored straight into
+    // "active"), so cancelEdit() is invoked directly to keep covering its
+    // "nothing to restore activeIndex to" path.
+    expect(container.querySelector<HTMLButtonElement>(".step-action-btn")!.hidden).toBe(true);
+    (flow as unknown as { cancelEdit(index: number): void }).cancelEdit(0);
 
     const row = container.querySelectorAll(".step-row")[0];
     expect(row.querySelector(".step-summary")!.textContent).toBe("col_x");
@@ -739,16 +750,18 @@ describe("StepFlow — Cancel", () => {
     b.setValue("b-value");
     b.lastCtx!.onComplete(); // b: complete, c: active (terminal)
 
-    container.querySelectorAll<HTMLButtonElement>(".step-edit-btn")[0].click(); // edit a
+    container.querySelectorAll<HTMLButtonElement>(".step-action-btn")[0].click(); // edit a
     a.lastCtx!.onComplete(); // recommit a -- b reactivates WITH cached data, c relocks
 
     // b is "active" with a cached summary but nobody clicked ITS [Edit], so it
     // must not offer Cancel: cancelEdit(1) there used to collapse b while
     // everything downstream stayed locked, leaving no step expanded at all.
-    const cancelBtns = Array.from(
-      container.querySelectorAll<HTMLButtonElement>(".step-cancel-btn"),
+    const actionBtns = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(".step-action-btn"),
     );
-    expect(cancelBtns.filter((btn) => !btn.hidden)).toHaveLength(0);
+    expect(actionBtns.filter((btn) => !btn.hidden && btn.dataset.mode === "cancel")).toHaveLength(
+      0,
+    );
   });
 
   it("leaves a step expanded after the complete/complete/edit/recommit/cancel sequence", () => {
@@ -757,12 +770,12 @@ describe("StepFlow — Cancel", () => {
     new StepFlow(container, [a, b, c]);
     a.lastCtx!.onComplete(); // 1. complete step 1
     b.lastCtx!.onComplete(); // 2. complete step 2 (terminal step 3 now active)
-    container.querySelectorAll<HTMLButtonElement>(".step-edit-btn")[0].click(); // 3. edit step 1
+    container.querySelectorAll<HTMLButtonElement>(".step-action-btn")[0].click(); // 3. edit step 1
     a.lastCtx!.onComplete(); // 4. recommit step 1
 
     // 5. click whatever Cancel the user can actually reach at this point.
-    Array.from(container.querySelectorAll<HTMLButtonElement>(".step-cancel-btn"))
-      .filter((btn) => !btn.hidden)
+    Array.from(container.querySelectorAll<HTMLButtonElement>(".step-action-btn"))
+      .filter((btn) => !btn.hidden && btn.dataset.mode === "cancel")
       .forEach((btn) => btn.click());
 
     const expandedBodies = Array.from(container.querySelectorAll<HTMLElement>(".step-body")).filter(
@@ -784,7 +797,7 @@ describe("StepFlow — a relocked step renders plain", () => {
     c.lastCtx!.onError(); // c's own commit failed
     expect(container.querySelectorAll(".step-icon")[2].textContent).toBe("✕");
 
-    container.querySelectorAll<HTMLButtonElement>(".step-edit-btn")[0].click(); // edit a
+    container.querySelectorAll<HTMLButtonElement>(".step-action-btn")[0].click(); // edit a
     a.lastCtx!.onComplete(); // recommit a -- c relocks
 
     const icon = container.querySelectorAll(".step-icon")[2];
@@ -806,19 +819,20 @@ describe("StepFlow — a relocked step renders plain", () => {
     c.lastCtx!.onBusyChange(true); // c's own commit is in flight -- holds the gate
     c.lastCtx!.onBusyChange(false); // ...and releases it, but leaves busyByIndex[2] stale
 
-    container.querySelectorAll<HTMLButtonElement>(".step-edit-btn")[0].click(); // edit a
+    container.querySelectorAll<HTMLButtonElement>(".step-action-btn")[0].click(); // edit a
     a.lastCtx!.onComplete(); // recommit a -- b reactivates, c and d relock
 
     // Walk forward to c again and complete it, then re-edit it.
     b.lastCtx!.onComplete(); // c: active, mounted afresh
     c.lastCtx!.onComplete(); // c: complete, d: active
-    container.querySelectorAll<HTMLButtonElement>(".step-edit-btn")[2].click(); // edit c
+    container.querySelectorAll<HTMLButtonElement>(".step-action-btn")[2].click(); // edit c
 
-    const cCancel = container
+    const cActionBtn = container
       .querySelectorAll(".step-row")[2]
-      .querySelector<HTMLButtonElement>(".step-cancel-btn")!;
-    expect(cCancel.hidden).toBe(false);
-    expect(cCancel.disabled).toBe(false);
+      .querySelector<HTMLButtonElement>(".step-action-btn")!;
+    expect(cActionBtn.hidden).toBe(false);
+    expect(cActionBtn.dataset.mode).toBe("cancel");
+    expect(cActionBtn.disabled).toBe(false);
   });
 });
 
@@ -830,10 +844,10 @@ describe("StepFlow — onEditingChange option", () => {
     new StepFlow(container, [a, b], undefined, { onEditingChange });
     a.lastCtx!.onComplete(); // a: complete, b: active
 
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a
     expect(onEditingChange).toHaveBeenLastCalledWith(true);
 
-    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click();
     expect(onEditingChange).toHaveBeenLastCalledWith(false);
   });
 
@@ -843,7 +857,7 @@ describe("StepFlow — onEditingChange option", () => {
     const onEditingChange = jest.fn();
     new StepFlow(container, [a, b], undefined, { onEditingChange });
     a.lastCtx!.onComplete();
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a
 
     a.lastCtx!.onComplete(); // re-complete a
 
@@ -868,12 +882,12 @@ describe("StepFlow — Cancel disabled while busy", () => {
     const container = makeContainer();
     new StepFlow(container, [a, b]);
     a.lastCtx!.onComplete(); // a: complete, b: active
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    container.querySelector<HTMLButtonElement>(".step-action-btn")!.click(); // edit a
 
     a.lastCtx!.onBusyChange(true);
-    expect(container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.disabled).toBe(true);
+    expect(container.querySelector<HTMLButtonElement>(".step-action-btn")!.disabled).toBe(true);
 
     a.lastCtx!.onBusyChange(false);
-    expect(container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.disabled).toBe(false);
+    expect(container.querySelector<HTMLButtonElement>(".step-action-btn")!.disabled).toBe(false);
   });
 });
