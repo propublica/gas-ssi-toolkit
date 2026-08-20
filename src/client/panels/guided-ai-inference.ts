@@ -24,6 +24,8 @@ export class GuidedAIInferencePanel implements Panel<undefined, StepFlowSavedSta
     this.nav = nav;
     this.inputsStep = null;
     this.runStep = null;
+    this.isEditingGuardActive = false;
+    this.isRefreshing = false;
     container.innerHTML = this.template();
     container.querySelector("#back-btn")?.addEventListener("click", () => nav.back());
     container

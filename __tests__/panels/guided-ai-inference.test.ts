@@ -181,6 +181,47 @@ describe("GuidedAIInferencePanel — refresh disabled while editing", () => {
     container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
     expect(container.querySelector<HTMLButtonElement>("#refresh-btn")!.disabled).toBe(false);
   });
+
+  it("resets editing guard on mount to prevent stuck-disabled button after back-during-edit (regression: singleton reuse)", async () => {
+    // Regression test for: user clicks [Edit], then immediately clicks Back
+    // (unmounting without resolving the edit), then navigates back into the panel.
+    // Before the fix, isEditingGuardActive stayed true and refresh button was stuck disabled.
+    const { container, panel } = await mountAndLoad(["NoteCol"]);
+
+    // Complete Step 1 to unlock [Edit] button on Step 1.
+    container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+    container.querySelector<HTMLElement>(".token-add-btn")!.click();
+    container.querySelector<HTMLElement>('.token-option[data-value="NoteCol"]')!.click();
+    container.querySelector<HTMLButtonElement>("#gi-continue")!.click();
+    await Promise.resolve();
+
+    // Click [Edit] on Step 1 — sets isEditingGuardActive = true.
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click();
+    expect(container.querySelector<HTMLButtonElement>("#refresh-btn")!.disabled).toBe(true);
+
+    // Click Back without resolving the edit (unmount).
+    container.querySelector<HTMLButtonElement>("#back-btn")!.click();
+    expect(mockNav.back).toHaveBeenCalled();
+
+    // Simulate the singleton being reused: same panel instance, mount() again
+    // with a fresh container (as would happen if user navigates back in).
+    const container2 = makeContainer();
+    panel.mount(container2, mockNav, undefined, undefined);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    // Before the fix, refresh button would be stuck disabled here.
+    // After the fix, it should be enabled.
+    const refreshBtn = container2.querySelector<HTMLButtonElement>("#refresh-btn")!;
+    expect(refreshBtn.disabled).toBe(false);
+
+    // Verify clicking refresh works and completes normally.
+    refreshBtn.click();
+    expect(refreshBtn.classList.contains("spinning")).toBe(true);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(refreshBtn.classList.contains("spinning")).toBe(false);
+    expect(refreshBtn.disabled).toBe(false);
+  });
 });
 
 describe("GuidedAIInferencePanel — unmount cleanup", () => {
