@@ -50,6 +50,16 @@ export class AsyncActionButton {
     this.render();
   }
 
+  /** Disables/enables the button independent of its own loading/idle/done
+   * state -- used by a step to gray out its own action button while a
+   * DIFFERENT step is mid-edit. Re-enabling is a no-op while genuinely
+   * loading, so an external caller can't accidentally re-enable a button
+   * mid-request. */
+  setInteractive(enabled: boolean): void {
+    if (enabled && this.state === "loading") return;
+    this.button.disabled = !enabled;
+  }
+
   private render(): void {
     this.button.disabled = this.state === "loading";
     if (this.state === "loading") {

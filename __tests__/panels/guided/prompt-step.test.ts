@@ -273,3 +273,17 @@ describe("PromptStep — unmount/mount round trip", () => {
     expect(new PromptStep().unmount()).toBeUndefined();
   });
 });
+
+describe("PromptStep — setInteractive", () => {
+  it("disables and re-enables the Continue button", () => {
+    const container = makeContainer();
+    const step = new PromptStep();
+    step.mount(container, makeCtx());
+
+    step.setInteractive(false);
+    expect(container.querySelector<HTMLButtonElement>("#gp-continue")!.disabled).toBe(true);
+
+    step.setInteractive(true);
+    expect(container.querySelector<HTMLButtonElement>("#gp-continue")!.disabled).toBe(false);
+  });
+});

@@ -35,6 +35,10 @@ export class InputsStep implements Step<InputsStepSavedState> {
     return this.result;
   }
 
+  setInteractive(enabled: boolean): void {
+    this.continueButton?.setInteractive(enabled);
+  }
+
   /** Refreshes the available columns in every existing column-picker row
    * in place, preserving each row's current selection -- mirrors the
    * "Refresh columns" behavior in ConfigureAIRunPanel/ImportDriveLinksPanel/

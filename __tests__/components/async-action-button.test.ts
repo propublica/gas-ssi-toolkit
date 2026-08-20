@@ -112,4 +112,23 @@ describe("AsyncActionButton", () => {
       expect(btn.disabled).toBe(false);
     });
   });
+
+  describe("setInteractive()", () => {
+    it("disables the button when passed false", () => {
+      asyncBtn.setInteractive(false);
+      expect(btn.disabled).toBe(true);
+    });
+
+    it("re-enables the button when passed true", () => {
+      asyncBtn.setInteractive(false);
+      asyncBtn.setInteractive(true);
+      expect(btn.disabled).toBe(false);
+    });
+
+    it("does not re-enable the button while genuinely loading", () => {
+      asyncBtn.setLoading();
+      asyncBtn.setInteractive(true);
+      expect(btn.disabled).toBe(true);
+    });
+  });
 });

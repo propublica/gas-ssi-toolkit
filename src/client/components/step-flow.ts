@@ -12,6 +12,10 @@ export class StepFlow {
   /** activeIndex to restore on Cancel, recorded by editStep(); null when the
    * step isn't currently mid-edit. */
   private preEditActiveIndex: Array<number | null>;
+  /** Index of the step currently mid-edit (Edit clicked, not yet resolved
+   * by Cancel or a successful recommit), or null when nothing is being
+   * edited. At most one step is ever mid-edit at a time. */
+  private editingIndex: number | null = null;
   private activeIndex: number;
   private rowEls: HTMLElement[] = [];
 
@@ -125,7 +129,9 @@ export class StepFlow {
     const editingExistingStep =
       status === "active" && !this.isLastStep(index) && this.savedByIndex[index] !== undefined;
 
-    row.querySelector<HTMLElement>(".step-edit-btn")!.hidden = !isEditable;
+    const editBtn = row.querySelector<HTMLButtonElement>(".step-edit-btn")!;
+    editBtn.hidden = !isEditable;
+    editBtn.disabled = this.editingIndex !== null && this.editingIndex !== index;
     row.querySelector<HTMLElement>(".step-cancel-btn")!.hidden = !editingExistingStep;
 
     const summaryEl = row.querySelector<HTMLElement>(".step-summary")!;
@@ -159,6 +165,7 @@ export class StepFlow {
       this.statuses[index] = "complete";
       this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
       this.updateIcon(index);
+      this.releaseEditingGate(index);
       return;
     }
 
@@ -181,6 +188,7 @@ export class StepFlow {
     this.applyRowDisplay(this.rowEls[nextIndex], nextIndex, this.steps[nextIndex]);
     this.updateIcon(index);
     this.updateIcon(nextIndex);
+    this.releaseEditingGate(index);
   }
 
   /** Reverts every step after fromIndex back to "locked" -- regardless of
@@ -216,17 +224,30 @@ export class StepFlow {
     }
   }
 
+  private setStepInteractive(index: number, enabled: boolean): void {
+    this.steps[index].setInteractive?.(enabled);
+  }
+
+  /** Re-applies every row's display -- needed whenever editingIndex changes,
+   * since an [[Edit]] button's disabled state (distinct from its hidden
+   * state) depends on whether ANY other step is currently mid-edit, not
+   * just this row's own status. */
+  private refreshAllRowDisplays(): void {
+    this.steps.forEach((step, i) => this.applyRowDisplay(this.rowEls[i], i, step));
+  }
+
   private editStep(index: number): void {
     const previousActive = this.activeIndex;
     this.preEditActiveIndex[index] = previousActive;
+    this.editingIndex = index;
     this.statuses[index] = "active";
     this.activeIndex = index;
     this.mountStep(index);
-    this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
     this.updateIcon(index);
     if (previousActive !== index) {
-      this.applyRowDisplay(this.rowEls[previousActive], previousActive, this.steps[previousActive]);
+      this.setStepInteractive(previousActive, false);
     }
+    this.refreshAllRowDisplays();
   }
 
   /** Discards whatever is currently typed in an edited step's form -- no
@@ -240,11 +261,32 @@ export class StepFlow {
    * no recorded pre-edit index to fall back to, so activeIndex is simply
    * left as-is rather than skipping the cancel entirely. */
   private cancelEdit(index: number): void {
+    this.statuses[index] = "complete";
+    const restoreIndex = this.releaseEditingGate(index);
+    if (restoreIndex !== null) this.activeIndex = restoreIndex;
+    // Unconditional, not folded into releaseEditingGate: a step restored
+    // directly into "active" from saved state holds no editing gate, so
+    // releaseEditingGate() is a no-op for it -- but its row still has to
+    // collapse. Redundant with the gate path's own refresh; both are
+    // idempotent.
+    this.refreshAllRowDisplays();
+    this.updateIcon(index);
+  }
+
+  /** Releases the editing-exclusivity gate if `index` was the step actually
+   * being edited (a no-op for a plain first-time completion, or for a step
+   * restored directly into "active" from saved state that was never
+   * actually edited this session -- in either case there's no gate to
+   * release). Re-enables whichever other step's buttons were disabled when
+   * the edit began, and refreshes every row's [Edit]-disabled state.
+   * Returns the index to restore activeIndex to, or null. */
+  private releaseEditingGate(index: number): number | null {
+    if (this.editingIndex !== index) return null;
+    this.editingIndex = null;
     const restoreIndex = this.preEditActiveIndex[index];
     this.preEditActiveIndex[index] = null;
-    this.statuses[index] = "complete";
-    if (restoreIndex !== null) this.activeIndex = restoreIndex;
-    this.applyRowDisplay(this.rowEls[index], index, this.steps[index]);
-    this.updateIcon(index);
+    if (restoreIndex !== null) this.setStepInteractive(restoreIndex, true);
+    this.refreshAllRowDisplays();
+    return restoreIndex;
   }
 }

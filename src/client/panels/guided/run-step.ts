@@ -88,4 +88,8 @@ export class RunStep implements Step<RunStepSavedState> {
   checkTestStatsFreshness(): void {
     this.runControls?.checkTestStatsFreshness();
   }
+
+  setInteractive(enabled: boolean): void {
+    this.runControls?.setInteractive(enabled);
+  }
 }

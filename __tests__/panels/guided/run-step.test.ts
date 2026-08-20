@@ -197,3 +197,24 @@ describe("RunStep — unmount/mount round trip", () => {
     expect(container.querySelector<HTMLButtonElement>("#test-btn")!.textContent).toBe("Tested ✓");
   });
 });
+
+describe("RunStep — setInteractive", () => {
+  it("disables and re-enables the Run and Test buttons", async () => {
+    const getPromptFields = jest.fn().mockReturnValue({
+      promptCols: [{ col: "NoteCol", kind: "auto" as const }],
+      systemPromptCol: "System Prompt",
+    });
+    const container = makeContainer();
+    const step = new RunStep(getPromptFields, jest.fn());
+    step.mount(container, makeCtx());
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    step.setInteractive(false);
+    expect(container.querySelector<HTMLButtonElement>("#run-btn")!.disabled).toBe(true);
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.disabled).toBe(true);
+
+    step.setInteractive(true);
+    expect(container.querySelector<HTMLButtonElement>("#run-btn")!.disabled).toBe(false);
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.disabled).toBe(false);
+  });
+});

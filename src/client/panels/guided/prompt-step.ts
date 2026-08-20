@@ -29,6 +29,10 @@ export class PromptStep implements Step<PromptStepSavedState> {
     return this.result;
   }
 
+  setInteractive(enabled: boolean): void {
+    this.continueButton?.setInteractive(enabled);
+  }
+
   hydrate(_savedState: PromptStepSavedState): void {
     this.result = { systemPromptCol: SYSTEM_PROMPT_COLUMN_TITLE };
   }

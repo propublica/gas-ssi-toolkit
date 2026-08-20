@@ -116,6 +116,19 @@ export class RunControls {
     }
   }
 
+  /** Disables/enables Test and Run while a DIFFERENT step is mid-edit
+   * (Guided AI Inference's terminal step is the only caller today).
+   * Respects each button's own busy state on re-enable: Test won't be
+   * force-enabled mid-request (AsyncActionButton.setInteractive() already
+   * guards this); Run has no comparable busy state of its own (the job
+   * strip communicates progress, not a disabled Run button), so it's a
+   * plain flip. */
+  setInteractive(enabled: boolean): void {
+    const runBtn = this.container.querySelector<HTMLButtonElement>("#run-btn");
+    if (runBtn) runBtn.disabled = !enabled;
+    this.testButton?.setInteractive(enabled);
+  }
+
   destroy(): void {
     this.container.innerHTML = "";
   }

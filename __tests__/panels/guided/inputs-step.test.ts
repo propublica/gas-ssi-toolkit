@@ -333,3 +333,17 @@ describe("InputsStep — destroy()", () => {
     removeSpy.mockRestore();
   });
 });
+
+describe("InputsStep — setInteractive", () => {
+  it("disables and re-enables the Continue button", () => {
+    const container = makeContainer();
+    const step = new InputsStep(["col_a"]);
+    step.mount(container, makeCtx());
+
+    step.setInteractive(false);
+    expect(container.querySelector<HTMLButtonElement>("#gi-continue")!.disabled).toBe(true);
+
+    step.setInteractive(true);
+    expect(container.querySelector<HTMLButtonElement>("#gi-continue")!.disabled).toBe(false);
+  });
+});

@@ -245,3 +245,17 @@ describe("RunControls — refreshRowRange", () => {
     for (let i = 0; i < 5; i++) await Promise.resolve();
   });
 });
+
+describe("RunControls — setInteractive", () => {
+  it("disables and re-enables the Run and Test buttons", async () => {
+    const { container, rc } = await mountAndSettle();
+
+    rc.setInteractive(false);
+    expect(container.querySelector<HTMLButtonElement>("#run-btn")!.disabled).toBe(true);
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.disabled).toBe(true);
+
+    rc.setInteractive(true);
+    expect(container.querySelector<HTMLButtonElement>("#run-btn")!.disabled).toBe(false);
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.disabled).toBe(false);
+  });
+});

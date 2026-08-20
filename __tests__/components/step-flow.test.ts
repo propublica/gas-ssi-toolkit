@@ -51,6 +51,13 @@ class FakeStepWithDestroy extends FakeStep {
   }
 }
 
+class FakeStepWithInteractive extends FakeStep {
+  interactiveCalls: boolean[] = [];
+  setInteractive(enabled: boolean): void {
+    this.interactiveCalls.push(enabled);
+  }
+}
+
 describe("StepFlow — initial render", () => {
   it("mounts only step 0, others locked", () => {
     const [a, b] = [new FakeStep("A"), new FakeStep("B")];
@@ -403,6 +410,75 @@ describe("StepFlow — relocking steps two or more hops downstream", () => {
       status: "locked",
       saved: { savedState: { value: "live-uncommitted-c" }, summary: "live-uncommitted-c" },
     });
+  });
+});
+
+describe("StepFlow — editing exclusivity", () => {
+  it("disables the previously-active step's own interactivity when a different step enters edit mode", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStepWithInteractive("C")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete(); // a: complete, b: active
+    b.lastCtx!.onComplete(); // b: complete, c: active (terminal)
+
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+
+    expect(c.interactiveCalls).toEqual([false]);
+  });
+
+  it("re-enables it when the edit is canceled", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStepWithInteractive("C")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete();
+    b.lastCtx!.onComplete();
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+
+    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+
+    expect(c.interactiveCalls).toEqual([false, true]);
+  });
+
+  it("re-enables it when the edit is recommitted successfully", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStepWithInteractive("C")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete();
+    b.lastCtx!.onComplete();
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+
+    a.lastCtx!.onComplete(); // re-complete a
+
+    expect(c.interactiveCalls).toEqual([false, true]);
+  });
+
+  it("disables every OTHER complete step's [Edit] button, not just the previously-active one", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStep("C")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete(); // a: complete, b: active
+    b.lastCtx!.onComplete(); // b: complete, c: active (terminal)
+
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a (first [Edit] in DOM order)
+
+    const rows = container.querySelectorAll(".step-row");
+    const bEditBtn = rows[1].querySelector<HTMLButtonElement>(".step-edit-btn")!;
+    expect(bEditBtn.hidden).toBe(false); // b is still complete -- still shown
+    expect(bEditBtn.disabled).toBe(true); // but not clickable while a different edit is open
+  });
+
+  it("re-enables other complete steps' [Edit] buttons once the edit resolves", () => {
+    const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStep("C")];
+    const container = makeContainer();
+    new StepFlow(container, [a, b, c]);
+    a.lastCtx!.onComplete();
+    b.lastCtx!.onComplete();
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+
+    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+
+    const rows = container.querySelectorAll(".step-row");
+    expect(rows[1].querySelector<HTMLButtonElement>(".step-edit-btn")!.disabled).toBe(false);
   });
 });
 
