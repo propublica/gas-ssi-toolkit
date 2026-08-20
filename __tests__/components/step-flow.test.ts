@@ -200,7 +200,7 @@ describe("StepFlow — onError", () => {
 });
 
 describe("StepFlow — [Edit]", () => {
-  it("re-expands a collapsed step with its cached savedState, leaving other steps untouched", () => {
+  it("re-expands a collapsed step with its cached savedState, collapsing whatever was open elsewhere", () => {
     const [a, b] = [new FakeStep("A"), new FakeStep("B")];
     const container = makeContainer();
     new StepFlow(container, [a, b]);
@@ -211,10 +211,10 @@ describe("StepFlow — [Edit]", () => {
 
     expect(a.mounted).toBe(true);
     expect(container.querySelector<HTMLInputElement>(".fake-step-input")!.value).toBe("col_x");
-    expect(b.mounted).toBe(true); // b was already mounted (active) and stays so
+    expect(b.mounted).toBe(false); // only one step is ever open at a time
   });
 
-  it("editing an earlier step does not collapse an already-complete terminal step", () => {
+  it("editing an earlier step collapses an already-complete terminal step that's still open", () => {
     const [a, b] = [new FakeStep("A"), new FakeStep("B")];
     const container = makeContainer();
     new StepFlow(container, [a, b]);
@@ -223,12 +223,12 @@ describe("StepFlow — [Edit]", () => {
 
     container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
 
-    expect(b.mounted).toBe(true);
+    expect(b.mounted).toBe(false);
     const rows = container.querySelectorAll(".step-row");
-    expect(rows[1].querySelector<HTMLElement>(".step-body")!.hidden).toBe(false);
+    expect(rows[1].querySelector<HTMLElement>(".step-body")!.hidden).toBe(true);
   });
 
-  it("editing an earlier step while a later non-terminal step is active keeps both mounted", () => {
+  it("editing an earlier step collapses a later active step, preserving its live state", () => {
     const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStep("C")];
     const container = makeContainer();
     const flow = new StepFlow(container, [a, b, c]);
@@ -236,22 +236,62 @@ describe("StepFlow — [Edit]", () => {
     b.setValue("in-progress-b");
     container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
     expect(a.mounted).toBe(true);
-    expect(b.mounted).toBe(true); // b must still be considered mounted
+    expect(b.mounted).toBe(false); // only one step is ever open at a time
     const saved = flow.getValue();
     const bSaved = saved.steps[1].saved;
     expect(bSaved?.savedState).toEqual({ value: "in-progress-b" }); // b's live state must be captured, not lost
   });
 
-  it("re-completing an edited earlier step does not remount an already-active later step", () => {
+  it("re-completing an edited earlier step remounts the later step it collapsed, restoring its draft", () => {
     const [a, b] = [new FakeStep("A"), new FakeStep("B")];
     const container = makeContainer();
     new StepFlow(container, [a, b]);
     a.lastCtx!.onComplete(); // a: complete, b: active
+    b.setValue("in-progress-b");
     expect(b.mountCallCount).toBe(1);
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a; b untouched
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a; b collapses
+    expect(b.mounted).toBe(false);
     a.lastCtx!.onComplete(); // re-complete a
-    expect(b.mounted).toBe(true); // b should still be mounted, not remounted-then-hidden
-    expect(b.mountCallCount).toBe(1); // and never remounted a second time
+    expect(b.mounted).toBe(true); // b remounts
+    expect(b.mountCallCount).toBe(2);
+    // Scoped to b's row: a's stale (now-hidden) input is still in the DOM too.
+    const bRow = container.querySelectorAll(".step-row")[1];
+    expect(bRow.querySelector<HTMLInputElement>(".fake-step-input")!.value).toBe("in-progress-b");
+  });
+
+  it("Cancel reopens a step it collapsed at edit-start, restoring its live draft", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    const flow = new StepFlow(container, [a, b]);
+    a.lastCtx!.onComplete(); // a: complete, b: active
+    b.setValue("in-progress-b");
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a; b collapses
+    expect(b.mounted).toBe(false);
+
+    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click(); // cancel a's edit
+
+    expect(b.mounted).toBe(true);
+    expect(b.mountCallCount).toBe(2);
+    // Scoped to b's row: a's stale (now-hidden) input is still in the DOM too.
+    const bRow = container.querySelectorAll(".step-row")[1];
+    expect(bRow.querySelector<HTMLInputElement>(".fake-step-input")!.value).toBe("in-progress-b");
+    expect(flow.getValue().steps[1].status).toBe("active");
+  });
+
+  it("Cancel reopens a collapsed terminal step back into its complete state, not active", () => {
+    const [a, b] = [new FakeStep("A"), new FakeStep("B")];
+    const container = makeContainer();
+    const flow = new StepFlow(container, [a, b]);
+    a.lastCtx!.onComplete();
+    b.lastCtx!.onComplete(); // b: terminal, complete, expanded
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a; b collapses
+    expect(b.mounted).toBe(false);
+
+    container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
+
+    expect(b.mounted).toBe(true);
+    expect(flow.getValue().steps[1].status).toBe("complete");
+    expect(container.querySelectorAll(".step-icon")[1].textContent).toBe("✓");
   });
 });
 
@@ -414,7 +454,7 @@ describe("StepFlow — relocking steps two or more hops downstream", () => {
 });
 
 describe("StepFlow — editing exclusivity", () => {
-  it("disables the previously-active step's own interactivity when a different step enters edit mode", () => {
+  it("collapses the previously-active step (not merely disables it) when a different step enters edit mode", () => {
     const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStepWithInteractive("C")];
     const container = makeContainer();
     new StepFlow(container, [a, b, c]);
@@ -423,42 +463,45 @@ describe("StepFlow — editing exclusivity", () => {
 
     container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
 
-    // The leading `true` is c's own mount, which asserts the (then-closed)
-    // gate as an invariant rather than waiting for an edit event.
-    expect(c.interactiveCalls).toEqual([true, false]);
+    expect(c.mounted).toBe(false);
+    // Only its original mount -- no separate "disabled but still visible"
+    // event, since it's torn down entirely rather than merely gated.
+    expect(c.interactiveCalls).toEqual([true]);
   });
 
-  it("re-enables it when the edit is canceled", () => {
+  it("remounts it, gate already closed, when the edit is canceled", () => {
     const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStepWithInteractive("C")];
     const container = makeContainer();
     new StepFlow(container, [a, b, c]);
     a.lastCtx!.onComplete();
     b.lastCtx!.onComplete();
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a; c collapses
 
     container.querySelector<HTMLButtonElement>(".step-cancel-btn")!.click();
 
-    expect(c.interactiveCalls).toEqual([true, false, true]); // mount, gate opens, gate closes
+    expect(c.mounted).toBe(true);
+    expect(c.mountCallCount).toBe(2);
+    expect(c.interactiveCalls).toEqual([true, true]); // original mount, then remount with the gate already closed
   });
 
-  it("does not re-enable a step the same recommit just relocked -- its next mount re-asserts the gate instead", () => {
+  it("does not touch a step its own edit-start already collapsed -- the later walk-forward remount re-asserts the gate instead", () => {
     const [a, b, c] = [new FakeStep("A"), new FakeStep("B"), new FakeStepWithInteractive("C")];
     const container = makeContainer();
     new StepFlow(container, [a, b, c]);
     a.lastCtx!.onComplete();
     b.lastCtx!.onComplete();
-    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a
+    container.querySelector<HTMLButtonElement>(".step-edit-btn")!.click(); // edit a -- c collapses immediately
 
-    a.lastCtx!.onComplete(); // re-complete a -- b reactivates, c relocks
+    a.lastCtx!.onComplete(); // re-complete a -- b reactivates, c stays locked
 
-    // c was unmounted by the relock cascade in this very call: re-enabling it
-    // would only touch a discarded instance. (The leading `true` is c's own
-    // original mount, before any edit began.)
-    expect(c.interactiveCalls).toEqual([true, false]);
+    // c was already unmounted when the edit began; the relock cascade this
+    // recommit triggers finds it already locked and skips it -- no second
+    // interactivity event.
+    expect(c.interactiveCalls).toEqual([true]);
 
     b.lastCtx!.onComplete(); // walk forward -- c mounts afresh, gate now closed
 
-    expect(c.interactiveCalls).toEqual([true, false, true]);
+    expect(c.interactiveCalls).toEqual([true, true]);
   });
 
   it("gates a step that mounts for the first time WHILE another step is mid-edit", () => {

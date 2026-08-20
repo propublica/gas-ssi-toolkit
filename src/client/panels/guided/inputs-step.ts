@@ -183,6 +183,10 @@ export class InputsStep implements Step<InputsStepSavedState> {
     const rows = this.currentRows().filter((r) =>
       r.kind === "column" ? r.colTitle !== "" : r.url !== "",
     );
+    if (rows.length === 0) {
+      globalThis.alert("Please add at least one column or Drive folder before continuing.");
+      return;
+    }
     const folderRows = rows.filter(
       (r): r is { kind: "drive-folder"; url: string; colTitle: string } =>
         r.kind === "drive-folder",

@@ -21,6 +21,12 @@ export class StepFlow {
   /** activeIndex to restore on Cancel, recorded by editStep(); null when the
    * step isn't currently mid-edit. */
   private preEditActiveIndex: Array<number | null>;
+  /** Status the step at preEditActiveIndex[index] had before editStep(index)
+   * collapsed it, so cancelEdit() can restore it exactly (an ordinary step
+   * reopens as "active"; the terminal step may reopen as "complete" if it
+   * had already finished a run). null when editStep(index) found nothing to
+   * collapse. */
+  private preEditRelockedStatus: Array<"active" | "complete" | null>;
   /** Index of the step currently mid-edit (Edit clicked, not yet resolved
    * by Cancel or a successful recommit), or null when nothing is being
    * edited. At most one step is ever mid-edit at a time. */
@@ -52,6 +58,7 @@ export class StepFlow {
     this.hasErrorByIndex = steps.map(() => false);
     this.busyByIndex = steps.map(() => false);
     this.preEditActiveIndex = steps.map(() => null);
+    this.preEditRelockedStatus = steps.map(() => null);
 
     this.container.innerHTML = "";
     this.rowEls = steps.map((step, i) => this.buildRow(step, i));
@@ -108,7 +115,7 @@ export class StepFlow {
 
   private buildRow(step: Step, index: number): HTMLElement {
     const row = document.createElement("div");
-    row.className = "step-row";
+    row.className = `step-row step-row--${this.statuses[index]}`;
     row.setAttribute("data-step-index", String(index));
     row.innerHTML = `
       <div class="step-header">
@@ -299,11 +306,17 @@ export class StepFlow {
   }
 
   private updateIcon(index: number): void {
-    const icon = this.rowEls[index].querySelector<HTMLElement>(".step-icon");
+    const row = this.rowEls[index];
+    const icon = row.querySelector<HTMLElement>(".step-icon");
     if (icon) {
       icon.textContent = this.iconFor(index);
       icon.classList.toggle("step-icon--error", this.hasErrorByIndex[index]);
     }
+    // The badge fill and the rail segment leading into the next badge are
+    // both driven by this same row-level status class -- see .step-row--*
+    // in sidebar.css.
+    row.classList.remove("step-row--locked", "step-row--active", "step-row--complete");
+    row.classList.add(`step-row--${this.statuses[index]}`);
   }
 
   /** The interactive state step `index` must be in RIGHT NOW, derived purely
@@ -337,6 +350,24 @@ export class StepFlow {
   private editStep(index: number): void {
     const previousActive = this.activeIndex;
     this.preEditActiveIndex[index] = previousActive;
+    this.preEditRelockedStatus[index] = null;
+    // Only one step is ever open at a time. If a different step was the one
+    // actually open (active, or the terminal step still expanded after a
+    // completed run), collapse it now rather than leaving it visibly
+    // editable alongside the step being edited. Its live state survives via
+    // the same recordUnmount() every other relock already uses, and
+    // cancelEdit() reopens it verbatim if this edit is abandoned; a
+    // successful recommit instead walks it forward again like any other
+    // downstream step, via the existing relockStepsAfter()/mountStep() path.
+    if (previousActive !== index && this.isMountedState(previousActive)) {
+      this.preEditRelockedStatus[index] = this.statuses[previousActive] as "active" | "complete";
+      this.recordUnmount(previousActive, this.steps[previousActive].unmount());
+      this.statuses[previousActive] = "locked";
+      this.hasErrorByIndex[previousActive] = false;
+      this.busyByIndex[previousActive] = false;
+      this.applyRowDisplay(this.rowEls[previousActive], previousActive, this.steps[previousActive]);
+      this.updateIcon(previousActive);
+    }
     this.editingIndex = index;
     this.statuses[index] = "active";
     this.activeIndex = index;
@@ -364,6 +395,23 @@ export class StepFlow {
     this.statuses[index] = "complete";
     const restoreIndex = this.releaseEditingGate(index);
     if (restoreIndex !== null) this.activeIndex = restoreIndex;
+    // Reopens whatever this edit collapsed at its start -- nothing upstream
+    // actually changed, so it snaps back exactly as it was rather than
+    // sitting locked awaiting a fresh walk-forward. Guarded on still being
+    // "locked": if that step resolved itself independently while this edit
+    // was open (e.g. its own commit completed), this edit no longer has
+    // anything to restore.
+    const relockedStatus = this.preEditRelockedStatus[index];
+    this.preEditRelockedStatus[index] = null;
+    if (
+      restoreIndex !== null &&
+      relockedStatus !== null &&
+      this.statuses[restoreIndex] === "locked"
+    ) {
+      this.statuses[restoreIndex] = relockedStatus;
+      this.mountStep(restoreIndex);
+      this.updateIcon(restoreIndex);
+    }
     // Unconditional, not folded into releaseEditingGate: a step restored
     // directly into "active" from saved state holds no editing gate, so
     // releaseEditingGate() is a no-op for it -- but its row still has to

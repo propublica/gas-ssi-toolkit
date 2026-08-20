@@ -13,11 +13,15 @@ export interface RunStepSavedState {
 }
 
 /**
- * Terminal step. Never collapses — its flavorText is intentionally empty, since
- * the wireframe places no flavor line here (Model/Tools/row-range/Test/Run speak
- * for themselves). Test never calls ctx.onComplete(); only a successful full
- * Run AI does, and since this is always the last step in GuidedAIInferencePanel's
- * array, StepFlow only flips its checklist icon rather than collapsing it.
+ * Terminal step. Never collapses on its OWN completion -- its flavorText is
+ * intentionally empty, since the wireframe places no flavor line here
+ * (Model/Tools/row-range/Test/Run speak for themselves). Test never calls
+ * ctx.onComplete(); only a successful full Run AI does, and since this is
+ * always the last step in GuidedAIInferencePanel's array, StepFlow only flips
+ * its checklist icon rather than collapsing it. It CAN still be collapsed
+ * from outside, though: editing an earlier step while this one is open
+ * temporarily relocks it (StepFlow.editStep()), reopening it verbatim on
+ * Cancel or via the normal walk-forward on a successful recommit.
  */
 export class RunStep implements Step<RunStepSavedState> {
   readonly title = "Run";

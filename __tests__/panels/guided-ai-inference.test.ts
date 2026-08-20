@@ -347,7 +347,9 @@ describe("GuidedAIInferencePanel — persistence", () => {
     for (let i = 0; i < 5; i++) await Promise.resolve();
 
     // Click [Edit] on Step 2 (the Prompt step) specifically, then navigate away
-    // WITHOUT re-completing it.
+    // WITHOUT re-completing it. Step 3 collapses the instant the edit opens
+    // (only one step is ever open at a time) and stays collapsed across the
+    // unmount/remount below, since nothing resolved the edit.
     const promptRow = container.querySelector('.step-row[data-step-index="1"]')!;
     promptRow.querySelector<HTMLButtonElement>(".step-edit-btn")!.click();
 
@@ -357,6 +359,19 @@ describe("GuidedAIInferencePanel — persistence", () => {
     const container2 = makeContainer();
     const panel2 = new GuidedAIInferencePanel();
     panel2.mount(container2, mockNav, undefined, saved);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    // Step 3 isn't reachable yet -- the Prompt edit from before the remount is
+    // still unresolved. A fresh StepFlow holds no in-memory edit session to
+    // Cancel back out of, so the only way forward is to recommit.
+    expect(container2.querySelector("#run-btn")).toBeNull();
+
+    // Recommit the restored Prompt step -- this is what actually proves the
+    // regression this test guards against: getResult() must already reflect
+    // the prior systemPromptCol via hydrate(), even though this PromptStep
+    // instance was reopened for editing but never remounted after its first
+    // real completion.
+    container2.querySelector<HTMLButtonElement>("#gp-continue")!.click();
     for (let i = 0; i < 5; i++) await Promise.resolve();
 
     container2.querySelector<HTMLButtonElement>("#run-btn")!.click();

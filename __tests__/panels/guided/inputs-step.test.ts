@@ -89,18 +89,55 @@ describe("InputsStep — column rows", () => {
   });
 
   it("removing a row before continuing excludes it", async () => {
+    (services.prepRecipe as jest.Mock).mockResolvedValue({ rowRange: { start: 2, end: 5 } });
     const container = makeContainer();
     const step = new InputsStep(["col_a"]);
     const ctx = makeCtx();
     step.mount(container, ctx);
 
     container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+    container.querySelector<HTMLElement>(".token-add-btn")!.click();
+    container.querySelector<HTMLElement>('.token-option[data-value="col_a"]')!.click();
+    container.querySelector<HTMLButtonElement>("#gi-add-folder")!.click();
+    container.querySelector<HTMLInputElement>(".guided-input-folder-url")!.value =
+      "https://drive.google.com/drive/folders/abc123";
+
+    // Removes the column row, leaving only the drive-folder row.
     container.querySelector<HTMLButtonElement>(".guided-input-remove")!.click();
     container.querySelector<HTMLButtonElement>("#gi-continue")!.click();
     await Promise.resolve();
+    await Promise.resolve();
 
-    expect(step.getResult()?.promptCols).toEqual([]);
+    expect(step.getResult()?.promptCols).toEqual([{ col: "Drive Link", kind: "auto" }]);
     expect(ctx.onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("alerts and does not call onComplete when continuing with no rows added at all", () => {
+    globalThis.alert = jest.fn();
+    const container = makeContainer();
+    const step = new InputsStep(["col_a"]);
+    const ctx = makeCtx();
+    step.mount(container, ctx);
+
+    container.querySelector<HTMLButtonElement>("#gi-continue")!.click();
+
+    expect(globalThis.alert).toHaveBeenCalledWith(expect.stringContaining("at least one"));
+    expect(ctx.onComplete).not.toHaveBeenCalled();
+    expect(services.prepRecipe).not.toHaveBeenCalled();
+  });
+
+  it("alerts when the only added row is left incomplete (column never picked)", () => {
+    globalThis.alert = jest.fn();
+    const container = makeContainer();
+    const step = new InputsStep(["col_a"]);
+    const ctx = makeCtx();
+    step.mount(container, ctx);
+
+    container.querySelector<HTMLButtonElement>("#gi-add-column")!.click();
+    container.querySelector<HTMLButtonElement>("#gi-continue")!.click();
+
+    expect(globalThis.alert).toHaveBeenCalledWith(expect.stringContaining("at least one"));
+    expect(ctx.onComplete).not.toHaveBeenCalled();
   });
 });
 
