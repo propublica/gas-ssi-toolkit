@@ -519,9 +519,9 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
           .filter((id) => fileErrors.has(id));
         if (failedIds.length > 0) {
           directWrites.set(
-          i,
-          formatCellError(`file processing failed — ${fileErrors.get(failedIds[0])}`),
-        );
+            i,
+            formatCellError(`file processing failed — ${fileErrors.get(failedIds[0])}`),
+          );
           continue;
         }
       }
