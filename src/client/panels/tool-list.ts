@@ -13,6 +13,9 @@ export class ToolListPanel implements Panel {
   }
 
   private wireEvents(container: HTMLElement, nav: NavigationContext): void {
+    container.querySelector("#btn-guided-ai")?.addEventListener("click", () => {
+      nav.navigate("guided-ai-inference");
+    });
     container.querySelector("#btn-run-ai")?.addEventListener("click", () => {
       nav.navigate("configure-ai-run");
     });
@@ -54,12 +57,27 @@ export class ToolListPanel implements Panel {
   private template(): string {
     return `
       <div class="section">
-        <h3>Main Tools</h3>
-        <button id="btn-recipes" class="tool-btn">
-          <span class="icon">🥞</span> Recipes
+        <h3>AI</h3>
+        <button id="btn-guided-ai" class="tool-btn">
+          <span class="icon">🧭</span>
+          <div class="tool-btn-text">
+            <span class="tool-btn-name">Guided</span>
+            <span class="tool-btn-sub">Not sure where to begin? Start here.</span>
+          </div>
         </button>
         <button id="btn-run-ai" class="tool-btn">
-          <span class="icon">▶️</span> Run AI Inference
+          <span class="icon">▶️</span>
+          <div class="tool-btn-text">
+            <span class="tool-btn-name">Freeform</span>
+            <span class="tool-btn-sub">Full control over inputs, prompts and settings</span>
+          </div>
+        </button>
+        <button id="btn-recipes" class="tool-btn">
+          <span class="icon">🥞</span>
+          <div class="tool-btn-text">
+            <span class="tool-btn-name">Recipes</span>
+            <span class="tool-btn-sub">Ready-made presets for common tasks</span>
+          </div>
         </button>
       </div>
       <div class="section">
@@ -78,9 +96,7 @@ export class ToolListPanel implements Panel {
         </button>
       </div>
       <div class="status-footer">
-        <strong>SSI Tools v2.1</strong><br>
-        Powered by Gemini 3.1 Flash Lite<br>
-        Evaluation Unrestricted Mode
+        <strong>SSI Toolkit v6</strong>
       </div>
     `;
   }

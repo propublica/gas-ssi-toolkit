@@ -86,6 +86,13 @@ export function getSheetHeaders(): string[] {
   return sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
 }
 
+/** Configurable via a GEMINI_GEM_URL Script Property (Project Settings > Script
+ * Properties) -- not a secret, so it's read directly here rather than through
+ * gemini-auth.ts, which is the sole reader of the Gemini API credential. */
+export function getGeminiGemUrl(): string | null {
+  return PropertiesService.getScriptProperties().getProperty("GEMINI_GEM_URL");
+}
+
 export function showSidebar(): void {
   const html = HtmlService.createTemplateFromFile("Sidebar");
   const output = html.evaluate().setTitle("SSI Toolkit").setWidth(300);
@@ -615,7 +622,16 @@ export function runTool(functionName: string, jobId?: string): void {
 
 export function prepRecipe({ cols, inputValues }: PrepRecipeParams): PrepRecipeResult {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  let numRows = 1;
+  const hasFolderSpec = cols.some((col) => col.fillStrategy.kind === "list-drive-folder");
+  // When nothing in this call determines a row count from an actual listing
+  // (no list-drive-folder spec), fall back to however many rows the sheet
+  // already has data in. Without this, a fill-value/template-only call (e.g.
+  // Guided AI Inference's system-prompt step, writing into a column
+  // alongside pre-existing data) silently wrote exactly 1 row regardless of
+  // the sheet's real size. Existing list-drive-folder-driven recipes are
+  // unaffected: numRows still starts at 1 and is only ever raised by the
+  // folder scan below, exactly as before.
+  let numRows = hasFolderSpec ? 1 : Math.max(1, sheet.getLastRow() - 1);
 
   // Pass 1: scan Drive folders, cache results, determine numRows
   const folderCache = new Map<string, string[]>();
