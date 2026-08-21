@@ -37,6 +37,7 @@ const mockUi = {
   GOOGLE_DOCS: "application/vnd.google-apps.document",
   GOOGLE_SHEETS: "application/vnd.google-apps.spreadsheet",
   PDF: "application/pdf",
+  PLAIN_TEXT: "text/plain",
 };
 
 (globalThis as any).UrlFetchApp = {
@@ -129,12 +130,89 @@ describe("extractTextUniversal", () => {
     expect(extractTextUniversal("zipId123")).toBe("[Skipped: Unsupported Type]");
   });
 
-  it("returns error string when an exception is thrown", () => {
-    (DriveApp.getFileById as jest.Mock).mockImplementation(() => {
-      throw new Error("File not found");
+  it("reads text directly from a plain text file", () => {
+    (DriveApp.getFileById as jest.Mock).mockReturnValue({
+      getMimeType: () => "text/plain",
+      getBlob: () => ({ getDataAsString: () => "plain text body" }),
     });
 
-    expect(extractTextUniversal("badId")).toBe("[Error: File not found]");
+    expect(extractTextUniversal("txtId123")).toBe("plain text body");
+  });
+
+  it("returns a generic access-error message and logs (without the raw detail) when fetching the file throws", () => {
+    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    (DriveApp.getFileById as jest.Mock).mockImplementation(() => {
+      throw new Error("File not found: badId, owner has revoked access");
+    });
+
+    const result = extractTextUniversal("badId");
+
+    expect(result).toBe(
+      "[Error: couldn't access this file — check that it still exists and you have permission to view it]",
+    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith("extractTextUniversal:read", { kind: "Error" });
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("returns a generic OCR-conversion error message when Drive.Files.create throws", () => {
+    (DriveApp.getFileById as jest.Mock).mockReturnValue({
+      getMimeType: () => "application/pdf",
+      getName: () => "report.pdf",
+      getBlob: () => ({}),
+    });
+    (globalThis as any).Drive = {
+      Files: {
+        create: jest.fn().mockImplementation(() => {
+          throw new Error("Conversion quota exceeded");
+        }),
+      },
+    };
+
+    expect(extractTextUniversal("pdfId123")).toBe(
+      "[Error: couldn't convert this file for text extraction — it may be too large or in an unsupported format]",
+    );
+  });
+
+  it("returns a generic OCR-read error message when reading the converted doc throws", () => {
+    (DriveApp.getFileById as jest.Mock).mockReturnValue({
+      getMimeType: () => "application/pdf",
+      getName: () => "report.pdf",
+      getBlob: () => ({}),
+    });
+    (globalThis as any).Drive = {
+      Files: {
+        create: jest.fn().mockReturnValue({ id: "tempDocId" }),
+        remove: jest.fn(),
+      },
+    };
+    (DocumentApp.openById as jest.Mock).mockImplementation(() => {
+      throw new Error("Document temporarily unavailable");
+    });
+
+    expect(extractTextUniversal("pdfId123")).toBe(
+      "[Error: OCR text extraction failed after conversion]",
+    );
+  });
+
+  it("still returns the extracted text when temp-doc cleanup fails", () => {
+    (DriveApp.getFileById as jest.Mock).mockReturnValue({
+      getMimeType: () => "application/pdf",
+      getName: () => "report.pdf",
+      getBlob: () => ({}),
+    });
+    (globalThis as any).Drive = {
+      Files: {
+        create: jest.fn().mockReturnValue({ id: "tempDocId" }),
+        remove: jest.fn().mockImplementation(() => {
+          throw new Error("Cleanup failed");
+        }),
+      },
+    };
+    (DocumentApp.openById as jest.Mock).mockReturnValue({
+      getBody: () => ({ getText: () => "ocr text from pdf" }),
+    });
+
+    expect(extractTextUniversal("pdfId123")).toBe("ocr text from pdf");
   });
 
   it("performs OCR for image files", () => {
@@ -554,6 +632,17 @@ describe("downloadDriveFiles", () => {
     downloadDriveFiles(["sheetId"], metadata, "token");
     const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
     expect(calls[0].url).toContain("export?mimeType=text/csv");
+  });
+
+  it("uses alt=media for plain text files (Run AI attaches .txt as-is; Gemini accepts text/plain natively)", () => {
+    const mockBlob = {};
+    (UrlFetchApp.fetchAll as jest.Mock).mockReturnValue([
+      { getResponseCode: () => 200, getBlob: () => mockBlob },
+    ]);
+    const metadata = new Map([["txtId", { mimeType: "text/plain", size: 0 }]]);
+    downloadDriveFiles(["txtId"], metadata, "token");
+    const calls = (UrlFetchApp.fetchAll as jest.Mock).mock.calls[0][0];
+    expect(calls[0].url).toContain("?alt=media");
   });
 
   it("uses alt=media for binary files", () => {

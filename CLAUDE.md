@@ -194,6 +194,28 @@ Recipes are journalist-facing presets that automate column setup and launch a Ru
 
 **To add a new recipe:** add an entry to `RECIPES` in `src/client/recipes.ts`. No other files need changing unless you need a new `FillStrategy` kind.
 
+### Error Handling
+
+Errors reach a user through one of four channels, each with a different fix:
+
+| Channel | Where | Convention |
+|---|---|---|
+| Cell write | `SSI()`, `extractTextUniversal`, `runBatchAI`'s per-row/file errors | `catch`, `logError`/`logUnexpected`, then `return formatCellError(...)` — must keep executing (a per-row failure can't abort the batch) |
+| `ui.alert()` validation | Menu-triggered tool functions (missing columns, no API key, etc.) | Hand-written copy for an expected condition, not a caught exception — not part of this pattern at all |
+| RPC-boundary throw | `importDriveLinks`, `extractText`, `prepRecipe`, `sampleRowsToEvaluation`, `runBatchAI` | Wrap the whole function body in `withErrorScrubbing(site, fn)` (from `error-handling.ts`) — logs and re-throws a safe message; the client's existing `alert(err.message)` renders it unchanged |
+| Backend log | Any catch site | `logError(site, e, meta?)` — the only logging in the codebase |
+
+**`src/server/error-handling.ts`** is the shared toolkit, used everywhere errors are caught:
+- `DomainError` — marks a message deliberately hand-written to be shown to the user verbatim (Gemini's own structured API error, a validation message, the missing-API-key message). No subclasses: no catch site needs to know *which kind*, only *whether*.
+- `logError(site, e, meta?)` — logs `e`'s type only, **never** `e.message`. A caught exception can originate from Drive/Docs/network layers this code doesn't control and may echo cell content or file names — logging the message would defeat the T12 threat-model mitigation. `meta` is typed `number | boolean` only, so a call site can't smuggle free text through it even by mistake.
+- `toSafeMessage(e, fallback)` — a `DomainError`'s message passes through verbatim; anything else returns `fallback`.
+- `logUnexpected(site, e, meta?)` — `logError`, but skipped for a `DomainError` (its message is already user-visible, and since there are no subclasses, logging it would just record the literal string `"DomainError"` — no signal).
+- `formatCellError(message)` — the `[Error: ...]` cell-write convention.
+- `GENERIC_FAILURE_MESSAGE` — the shared fallback string. Deliberately does not say "see script logs": most users have sheet-edit access but not Apps Script project access, so they can't see Cloud Logging.
+- `withErrorScrubbing(site, fn)` — wraps an RPC-exposed function's body (see table above).
+
+**Adding a new error path:** decide which channel it is first (table above), then reuse these primitives directly — don't write a new single-purpose wrapper function for a specific operation or message (tried this once for a Drive-folder-not-found case; reverted both attempts as unjustified complexity for one call site). If a case recurs at a third call site with the same specific need, that's the signal a shared helper is worth it — see `safe-writes.ts` (R45), which was only built after the same bug (T6) recurred three times.
+
 ### TypeScript Configuration
 
 Two tsconfigs for two build environments:

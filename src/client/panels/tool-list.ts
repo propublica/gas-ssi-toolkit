@@ -37,7 +37,7 @@ export class ToolListPanel implements Panel {
       btn.disabled = true;
       btn.innerHTML = '<span class="icon">📝</span> Formatting...';
       formatMarkdownSelection()
-        .catch((err: Error) => globalThis.alert("Error: " + err.message))
+        .catch((err: Error) => globalThis.alert(err.message))
         .finally(() => {
           btn.disabled = false;
           btn.innerHTML = originalHtml;
@@ -51,7 +51,7 @@ export class ToolListPanel implements Panel {
     const label = btn.textContent?.trim() ?? fn;
     jobStore
       .dispatch(jobId, label, runTool(fn, jobId))
-      .catch((err: Error) => globalThis.alert("Error: " + err.message));
+      .catch((err: Error) => globalThis.alert(err.message));
   }
 
   private template(): string {

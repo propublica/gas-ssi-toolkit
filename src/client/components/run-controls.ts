@@ -344,11 +344,11 @@ export class RunControls {
           .dispatch(jobId, "Batch AI Run", this.runChunks(jobId, config, chunks))
           .then(() => this.config.onRunSucceeded?.())
           .catch((err: Error) => {
-            globalThis.alert("Error: " + err.message);
+            globalThis.alert(err.message);
           });
       })
       .catch((err: Error) => {
-        globalThis.alert("Error: " + err.message);
+        globalThis.alert(err.message);
       })
       .finally(() => this.config.onBusyChange?.(false));
   }
@@ -422,7 +422,7 @@ export class RunControls {
         }
       })
       .catch((err: Error) => {
-        globalThis.alert("Error: " + err.message);
+        globalThis.alert(err.message);
         this.testButton?.setIdle();
       })
       .finally(() => this.config.onBusyChange?.(false));

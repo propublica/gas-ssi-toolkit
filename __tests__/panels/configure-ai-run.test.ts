@@ -238,7 +238,7 @@ describe("ConfigureAIRunPanel — Run AI", () => {
     // Extra ticks: getActiveRangeInfo adds an async hop before runBatchAI, so
     // the catch handler fires one tick later than in the single-dispatch path.
     for (let i = 0; i < 5; i++) await Promise.resolve();
-    expect(globalThis.alert).toHaveBeenCalledWith("Error: API error");
+    expect(globalThis.alert).toHaveBeenCalledWith("API error");
   });
 
   it("assembleRunConfig includes drive file cols as file entries in promptCols", async () => {
@@ -385,7 +385,7 @@ describe("ConfigureAIRunPanel — untested-run warning", () => {
     });
     await clickRun(container);
     expect(services.runBatchAI).not.toHaveBeenCalled();
-    expect(globalThis.alert).toHaveBeenCalledWith("Error: RPC down");
+    expect(globalThis.alert).toHaveBeenCalledWith("RPC down");
   });
 });
 
@@ -1049,7 +1049,7 @@ describe("ConfigureAIRunPanel — Test AI", () => {
     });
     container.querySelector<HTMLButtonElement>("#test-btn")!.click();
     for (let i = 0; i < 5; i++) await Promise.resolve();
-    expect(globalThis.alert).toHaveBeenCalledWith("Error: API error");
+    expect(globalThis.alert).toHaveBeenCalledWith("API error");
   });
 });
 

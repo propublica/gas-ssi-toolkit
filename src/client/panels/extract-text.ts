@@ -51,7 +51,7 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
           loader.setState({ status: "idle" });
         },
         (err: Error) => {
-          globalThis.alert("Error loading headers: " + err.message);
+          globalThis.alert("Couldn't load headers: " + err.message);
           nav.back();
         },
       );
@@ -112,7 +112,7 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
     const jobId = `extract-text-${Date.now()}`;
     jobStore
       .dispatch(jobId, "Extract Text", extractText(config, jobId))
-      .catch((err: Error) => globalThis.alert("Error: " + err.message));
+      .catch((err: Error) => globalThis.alert(err.message));
   }
 
   private assembleConfig(): ExtractTextConfig | null {

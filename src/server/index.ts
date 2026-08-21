@@ -21,6 +21,7 @@ import {
 import { uploadFilesToGemini } from "./files";
 import { hasGeminiApiKey, MISSING_API_KEY_MESSAGE } from "./gemini-auth";
 import { buildInferenceRequest } from "./inference";
+import { DomainError, formatCellError, withErrorScrubbing } from "./error-handling";
 import { parseMarkdown, type RichSpan } from "./markdown-to-rich-text";
 import { injectCitations, groundingToMarkdown } from "./gemini-grounding";
 import {
@@ -104,28 +105,30 @@ export function showSidebar(): void {
 // ==========================================
 
 export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string): void {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  const folderId = extractId(config.folderUrl);
+  withErrorScrubbing("Import Drive Links", () => {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    const folderId = extractId(config.folderUrl);
 
-  if (jobId) {
-    writeJobProgress(CacheService.getUserCache(), jobId, { message: "Scanning folder..." });
-  }
+    if (jobId) {
+      writeJobProgress(CacheService.getUserCache(), jobId, { message: "Scanning folder..." });
+    }
 
-  const parentFolder = DriveApp.getFolderById(folderId);
-  const allFiles: DriveFileInfo[] = [];
-  getAllFilesRecursive(parentFolder, allFiles, config.mimeTypes);
+    const parentFolder = DriveApp.getFolderById(folderId);
+    const allFiles: DriveFileInfo[] = [];
+    getAllFilesRecursive(parentFolder, allFiles, config.mimeTypes);
 
-  const col = findOrCreateColumn(sheet, config.outputCol, SpreadsheetApp.WrapStrategy.CLIP);
-  writeColumn(
-    sheet,
-    col,
-    allFiles.map((f) => f.url),
-  );
-  SpreadsheetApp.getActive().toast(
-    `Imported ${allFiles.length} link${allFiles.length === 1 ? "" : "s"} into "${config.outputCol}".`,
-    "Complete",
-    5,
-  );
+    const col = findOrCreateColumn(sheet, config.outputCol, SpreadsheetApp.WrapStrategy.CLIP);
+    writeColumn(
+      sheet,
+      col,
+      allFiles.map((f) => f.url),
+    );
+    SpreadsheetApp.getActive().toast(
+      `Imported ${allFiles.length} link${allFiles.length === 1 ? "" : "s"} into "${config.outputCol}".`,
+      "Complete",
+      5,
+    );
+  });
 }
 
 // ==========================================
@@ -133,54 +136,58 @@ export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string)
 // ==========================================
 
 export function extractText(config: ExtractTextConfig, jobId?: string): void {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  withErrorScrubbing("Extract Text", () => {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
 
-  if (!checkDriveService(SpreadsheetApp.getUi())) return;
+    if (!checkDriveService(SpreadsheetApp.getUi())) return;
 
-  const lastCol = sheet.getLastColumn();
-  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
-  const sourceColIdx = headers.indexOf(config.sourceCol);
+    const lastCol = sheet.getLastColumn();
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
+    const sourceColIdx = headers.indexOf(config.sourceCol);
 
-  if (sourceColIdx === -1) {
-    throw new Error(`Column "${config.sourceCol}" not found`);
-  }
-
-  const outputCol = findOrCreateColumn(sheet, config.outputCol, SpreadsheetApp.WrapStrategy.WRAP);
-
-  let startRow: number;
-  let total: number;
-  if (config.rowRange) {
-    startRow = config.rowRange.start;
-    total = config.rowRange.end - config.rowRange.start + 1;
-  } else {
-    const activeRange = sheet.getActiveRange();
-    if (!activeRange) return;
-    startRow = activeRange.getRow();
-    total = activeRange.getNumRows();
-  }
-
-  for (let i = 0; i < total; i++) {
-    const rowIdx = startRow + i; // sheet row number (1-indexed; start=2 = first data row)
-
-    if (jobId) {
-      writeJobProgress(CacheService.getUserCache(), jobId, {
-        message: `Extracting row ${i + 1} of ${total}...`,
-        current: i + 1,
-        total,
-      });
+    if (sourceColIdx === -1) {
+      // The column name is the user's own selection from the sidebar, not
+      // internal detail — safe and useful to show verbatim.
+      throw new DomainError(`Column "${config.sourceCol}" not found`);
     }
 
-    const cellValue = sheet.getRange(rowIdx, sourceColIdx + 1).getValue() as string;
+    const outputCol = findOrCreateColumn(sheet, config.outputCol, SpreadsheetApp.WrapStrategy.WRAP);
 
-    if (!isValidDriveLink(cellValue)) {
-      continue;
+    let startRow: number;
+    let total: number;
+    if (config.rowRange) {
+      startRow = config.rowRange.start;
+      total = config.rowRange.end - config.rowRange.start + 1;
+    } else {
+      const activeRange = sheet.getActiveRange();
+      if (!activeRange) return;
+      startRow = activeRange.getRow();
+      total = activeRange.getNumRows();
     }
 
-    const fileId = extractId(cellValue);
-    const text = truncateText(extractTextUniversal(fileId), 49000);
-    writeSafeValue(sheet.getRange(rowIdx, outputCol), text);
-    SpreadsheetApp.flush();
-  }
+    for (let i = 0; i < total; i++) {
+      const rowIdx = startRow + i; // sheet row number (1-indexed; start=2 = first data row)
+
+      if (jobId) {
+        writeJobProgress(CacheService.getUserCache(), jobId, {
+          message: `Extracting row ${i + 1} of ${total}...`,
+          current: i + 1,
+          total,
+        });
+      }
+
+      const cellValue = sheet.getRange(rowIdx, sourceColIdx + 1).getValue() as string;
+
+      if (!isValidDriveLink(cellValue)) {
+        continue;
+      }
+
+      const fileId = extractId(cellValue);
+      const text = truncateText(extractTextUniversal(fileId), 49000);
+      writeSafeValue(sheet.getRange(rowIdx, outputCol), text);
+      SpreadsheetApp.flush();
+    }
+  });
 }
 
 // ==========================================
@@ -188,71 +195,75 @@ export function extractText(config: ExtractTextConfig, jobId?: string): void {
 // ==========================================
 
 export function sampleRowsToEvaluation(_jobId?: string): void {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const ui = SpreadsheetApp.getUi();
-  const sourceSheet = ss.getActiveSheet();
-  const sourceName = sourceSheet.getName();
+  withErrorScrubbing("Sample Rows", () => {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ui = SpreadsheetApp.getUi();
+    const sourceSheet = ss.getActiveSheet();
+    const sourceName = sourceSheet.getName();
 
-  const targetName = `${sourceName}_evaluation`;
-  let targetSheet = ss.getSheetByName(targetName);
+    const targetName = `${sourceName}_evaluation`;
+    let targetSheet = ss.getSheetByName(targetName);
 
-  const lastRow = sourceSheet.getLastRow();
-  if (lastRow < 2) {
-    ui.alert("Error", `The sheet "${sourceName}" appears to be empty.`, ui.ButtonSet.OK);
-    return;
-  }
+    const lastRow = sourceSheet.getLastRow();
+    if (lastRow < 2) {
+      ui.alert("Error", `The sheet "${sourceName}" appears to be empty.`, ui.ButtonSet.OK);
+      return;
+    }
 
-  const allData = sourceSheet.getRange(2, 1, lastRow - 1, sourceSheet.getLastColumn()).getValues();
+    const allData = sourceSheet
+      .getRange(2, 1, lastRow - 1, sourceSheet.getLastColumn())
+      .getValues();
 
-  // Sample size
-  const countResponse = ui.prompt(
-    "Sample Data",
-    `Found ${allData.length} rows in "${sourceName}".\nHow many rows would you like to sample to "${targetName}"?`,
-    ui.ButtonSet.OK_CANCEL,
-  );
-  if (countResponse.getSelectedButton() !== ui.Button.OK) return;
+    // Sample size
+    const countResponse = ui.prompt(
+      "Sample Data",
+      `Found ${allData.length} rows in "${sourceName}".\nHow many rows would you like to sample to "${targetName}"?`,
+      ui.ButtonSet.OK_CANCEL,
+    );
+    if (countResponse.getSelectedButton() !== ui.Button.OK) return;
 
-  const sampleSize = parseInt(countResponse.getResponseText());
-  if (isNaN(sampleSize) || sampleSize < 1 || sampleSize > allData.length) {
+    const sampleSize = parseInt(countResponse.getResponseText());
+    if (isNaN(sampleSize) || sampleSize < 1 || sampleSize > allData.length) {
+      ui.alert(
+        "Error",
+        `Please enter a valid number between 1 and ${allData.length}.`,
+        ui.ButtonSet.OK,
+      );
+      return;
+    }
+
+    // Seed
+    const seedResponse = ui.prompt(
+      "Random Seed",
+      "Enter a seed number for reproducibility (default: 42):",
+      ui.ButtonSet.OK_CANCEL,
+    );
+    if (seedResponse.getSelectedButton() !== ui.Button.OK) return;
+    const seed = parseInt(seedResponse.getResponseText()) || 42;
+
+    // Create target sheet if missing
+    if (!targetSheet) {
+      targetSheet = ss.insertSheet(targetName);
+      const headers = sourceSheet.getRange(1, 1, 1, sourceSheet.getLastColumn()).getValues();
+      writeSafeValueGrid(targetSheet.getRange(1, 1, 1, headers[0].length), headers);
+    }
+
+    const selectedRows = sampleRows(allData, sampleSize, seed);
+
+    // Write to target
+    const targetRow = targetSheet.getLastRow() + 1;
+    writeSafeValueGrid(
+      targetSheet.getRange(targetRow, 1, selectedRows.length, selectedRows[0].length),
+      selectedRows,
+    );
+
+    ss.setActiveSheet(targetSheet);
     ui.alert(
-      "Error",
-      `Please enter a valid number between 1 and ${allData.length}.`,
+      "Success",
+      `Copied ${sampleSize} rows from "${sourceName}" to "${targetName}" using seed ${seed}.`,
       ui.ButtonSet.OK,
     );
-    return;
-  }
-
-  // Seed
-  const seedResponse = ui.prompt(
-    "Random Seed",
-    "Enter a seed number for reproducibility (default: 42):",
-    ui.ButtonSet.OK_CANCEL,
-  );
-  if (seedResponse.getSelectedButton() !== ui.Button.OK) return;
-  const seed = parseInt(seedResponse.getResponseText()) || 42;
-
-  // Create target sheet if missing
-  if (!targetSheet) {
-    targetSheet = ss.insertSheet(targetName);
-    const headers = sourceSheet.getRange(1, 1, 1, sourceSheet.getLastColumn()).getValues();
-    writeSafeValueGrid(targetSheet.getRange(1, 1, 1, headers[0].length), headers);
-  }
-
-  const selectedRows = sampleRows(allData, sampleSize, seed);
-
-  // Write to target
-  const targetRow = targetSheet.getLastRow() + 1;
-  writeSafeValueGrid(
-    targetSheet.getRange(targetRow, 1, selectedRows.length, selectedRows[0].length),
-    selectedRows,
-  );
-
-  ss.setActiveSheet(targetSheet);
-  ui.alert(
-    "Success",
-    `Copied ${sampleSize} rows from "${sourceName}" to "${targetName}" using seed ${seed}.`,
-    ui.ButtonSet.OK,
-  );
+  });
 }
 
 // ==========================================
@@ -317,292 +328,297 @@ export function formatMarkdownSelection(): void {
 const FILE_PIPELINE_BATCH_SIZE = 10;
 
 export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
-  const startTime = Date.now();
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getActiveSheet();
-  const ui = SpreadsheetApp.getUi();
+  return withErrorScrubbing("Run AI", () => {
+    const startTime = Date.now();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getActiveSheet();
+    const ui = SpreadsheetApp.getUi();
 
-  const headers = getSheetHeaders();
-  if (headers.length === 0) {
-    ui.alert("Error", "The active sheet has no column headers.", ui.ButtonSet.OK);
-    return null;
-  }
+    const headers = getSheetHeaders();
+    if (headers.length === 0) {
+      ui.alert("Error", "The active sheet has no column headers.", ui.ButtonSet.OK);
+      return null;
+    }
 
-  // Validate prompt columns (required — at least one)
-  const promptIdxs = resolveColumns(
-    headers,
-    config.promptCols.map((pc) => pc.col),
-  );
-  const missingPromptCols = config.promptCols
-    .filter((_, i) => promptIdxs[i] === -1)
-    .map((pc) => pc.col);
-  if (config.promptCols.length === 0 || missingPromptCols.length > 0) {
-    ui.alert(
-      "Error: Missing Columns",
-      missingPromptCols.length > 0
-        ? `Could not find columns: ${missingPromptCols.join(", ")}`
-        : "Please select at least one prompt column.",
-      ui.ButtonSet.OK,
+    // Validate prompt columns (required — at least one)
+    const promptIdxs = resolveColumns(
+      headers,
+      config.promptCols.map((pc) => pc.col),
     );
-    return null;
-  }
-
-  // Validate system prompt column (if selected)
-  let systemPromptIdx = -1;
-  if (config.systemPromptCol) {
-    const idxs = resolveColumns(headers, [config.systemPromptCol]);
-    if (idxs[0] === -1) {
+    const missingPromptCols = config.promptCols
+      .filter((_, i) => promptIdxs[i] === -1)
+      .map((pc) => pc.col);
+    if (config.promptCols.length === 0 || missingPromptCols.length > 0) {
       ui.alert(
         "Error: Missing Columns",
-        `Could not find column: ${config.systemPromptCol}`,
+        missingPromptCols.length > 0
+          ? `Could not find columns: ${missingPromptCols.join(", ")}`
+          : "Please select at least one prompt column.",
         ui.ButtonSet.OK,
       );
       return null;
     }
-    systemPromptIdx = idxs[0];
-  }
 
-  // Resolve output column — create if not found
-  const outputIdx = findOrCreateColumn(sheet, config.outputCol) - 1;
-
-  // Resolve grounding column — create if not found (only when opted in)
-  let groundingIdx = -1;
-  const groundingColName = config.outputCol + "_grounding";
-  if (config.includeGrounding) {
-    groundingIdx = findOrCreateColumn(sheet, groundingColName) - 1;
-  }
-
-  // Determine row range
-  let startRow: number;
-  let numRows: number;
-  if (config.rowRange) {
-    startRow = config.rowRange.start;
-    numRows = config.rowRange.end - config.rowRange.start + 1;
-  } else {
-    const range = sheet.getActiveRange();
-    if (!range) return null;
-    startRow = range.getRow();
-    numRows = range.getNumRows();
-  }
-
-  const dataValues = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues();
-
-  if (!hasGeminiApiKey()) {
-    ui.alert("Error", MISSING_API_KEY_MESSAGE, ui.ButtonSet.OK);
-    return null;
-  }
-
-  const cache = CacheService.getUserCache();
-  const hasFileInputs = config.promptCols.some((pc) => pc.kind === "file" || pc.kind === "auto");
-
-  // Build all prompt input arrays (one per row) — pure, no I/O
-  const allPromptInputs: PromptInput[][] = dataValues.map((row) =>
-    config.promptCols.map((pc, colIdx) => ({
-      kind: pc.kind,
-      value: row[promptIdxs[colIdx]],
-      label: pc.col,
-    })),
-  );
-
-  // Wave 1 — file work (multimodal chunks only)
-  const fileUriMap = new Map<string, { uri: string; mimeType: string }>();
-  let fileErrors = new Map<string, string>();
-
-  if (hasFileInputs) {
-    const oauthToken = ScriptApp.getOAuthToken();
-
-    // Collect unique Drive file IDs across all rows in this chunk
-    const allFileIds = new Set<string>();
-    for (const inputs of allPromptInputs) {
-      for (const input of inputs) {
-        if (input.kind === "file" || input.kind === "auto") {
-          flattenArg(input.value)
-            .filter(isValidDriveLink)
-            .map(extractId)
-            .forEach((id) => allFileIds.add(id));
-        }
+    // Validate system prompt column (if selected)
+    let systemPromptIdx = -1;
+    if (config.systemPromptCol) {
+      const idxs = resolveColumns(headers, [config.systemPromptCol]);
+      if (idxs[0] === -1) {
+        ui.alert(
+          "Error: Missing Columns",
+          `Could not find column: ${config.systemPromptCol}`,
+          ui.ButtonSet.OK,
+        );
+        return null;
       }
+      systemPromptIdx = idxs[0];
     }
 
-    const fileIds = Array.from(allFileIds);
-    if (fileIds.length > 0) {
-      if (jobId) {
-        writeJobProgress(cache, jobId, {
-          message: `Downloading files for rows ${startRow}–${startRow + numRows - 1}...`,
-        });
+    // Resolve output column — create if not found
+    const outputIdx = findOrCreateColumn(sheet, config.outputCol) - 1;
+
+    // Resolve grounding column — create if not found (only when opted in)
+    let groundingIdx = -1;
+    const groundingColName = config.outputCol + "_grounding";
+    if (config.includeGrounding) {
+      groundingIdx = findOrCreateColumn(sheet, groundingColName) - 1;
+    }
+
+    // Determine row range
+    let startRow: number;
+    let numRows: number;
+    if (config.rowRange) {
+      startRow = config.rowRange.start;
+      numRows = config.rowRange.end - config.rowRange.start + 1;
+    } else {
+      const range = sheet.getActiveRange();
+      if (!range) return null;
+      startRow = range.getRow();
+      numRows = range.getNumRows();
+    }
+
+    const dataValues = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues();
+
+    if (!hasGeminiApiKey()) {
+      ui.alert("Error", MISSING_API_KEY_MESSAGE, ui.ButtonSet.OK);
+      return null;
+    }
+
+    const cache = CacheService.getUserCache();
+    const hasFileInputs = config.promptCols.some((pc) => pc.kind === "file" || pc.kind === "auto");
+
+    // Build all prompt input arrays (one per row) — pure, no I/O
+    const allPromptInputs: PromptInput[][] = dataValues.map((row) =>
+      config.promptCols.map((pc, colIdx) => ({
+        kind: pc.kind,
+        value: row[promptIdxs[colIdx]],
+        label: pc.col,
+      })),
+    );
+
+    // Wave 1 — file work (multimodal chunks only)
+    const fileUriMap = new Map<string, { uri: string; mimeType: string }>();
+    let fileErrors = new Map<string, string>();
+
+    if (hasFileInputs) {
+      const oauthToken = ScriptApp.getOAuthToken();
+
+      // Collect unique Drive file IDs across all rows in this chunk
+      const allFileIds = new Set<string>();
+      for (const inputs of allPromptInputs) {
+        for (const input of inputs) {
+          if (input.kind === "file" || input.kind === "auto") {
+            flattenArg(input.value)
+              .filter(isValidDriveLink)
+              .map(extractId)
+              .forEach((id) => allFileIds.add(id));
+          }
+        }
       }
-      const { metadata, errors: metadataErrors } = fetchDriveMetadata(fileIds, oauthToken);
 
-      // Only attempt to download files whose metadata was successfully fetched
-      const downloadIds = fileIds.filter((id) => metadata.has(id));
-
-      // Translate Drive native MIME types to exported MIME types.
-      // downloadDriveFiles exports Docs as PDF and Sheets as CSV.
-      const DOCS_DRIVE_MIME = "application/vnd.google-apps.document";
-      const SHEETS_DRIVE_MIME = "application/vnd.google-apps.spreadsheet";
-
-      // Process files in sub-batches: download → upload → clear → next sub-batch.
-      // Peak memory is bounded to FILE_PIPELINE_BATCH_SIZE files at a time rather
-      // than all files in the chunk, preventing JS runtime crashes from the
-      // Uint8Array→Byte[] expansion that UrlFetchApp payloads require (~8× overhead).
-      const allDownloadErrors = new Map<string, string>();
-      const allUploadErrors = new Map<string, string>();
-      for (let bStart = 0; bStart < downloadIds.length; bStart += FILE_PIPELINE_BATCH_SIZE) {
-        const batchIds = downloadIds.slice(bStart, bStart + FILE_PIPELINE_BATCH_SIZE);
+      const fileIds = Array.from(allFileIds);
+      if (fileIds.length > 0) {
         if (jobId) {
           writeJobProgress(cache, jobId, {
-            message: `Processing files ${bStart + 1}–${Math.min(bStart + FILE_PIPELINE_BATCH_SIZE, downloadIds.length)} of ${downloadIds.length}...`,
+            message: `Downloading files for rows ${startRow}–${startRow + numRows - 1}...`,
           });
         }
-        const batchMetadata = new Map(batchIds.map((id) => [id, metadata.get(id)!]));
-        const { bytes: batchBytes, errors: batchDownloadErrors } = downloadDriveFiles(
-          batchIds,
-          batchMetadata,
-          oauthToken,
-        );
-        for (const [id, err] of batchDownloadErrors) allDownloadErrors.set(id, err);
+        const { metadata, errors: metadataErrors } = fetchDriveMetadata(fileIds, oauthToken);
 
-        const batchUploadIds = batchIds.filter((id) => batchBytes.has(id));
-        const batchMimeTypes = new Map(
-          batchUploadIds.map((id) => {
-            const driveMime = metadata.get(id)!.mimeType;
-            let effectiveMime = driveMime;
-            if (driveMime === DOCS_DRIVE_MIME) effectiveMime = "application/pdf";
-            else if (driveMime === SHEETS_DRIVE_MIME) effectiveMime = "text/csv";
-            return [id, effectiveMime];
-          }),
-        );
-        const { uploads: batchUploads, errors: batchUploadErrors } = uploadFilesToGemini(
-          batchBytes,
-          batchMimeTypes,
-        );
-        batchBytes.clear(); // release immediately — only one sub-batch in memory at a time
-        for (const [id, info] of batchUploads) fileUriMap.set(id, info);
-        for (const [id, err] of batchUploadErrors) allUploadErrors.set(id, err);
-      }
-      fileErrors = new Map([...metadataErrors, ...allDownloadErrors, ...allUploadErrors]);
-    }
-  }
+        // Only attempt to download files whose metadata was successfully fetched
+        const downloadIds = fileIds.filter((id) => metadata.has(id));
 
-  // Wave 2 — build requests and fire inference in parallel
-  if (jobId) {
-    writeJobProgress(cache, jobId, {
-      message: `Running AI on rows ${startRow}–${startRow + numRows - 1}...`,
-    });
-  }
+        // Translate Drive native MIME types to exported MIME types.
+        // downloadDriveFiles exports Docs as PDF and Sheets as CSV.
+        const DOCS_DRIVE_MIME = "application/vnd.google-apps.document";
+        const SHEETS_DRIVE_MIME = "application/vnd.google-apps.spreadsheet";
 
-  const requests: GeminiRequest[] = [];
-  const rowIndices: number[] = [];
-  // File-error rows are deferred here and written in the same post-batch loop as
-  // inference results, so the entire chunk lands in a single SpreadsheetApp.flush().
-  const directWrites = new Map<number, string>();
+        // Process files in sub-batches: download → upload → clear → next sub-batch.
+        // Peak memory is bounded to FILE_PIPELINE_BATCH_SIZE files at a time rather
+        // than all files in the chunk, preventing JS runtime crashes from the
+        // Uint8Array→Byte[] expansion that UrlFetchApp payloads require (~8× overhead).
+        const allDownloadErrors = new Map<string, string>();
+        const allUploadErrors = new Map<string, string>();
+        for (let bStart = 0; bStart < downloadIds.length; bStart += FILE_PIPELINE_BATCH_SIZE) {
+          const batchIds = downloadIds.slice(bStart, bStart + FILE_PIPELINE_BATCH_SIZE);
+          if (jobId) {
+            writeJobProgress(cache, jobId, {
+              message: `Processing files ${bStart + 1}–${Math.min(bStart + FILE_PIPELINE_BATCH_SIZE, downloadIds.length)} of ${downloadIds.length}...`,
+            });
+          }
+          const batchMetadata = new Map(batchIds.map((id) => [id, metadata.get(id)!]));
+          const { bytes: batchBytes, errors: batchDownloadErrors } = downloadDriveFiles(
+            batchIds,
+            batchMetadata,
+            oauthToken,
+          );
+          for (const [id, err] of batchDownloadErrors) allDownloadErrors.set(id, err);
 
-  for (let i = 0; i < allPromptInputs.length; i++) {
-    // If any file input for this row failed to fetch/download/upload, defer an
-    // error string for the post-batch write loop and skip inference.
-    if (fileErrors.size > 0) {
-      const failedIds = allPromptInputs[i]
-        .filter((inp) => inp.kind === "file" || inp.kind === "auto")
-        .flatMap((inp) => flattenArg(inp.value).filter(isValidDriveLink).map(extractId))
-        .filter((id) => fileErrors.has(id));
-      if (failedIds.length > 0) {
-        directWrites.set(i, `[File error: ${fileErrors.get(failedIds[0])}]`);
-        continue;
+          const batchUploadIds = batchIds.filter((id) => batchBytes.has(id));
+          const batchMimeTypes = new Map(
+            batchUploadIds.map((id) => {
+              const driveMime = metadata.get(id)!.mimeType;
+              let effectiveMime = driveMime;
+              if (driveMime === DOCS_DRIVE_MIME) effectiveMime = "application/pdf";
+              else if (driveMime === SHEETS_DRIVE_MIME) effectiveMime = "text/csv";
+              return [id, effectiveMime];
+            }),
+          );
+          const { uploads: batchUploads, errors: batchUploadErrors } = uploadFilesToGemini(
+            batchBytes,
+            batchMimeTypes,
+          );
+          batchBytes.clear(); // release immediately — only one sub-batch in memory at a time
+          for (const [id, info] of batchUploads) fileUriMap.set(id, info);
+          for (const [id, err] of batchUploadErrors) allUploadErrors.set(id, err);
+        }
+        fileErrors = new Map([...metadataErrors, ...allDownloadErrors, ...allUploadErrors]);
       }
     }
 
-    const systemPrompt = systemPromptIdx >= 0 ? dataValues[i][systemPromptIdx] : undefined;
-    const req = buildInferenceRequest(
-      allPromptInputs[i],
-      systemPrompt,
-      config.tools,
-      config.wrapPromptsInTags ?? true,
-      hasFileInputs ? fileUriMap : undefined,
-    );
-    if (req !== null) {
-      requests.push({ ...req, modelName: config.model });
-      rowIndices.push(i);
+    // Wave 2 — build requests and fire inference in parallel
+    if (jobId) {
+      writeJobProgress(cache, jobId, {
+        message: `Running AI on rows ${startRow}–${startRow + numRows - 1}...`,
+      });
     }
-  }
 
-  if (requests.length === 0 && directWrites.size === 0) {
-    SpreadsheetApp.getActive().toast("No rows to process.", "Info", 5);
-    SpreadsheetApp.flush();
-    return null;
-  }
+    const requests: GeminiRequest[] = [];
+    const rowIndices: number[] = [];
+    // File-error rows are deferred here and written in the same post-batch loop as
+    // inference results, so the entire chunk lands in a single SpreadsheetApp.flush().
+    const directWrites = new Map<number, string>();
 
-  const results = requests.length > 0 ? callGeminiAPIBatch(requests) : [];
-
-  const resolvedUris =
-    (config.applyMarkdown || config.includeGrounding) &&
-    results.some((r) => (r.groundingMetadata?.groundingChunks?.length ?? 0) > 0)
-      ? resolveGroundingUris(results)
-      : new Map<string, string>();
-
-  // Write all results and file errors in a single batch — one flush at end of chunk.
-  for (let j = 0; j < results.length; j++) {
-    const i = rowIndices[j];
-    const realRowIndex = startRow + i;
-    const result = results[j];
-
-    if (config.applyMarkdown) {
-      try {
-        writeSafeRichText(
-          sheet.getRange(realRowIndex, outputIdx + 1),
-          toCellValue(parseMarkdown(injectCitations(result, resolvedUris))),
+    for (let i = 0; i < allPromptInputs.length; i++) {
+      // If any file input for this row failed to fetch/download/upload, defer an
+      // error string for the post-batch write loop and skip inference.
+      if (fileErrors.size > 0) {
+        const failedIds = allPromptInputs[i]
+          .filter((inp) => inp.kind === "file" || inp.kind === "auto")
+          .flatMap((inp) => flattenArg(inp.value).filter(isValidDriveLink).map(extractId))
+          .filter((id) => fileErrors.has(id));
+        if (failedIds.length > 0) {
+          directWrites.set(
+          i,
+          formatCellError(`file processing failed — ${fileErrors.get(failedIds[0])}`),
         );
-      } catch (_e) {
+          continue;
+        }
+      }
+
+      const systemPrompt = systemPromptIdx >= 0 ? dataValues[i][systemPromptIdx] : undefined;
+      const req = buildInferenceRequest(
+        allPromptInputs[i],
+        systemPrompt,
+        config.tools,
+        config.wrapPromptsInTags ?? true,
+        hasFileInputs ? fileUriMap : undefined,
+      );
+      if (req !== null) {
+        requests.push({ ...req, modelName: config.model });
+        rowIndices.push(i);
+      }
+    }
+
+    if (requests.length === 0 && directWrites.size === 0) {
+      SpreadsheetApp.getActive().toast("No rows to process.", "Info", 5);
+      SpreadsheetApp.flush();
+      return null;
+    }
+
+    const results = requests.length > 0 ? callGeminiAPIBatch(requests) : [];
+
+    const resolvedUris =
+      (config.applyMarkdown || config.includeGrounding) &&
+      results.some((r) => (r.groundingMetadata?.groundingChunks?.length ?? 0) > 0)
+        ? resolveGroundingUris(results)
+        : new Map<string, string>();
+
+    // Write all results and file errors in a single batch — one flush at end of chunk.
+    for (let j = 0; j < results.length; j++) {
+      const i = rowIndices[j];
+      const realRowIndex = startRow + i;
+      const result = results[j];
+
+      if (config.applyMarkdown) {
+        try {
+          writeSafeRichText(
+            sheet.getRange(realRowIndex, outputIdx + 1),
+            toCellValue(parseMarkdown(injectCitations(result, resolvedUris))),
+          );
+        } catch (_e) {
+          writeSafeValue(sheet.getRange(realRowIndex, outputIdx + 1), result.text);
+        }
+      } else {
         writeSafeValue(sheet.getRange(realRowIndex, outputIdx + 1), result.text);
       }
-    } else {
-      writeSafeValue(sheet.getRange(realRowIndex, outputIdx + 1), result.text);
-    }
 
-    if (config.includeGrounding && groundingIdx >= 0) {
-      const groundingMarkdown = groundingToMarkdown(result, resolvedUris);
-      if (groundingMarkdown !== null) {
-        writeSafeRichText(
-          sheet.getRange(realRowIndex, groundingIdx + 1),
-          toCellValue(parseMarkdown(groundingMarkdown)),
-        );
+      if (config.includeGrounding && groundingIdx >= 0) {
+        const groundingMarkdown = groundingToMarkdown(result, resolvedUris);
+        if (groundingMarkdown !== null) {
+          writeSafeRichText(
+            sheet.getRange(realRowIndex, groundingIdx + 1),
+            toCellValue(parseMarkdown(groundingMarkdown)),
+          );
+        }
       }
     }
-  }
 
-  for (const [i, errorText] of directWrites) {
-    writeSafeValue(sheet.getRange(startRow + i, outputIdx + 1), errorText);
-  }
-
-  SpreadsheetApp.flush();
-  markAIOutputRange(sheet, outputIdx + 1, startRow, numRows);
-
-  const successCount = results.filter((r) => !r.text.startsWith("Error:")).length;
-  const errorCount = results.length - successCount + directWrites.size;
-  SpreadsheetApp.getActive().toast(
-    errorCount === 0
-      ? `Complete! Processed ${results.length} rows.`
-      : `Complete! Processed ${successCount} of ${results.length + directWrites.size} rows (${errorCount} errors).`,
-    "Success",
-    5,
-  );
-
-  let stats: RunStats | null = null;
-  try {
-    const computed: RunStats = {
-      ...computeRunStats(results, Date.now() - startTime, config.model ?? CONFIG.DEFAULT_MODEL),
-      testedAt: startTime,
-      config: buildConfigSnapshot(config),
-    };
-    if (computed.rowCount > 0) {
-      writeRunStats(cache, ss.getId(), computed);
-      stats = computed;
+    for (const [i, errorText] of directWrites) {
+      writeSafeValue(sheet.getRange(startRow + i, outputIdx + 1), errorText);
     }
-  } catch (_e) {
-    // Stats/cost tracking is best-effort and must never fail the underlying
-    // AI run, which has already fully completed by this point.
-  }
 
-  return stats;
+    SpreadsheetApp.flush();
+    markAIOutputRange(sheet, outputIdx + 1, startRow, numRows);
+
+    const successCount = results.filter((r) => !r.text.startsWith("[Error:")).length;
+    const errorCount = results.length - successCount + directWrites.size;
+    SpreadsheetApp.getActive().toast(
+      errorCount === 0
+        ? `Complete! Processed ${results.length} rows.`
+        : `Complete! Processed ${successCount} of ${results.length + directWrites.size} rows (${errorCount} errors).`,
+      "Success",
+      5,
+    );
+
+    let stats: RunStats | null = null;
+    try {
+      const computed: RunStats = {
+        ...computeRunStats(results, Date.now() - startTime, config.model ?? CONFIG.DEFAULT_MODEL),
+        testedAt: startTime,
+        config: buildConfigSnapshot(config),
+      };
+      if (computed.rowCount > 0) {
+        writeRunStats(cache, ss.getId(), computed);
+        stats = computed;
+      }
+    } catch (_e) {
+      // Stats/cost tracking is best-effort and must never fail the underlying
+      // AI run, which has already fully completed by this point.
+    }
+
+    return stats;
+  });
 }
 
 // ==========================================
@@ -621,70 +637,72 @@ export function runTool(functionName: string, jobId?: string): void {
 // ==========================================
 
 export function prepRecipe({ cols, inputValues }: PrepRecipeParams): PrepRecipeResult {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  const hasFolderSpec = cols.some((col) => col.fillStrategy.kind === "list-drive-folder");
-  // When nothing in this call determines a row count from an actual listing
-  // (no list-drive-folder spec), fall back to however many rows the sheet
-  // already has data in. Without this, a fill-value/template-only call (e.g.
-  // Guided AI Inference's system-prompt step, writing into a column
-  // alongside pre-existing data) silently wrote exactly 1 row regardless of
-  // the sheet's real size. Existing list-drive-folder-driven recipes are
-  // unaffected: numRows still starts at 1 and is only ever raised by the
-  // folder scan below, exactly as before.
-  let numRows = hasFolderSpec ? 1 : Math.max(1, sheet.getLastRow() - 1);
+  return withErrorScrubbing("Recipe Setup", () => {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    const hasFolderSpec = cols.some((col) => col.fillStrategy.kind === "list-drive-folder");
+    // When nothing in this call determines a row count from an actual listing
+    // (no list-drive-folder spec), fall back to however many rows the sheet
+    // already has data in. Without this, a fill-value/template-only call (e.g.
+    // Guided AI Inference's system-prompt step, writing into a column
+    // alongside pre-existing data) silently wrote exactly 1 row regardless of
+    // the sheet's real size. Existing list-drive-folder-driven recipes are
+    // unaffected: numRows still starts at 1 and is only ever raised by the
+    // folder scan below, exactly as before.
+    let numRows = hasFolderSpec ? 1 : Math.max(1, sheet.getLastRow() - 1);
 
-  // Pass 1: scan Drive folders, cache results, determine numRows
-  const folderCache = new Map<string, string[]>();
-  for (const col of cols) {
-    if (col.fillStrategy.kind === "list-drive-folder") {
-      const url = inputValues[col.fillStrategy.inputId] ?? "";
-      if (!folderCache.has(url)) {
-        const folder = DriveApp.getFolderById(extractId(url));
-        const files: { url: string }[] = [];
-        getAllFilesRecursive(folder, files);
-        folderCache.set(
-          url,
-          files.map((f) => f.url),
-        );
+    // Pass 1: scan Drive folders, cache results, determine numRows
+    const folderCache = new Map<string, string[]>();
+    for (const col of cols) {
+      if (col.fillStrategy.kind === "list-drive-folder") {
+        const url = inputValues[col.fillStrategy.inputId] ?? "";
+        if (!folderCache.has(url)) {
+          const folder = DriveApp.getFolderById(extractId(url));
+          const files: { url: string }[] = [];
+          getAllFilesRecursive(folder, files);
+          folderCache.set(
+            url,
+            files.map((f) => f.url),
+          );
+        }
+        numRows = Math.max(numRows, folderCache.get(url)!.length || 1);
       }
-      numRows = Math.max(numRows, folderCache.get(url)!.length || 1);
     }
-  }
 
-  // Pass 2: write all columns
-  for (const col of cols) {
-    const colIdx = findOrCreateColumn(sheet, col.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
-    switch (col.fillStrategy.kind) {
-      case "list-drive-folder": {
-        const urls = folderCache.get(inputValues[col.fillStrategy.inputId] ?? "") ?? [];
-        writeColumn(sheet, colIdx, urls, SpreadsheetApp.WrapStrategy.CLIP);
-        break;
+    // Pass 2: write all columns
+    for (const col of cols) {
+      const colIdx = findOrCreateColumn(sheet, col.colTitle, SpreadsheetApp.WrapStrategy.CLIP);
+      switch (col.fillStrategy.kind) {
+        case "list-drive-folder": {
+          const urls = folderCache.get(inputValues[col.fillStrategy.inputId] ?? "") ?? [];
+          writeColumn(sheet, colIdx, urls, SpreadsheetApp.WrapStrategy.CLIP);
+          break;
+        }
+        case "fill-value":
+          writeColumn(
+            sheet,
+            colIdx,
+            Array(numRows).fill(col.fillStrategy.value) as string[],
+            SpreadsheetApp.WrapStrategy.CLIP,
+          );
+          break;
+        case "template": {
+          const resolved = interpolateTemplate(col.fillStrategy.template, inputValues);
+          writeColumn(
+            sheet,
+            colIdx,
+            Array(numRows).fill(resolved) as string[],
+            SpreadsheetApp.WrapStrategy.CLIP,
+          );
+          break;
+        }
+        case "create-empty":
+          break;
       }
-      case "fill-value":
-        writeColumn(
-          sheet,
-          colIdx,
-          Array(numRows).fill(col.fillStrategy.value) as string[],
-          SpreadsheetApp.WrapStrategy.CLIP,
-        );
-        break;
-      case "template": {
-        const resolved = interpolateTemplate(col.fillStrategy.template, inputValues);
-        writeColumn(
-          sheet,
-          colIdx,
-          Array(numRows).fill(resolved) as string[],
-          SpreadsheetApp.WrapStrategy.CLIP,
-        );
-        break;
-      }
-      case "create-empty":
-        break;
     }
-  }
 
-  SpreadsheetApp.flush();
-  return { rowRange: { start: 2, end: 2 + numRows - 1 } };
+    SpreadsheetApp.flush();
+    return { rowRange: { start: 2, end: 2 + numRows - 1 } };
+  });
 }
 
 // ==========================================

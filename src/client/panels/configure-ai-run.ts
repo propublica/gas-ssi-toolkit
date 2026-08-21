@@ -173,7 +173,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         }
       },
       (err: Error) => {
-        globalThis.alert("Error loading headers: " + err.message);
+        globalThis.alert("Couldn't load headers: " + err.message);
         this.nav?.back();
       },
     );

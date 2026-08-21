@@ -197,7 +197,7 @@ describe("ExtractTextPanel", () => {
     selectColumn(c, "output-col", "extracted_text");
     c.querySelector<HTMLButtonElement>("#extract-btn")!.click();
     await new Promise((r) => setTimeout(r, 0));
-    expect(globalThis.alert).toHaveBeenCalledWith("Error: job failed");
+    expect(globalThis.alert).toHaveBeenCalledWith("job failed");
   });
 
   it("refresh button re-fetches headers", async () => {
