@@ -156,38 +156,57 @@ describe("runInference", () => {
     expect(payload.tools).toBeUndefined();
   });
 
-  describe("label prefix", () => {
-    it("prefixes a text part with the label and a colon-space separator", () => {
+  describe("tag wrapping", () => {
+    it("wraps a text part in an XML tag named after the label", () => {
       mockOkResponse("ok");
       runInference([{ kind: "text", value: "hello", label: "Summary" }]);
       const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
-      expect(payload.contents[0].parts[0].text).toBe("Summary: hello");
+      expect(payload.contents[0].parts).toEqual([
+        { text: "<Summary>" },
+        { text: "hello" },
+        { text: "</Summary>" },
+      ]);
     });
 
-    it("prefixes every part when a labeled input flattens to multiple texts", () => {
+    it("wraps every flattened part of a labeled input as a single unit", () => {
       mockOkResponse("ok");
       runInference([{ kind: "text", value: [["first"], ["second"]], label: "Notes" }]);
       const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
-      expect(payload.contents[0].parts[0].text).toBe("Notes: first");
-      expect(payload.contents[0].parts[1].text).toBe("Notes: second");
+      expect(payload.contents[0].parts).toEqual([
+        { text: "<Notes>" },
+        { text: "first" },
+        { text: "second" },
+        { text: "</Notes>" },
+      ]);
     });
 
-    it("does not prefix text parts when label is absent", () => {
+    it("does not wrap when label is absent", () => {
       mockOkResponse("ok");
       runInference([{ kind: "text", value: "hello" }]);
       const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
-      expect(payload.contents[0].parts[0].text).toBe("hello");
+      expect(payload.contents[0].parts).toEqual([{ text: "hello" }]);
     });
 
-    it("does not prefix file parts when label is set", () => {
+    it("wraps file parts in a tag too when label is set", () => {
       mockOkResponse("ok");
       runInference([
-        { kind: "file", value: "https://drive.google.com/file/d/abc123/view", label: "Attachment" },
+        {
+          kind: "file",
+          value: "https://drive.google.com/file/d/abc123/view",
+          label: "Attachment",
+        },
       ]);
       const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
-      expect(payload.contents[0].parts).toHaveLength(1);
-      expect(payload.contents[0].parts[0].inline_data).toBeDefined();
-      expect(payload.contents[0].parts[0].text).toBeUndefined();
+      expect(payload.contents[0].parts[0]).toEqual({ text: "<Attachment>" });
+      expect(payload.contents[0].parts[1].inline_data).toBeDefined();
+      expect(payload.contents[0].parts[2]).toEqual({ text: "</Attachment>" });
+    });
+
+    it("sanitizes the label into a valid tag name", () => {
+      mockOkResponse("ok");
+      runInference([{ kind: "text", value: "hello", label: "Drive Link" }]);
+      const payload = JSON.parse((UrlFetchApp.fetch as jest.Mock).mock.calls[0][1].payload);
+      expect(payload.contents[0].parts[0]).toEqual({ text: "<Drive_Link>" });
     });
   });
 });
@@ -230,6 +249,7 @@ describe("buildInferenceRequest", () => {
       [{ kind: "file", value: `https://drive.google.com/file/d/${realFileId}/view` }],
       undefined,
       undefined,
+      true,
       fileUriMap,
     );
     expect(req).not.toBeNull();
@@ -255,6 +275,7 @@ describe("buildInferenceRequest", () => {
       ],
       undefined,
       undefined,
+      true,
       fileUriMap,
     );
     // No parts — returns null
@@ -281,13 +302,100 @@ describe("buildInferenceRequest", () => {
     expect(req!.userParts[0]).toHaveProperty("inline_data");
   });
 
-  it("prefixes text parts with label when label is set", () => {
+  it("wraps text parts in a tag when label is set", () => {
     const req = buildInferenceRequest([{ kind: "text", value: "content", label: "Article" }]);
-    expect(req!.userParts[0]).toEqual({ text: "Article: content" });
+    expect(req!.userParts).toEqual([
+      { text: "<Article>" },
+      { text: "content" },
+      { text: "</Article>" },
+    ]);
+  });
+
+  it("does not wrap when wrapPromptsInTags is explicitly false", () => {
+    const req = buildInferenceRequest(
+      [{ kind: "text", value: "content", label: "Article" }],
+      undefined,
+      undefined,
+      false,
+    );
+    expect(req!.userParts).toEqual([{ text: "content" }]);
   });
 
   it("does not add apiKey (caller responsibility)", () => {
     const req = buildInferenceRequest([{ kind: "text", value: "Q" }]);
     expect(req).not.toHaveProperty("apiKey");
+  });
+});
+
+describe("auto kind classification", () => {
+  it("treats a plain-text value as a text part", () => {
+    const req = buildInferenceRequest([{ kind: "auto", value: "just some notes" }]);
+    expect(req!.userParts).toEqual([{ text: "just some notes" }]);
+  });
+
+  it("treats a Drive-link value as a file part", () => {
+    (DriveApp.getFileById as jest.Mock).mockReturnValue({
+      getMimeType: () => "application/pdf",
+      getSize: () => 1000,
+      getBlob: () => ({ getBytes: () => [1, 2, 3] }),
+      getName: () => "test.pdf",
+    });
+    (Utilities.base64Encode as jest.Mock).mockReturnValue("encoded==");
+    const req = buildInferenceRequest([
+      {
+        kind: "auto",
+        value: "https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs/view",
+      },
+    ]);
+    expect(req!.userParts[0]).toHaveProperty("inline_data");
+  });
+
+  it("classifies each value of a mixed multi-value column independently, preserving order", () => {
+    (DriveApp.getFileById as jest.Mock).mockReturnValue({
+      getMimeType: () => "application/pdf",
+      getSize: () => 1000,
+      getBlob: () => ({ getBytes: () => [1, 2, 3] }),
+      getName: () => "test.pdf",
+    });
+    (Utilities.base64Encode as jest.Mock).mockReturnValue("encoded==");
+    const req = buildInferenceRequest([
+      {
+        kind: "auto",
+        value: [
+          ["plain text"],
+          ["https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs/view"],
+        ],
+      },
+    ]);
+    expect(req!.userParts[0]).toEqual({ text: "plain text" });
+    expect(req!.userParts[1]).toHaveProperty("inline_data");
+  });
+
+  it("wraps a mixed auto column's text and file parts in a single tag pair", () => {
+    (DriveApp.getFileById as jest.Mock).mockReturnValue({
+      getMimeType: () => "application/pdf",
+      getSize: () => 1000,
+      getBlob: () => ({ getBytes: () => [1, 2, 3] }),
+      getName: () => "test.pdf",
+    });
+    (Utilities.base64Encode as jest.Mock).mockReturnValue("encoded==");
+    const req = buildInferenceRequest([
+      {
+        kind: "auto",
+        value: [
+          ["plain text"],
+          ["https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs/view"],
+        ],
+        label: "case_notes",
+      },
+    ]);
+    expect(req!.userParts[0]).toEqual({ text: "<case_notes>" });
+    expect(req!.userParts[1]).toEqual({ text: "plain text" });
+    expect(req!.userParts[2]).toHaveProperty("inline_data");
+    expect(req!.userParts[3]).toEqual({ text: "</case_notes>" });
+  });
+
+  it("returns null when an auto-kind input flattens to nothing", () => {
+    expect(buildInferenceRequest([{ kind: "auto", value: "" }])).toBeNull();
   });
 });

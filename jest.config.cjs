@@ -106,15 +106,48 @@ module.exports = {
       branches: 90,
       functions: 100,
     },
+    "./src/client/components/run-controls.ts": {
+      statements: 95,
+      branches: 80,
+      functions: 90,
+    },
+    "./src/client/components/step-flow.ts": {
+      statements: 95,
+      branches: 95,
+      functions: 100,
+    },
     "./src/client/panels/tool-list.ts": {
       statements: 85,
       branches: 75,
       functions: 90,
     },
     "./src/client/panels/configure-ai-run.ts": {
-      statements: 85,
+      // Re-baselined after Task 1's RunControls extraction — this threshold
+      // previously targeted the pre-extraction 655-line panel and had drifted
+      // far looser than the real ~289-line post-extraction file.
+      statements: 95,
+      branches: 80,
+      functions: 95,
+    },
+    "./src/client/panels/guided/inputs-step.ts": {
+      statements: 95,
+      branches: 75,
+      functions: 95,
+    },
+    "./src/client/panels/guided/prompt-step.ts": {
+      statements: 100,
+      branches: 100,
+      functions: 100,
+    },
+    "./src/client/panels/guided/run-step.ts": {
+      statements: 90,
+      branches: 75,
+      functions: 100,
+    },
+    "./src/client/panels/guided-ai-inference.ts": {
+      statements: 90,
       branches: 70,
-      functions: 90,
+      functions: 85,
     },
     "./src/client/components/recipe-prep-cook.ts": {
       statements: 90,

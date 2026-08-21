@@ -1,0 +1,266 @@
+/**
+ * @jest-environment jsdom
+ */
+
+jest.mock("../../../src/client/services", () => ({
+  runBatchAI: jest.fn().mockResolvedValue(undefined),
+  getActiveRangeInfo: jest.fn().mockResolvedValue({ start: 2, end: 11 }),
+  getDefaultRowRange: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("../../../src/client/job-store", () => ({
+  jobStore: {
+    dispatch: jest.fn().mockImplementation((_id, _label, fn: Promise<void>) => fn),
+    isCancelled: jest.fn().mockReturnValue(false),
+    setProgress: jest.fn(),
+  },
+}));
+
+import { RunStep, GUIDED_OUTPUT_COLUMN_TITLE } from "../../../src/client/panels/guided/run-step";
+import * as services from "../../../src/client/services";
+import type { StepContext } from "../../../src/client/types";
+
+function makeContainer(): HTMLElement {
+  document.body.innerHTML = '<div id="app"></div>';
+  return document.getElementById("app")!;
+}
+
+function makeCtx(): StepContext & {
+  onComplete: jest.Mock;
+  onError: jest.Mock;
+  onBusyChange: jest.Mock;
+} {
+  return { onComplete: jest.fn(), onError: jest.fn(), onBusyChange: jest.fn() };
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
+describe("RunStep — mount and Run AI", () => {
+  it("assembles promptCols/systemPromptCol from the host callback plus a fixed output column", async () => {
+    const getPromptFields = jest.fn().mockReturnValue({
+      promptCols: [{ col: "NoteCol", kind: "auto" as const }],
+      systemPromptCol: "System Prompt",
+    });
+    const container = makeContainer();
+    const step = new RunStep(getPromptFields, jest.fn());
+    step.mount(container, makeCtx());
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(services.runBatchAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        promptCols: [{ col: "NoteCol", kind: "auto" }],
+        systemPromptCol: "System Prompt",
+        outputCol: GUIDED_OUTPUT_COLUMN_TITLE,
+      }),
+      expect.any(String),
+    );
+  });
+
+  it("defaults applyMarkdown to true, matching wrapPromptsInTags' on-by-default behavior", async () => {
+    const container = makeContainer();
+    const step = new RunStep(
+      () => ({ promptCols: [{ col: "a", kind: "auto" as const }] }),
+      jest.fn(),
+    );
+    step.mount(container, makeCtx());
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(services.runBatchAI).toHaveBeenCalledWith(
+      expect.objectContaining({ applyMarkdown: true }),
+      expect.any(String),
+    );
+  });
+
+  it("calls ctx.onComplete after a successful Run AI, not after Test", async () => {
+    const ctx = makeCtx();
+    const container = makeContainer();
+    const step = new RunStep(() => ({ promptCols: [{ col: "a", kind: "auto" }] }), jest.fn());
+    step.mount(container, ctx);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    container.querySelector<HTMLButtonElement>("#test-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(ctx.onComplete).not.toHaveBeenCalled();
+
+    container.querySelector<HTMLButtonElement>("#run-btn")!.click();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(ctx.onComplete).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("RunStep — Switch to Freeform", () => {
+  it("navigates with the current promptCols/systemPromptCol/outputCol plus live run-controls settings", async () => {
+    const onSwitchToFreeform = jest.fn();
+    const container = makeContainer();
+    const step = new RunStep(
+      () => ({
+        promptCols: [{ col: "a", kind: "auto" as const }],
+        systemPromptCol: "System Prompt",
+      }),
+      onSwitchToFreeform,
+    );
+    step.mount(container, makeCtx());
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    container.querySelector<HTMLButtonElement>("#gr-switch-to-freeform")!.click();
+
+    expect(onSwitchToFreeform).toHaveBeenCalledWith(
+      expect.objectContaining({
+        promptCols: [{ col: "a", kind: "auto" }],
+        systemPromptCol: "System Prompt",
+        outputCol: GUIDED_OUTPUT_COLUMN_TITLE,
+      }),
+    );
+  });
+
+  it("carries forward Guided's fixed applyMarkdown/wrapPromptsInTags settings, matching what RunControls actually ran with", async () => {
+    const onSwitchToFreeform = jest.fn();
+    const container = makeContainer();
+    const step = new RunStep(
+      () => ({ promptCols: [{ col: "a", kind: "auto" as const }] }),
+      onSwitchToFreeform,
+    );
+    step.mount(container, makeCtx());
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    container.querySelector<HTMLButtonElement>("#gr-switch-to-freeform")!.click();
+
+    // objectContaining({wrapPromptsInTags: undefined}) would pass even if the
+    // key were omitted entirely (the exact bug this guards against), so we
+    // assert the key's presence explicitly rather than just its value.
+    const callArg = onSwitchToFreeform.mock.calls[0][0];
+    expect(callArg.applyMarkdown).toBe(true);
+    expect(callArg).toHaveProperty("wrapPromptsInTags");
+    expect(callArg.wrapPromptsInTags).toBeUndefined();
+  });
+});
+
+describe("RunStep — unmount/mount round trip", () => {
+  it("unmount() returns RunControls' live state; mount(savedState) restores it", async () => {
+    const container = makeContainer();
+    const step = new RunStep(() => ({ promptCols: [] }), jest.fn());
+    step.mount(container, makeCtx());
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    container.querySelector<HTMLElement>('[data-value="google_search"]')!.click();
+
+    const result = step.unmount();
+    expect(result?.savedState.runControls?.tools).toEqual(["google_search"]);
+
+    const step2 = new RunStep(() => ({ promptCols: [] }), jest.fn());
+    step2.mount(container, makeCtx(), result?.savedState);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(
+      container
+        .querySelector<HTMLElement>('[data-value="google_search"]')
+        ?.classList.contains("selected"),
+    ).toBe(true);
+  });
+
+  it("restores and re-validates a saved lastTest against the live config on mount", async () => {
+    const matchingConfig = {
+      promptCols: [{ col: "NoteCol", kind: "auto" as const }],
+      systemPromptCol: undefined,
+      tools: [],
+      wrapPromptsInTags: true,
+      model: "gemini-3.1-flash-lite" as const,
+    };
+    const savedState = {
+      runControls: {
+        lastTest: {
+          stats: {
+            rowCount: 10,
+            totalTimeMs: 4200,
+            totalInputTokens: 500,
+            totalOutputTokens: 300,
+            totalTokenCost: 0.002,
+            totalGroundingQueries: 0,
+            totalGroundingCost: 0,
+            testedAt: 1234567890,
+            config: matchingConfig,
+          },
+          fullRowCount: 10,
+        },
+      },
+    };
+    const container = makeContainer();
+    const step = new RunStep(() => ({ promptCols: matchingConfig.promptCols }), jest.fn());
+    step.mount(container, makeCtx(), savedState);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    const results = container.querySelector<HTMLElement>("#test-results")!;
+    expect(results.hidden).toBe(false);
+    expect(results.textContent).toContain("Test run:");
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.textContent).toBe("Tested ✓");
+  });
+});
+
+describe("RunStep — setInteractive", () => {
+  it("disables and re-enables the Run and Test buttons", async () => {
+    const getPromptFields = jest.fn().mockReturnValue({
+      promptCols: [{ col: "NoteCol", kind: "auto" as const }],
+      systemPromptCol: "System Prompt",
+    });
+    const container = makeContainer();
+    const step = new RunStep(getPromptFields, jest.fn());
+    step.mount(container, makeCtx());
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    step.setInteractive(false);
+    expect(container.querySelector<HTMLButtonElement>("#run-btn")!.disabled).toBe(true);
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.disabled).toBe(true);
+
+    step.setInteractive(true);
+    expect(container.querySelector<HTMLButtonElement>("#run-btn")!.disabled).toBe(false);
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.disabled).toBe(false);
+  });
+
+  it("stays disabled when gated immediately after mount, before RunControls' row-range fetch settles", async () => {
+    // The reachable case StepFlow's mount-time gate produces: this step mounts
+    // while an earlier step is mid-edit, so setInteractive(false) lands while
+    // #test-btn's AsyncActionButton doesn't exist yet, and mount()'s own
+    // ready.then(checkTestStatsFreshness) fires a state change afterwards.
+    const container = makeContainer();
+    const step = new RunStep(
+      () => ({ promptCols: [{ col: "NoteCol", kind: "auto" as const }] }),
+      jest.fn(),
+    );
+    step.mount(container, makeCtx(), {
+      runControls: {
+        lastTest: {
+          stats: {
+            rowCount: 10,
+            totalTimeMs: 4200,
+            totalInputTokens: 500,
+            totalOutputTokens: 300,
+            totalTokenCost: 0.002,
+            totalGroundingQueries: 0,
+            totalGroundingCost: 0,
+            testedAt: 1234567890,
+            config: {
+              promptCols: [{ col: "Other", kind: "text" as const }],
+              systemPromptCol: undefined,
+              tools: [],
+              wrapPromptsInTags: true,
+              model: "gemini-3.1-flash-lite" as const,
+            },
+          },
+          fullRowCount: 10,
+        },
+      },
+    });
+
+    step.setInteractive(false);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(container.querySelector<HTMLButtonElement>("#run-btn")!.disabled).toBe(true);
+    expect(container.querySelector<HTMLButtonElement>("#test-btn")!.disabled).toBe(true);
+  });
+});

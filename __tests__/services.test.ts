@@ -6,7 +6,9 @@ const mockRun = {
   withSuccessHandler: jest.fn().mockReturnThis(),
   withFailureHandler: jest.fn().mockReturnThis(),
   getSheetHeaders: jest.fn(),
+  getGeminiGemUrl: jest.fn(),
   getActiveRangeInfo: jest.fn(),
+  getDefaultRowRange: jest.fn(),
   runBatchAI: jest.fn(),
   runTool: jest.fn(),
   prepRecipe: jest.fn(),
@@ -102,6 +104,30 @@ describe("getSheetHeaders", () => {
   });
 });
 
+describe("getGeminiGemUrl", () => {
+  it("calls google.script.run.getGeminiGemUrl and resolves with the URL", async () => {
+    const handlers = captureHandlers();
+    const promise = services.getGeminiGemUrl();
+    handlers.resolve("https://gemini.google.com/gem/abc123");
+    await expect(promise).resolves.toBe("https://gemini.google.com/gem/abc123");
+    expect(mockRun.getGeminiGemUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it("normalizes a null result (property unset) to undefined", async () => {
+    const handlers = captureHandlers();
+    const promise = services.getGeminiGemUrl();
+    handlers.resolve(null);
+    await expect(promise).resolves.toBeUndefined();
+  });
+
+  it("rejects with the error on failure", async () => {
+    const handlers = captureHandlers();
+    const promise = services.getGeminiGemUrl();
+    handlers.reject(new Error("props error"));
+    await expect(promise).rejects.toThrow("props error");
+  });
+});
+
 describe("runBatchAI", () => {
   it("calls google.script.run.runBatchAI with config and resolves", async () => {
     const handlers = captureHandlers();
@@ -137,7 +163,7 @@ describe("runBatchAI", () => {
       config: {
         promptCols: [{ col: "col_a", kind: "text" }],
         tools: [],
-        prefixWithColName: false,
+        wrapPromptsInTags: false,
       },
     };
     const promise = services.runBatchAI(config as import("../src/shared/types").RunConfig);
@@ -170,7 +196,7 @@ describe("runBatchAI", () => {
         promptCols: [{ col: "col_a", kind: "text" }],
         systemPromptCol: null, // as google.script.run's bridge may deliver an omitted value
         tools: [],
-        prefixWithColName: false,
+        wrapPromptsInTags: false,
         model: null,
       },
     });
@@ -321,6 +347,31 @@ describe("getActiveRangeInfo", () => {
   it("rejects on failure", async () => {
     const handlers = captureHandlers();
     const promise = services.getActiveRangeInfo();
+    handlers.reject(new Error("range error"));
+    await expect(promise).rejects.toThrow("range error");
+  });
+});
+
+describe("getDefaultRowRange", () => {
+  it("calls google.script.run.getDefaultRowRange and resolves with range", async () => {
+    const handlers = captureHandlers();
+    const range = { start: 2, end: 20 };
+    const promise = services.getDefaultRowRange();
+    handlers.resolve(range);
+    await expect(promise).resolves.toEqual(range);
+    expect(mockRun.getDefaultRowRange).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves with undefined when the sheet has no data rows", async () => {
+    const handlers = captureHandlers();
+    const promise = services.getDefaultRowRange();
+    handlers.resolve(null);
+    await expect(promise).resolves.toBeUndefined();
+  });
+
+  it("rejects on failure", async () => {
+    const handlers = captureHandlers();
+    const promise = services.getDefaultRowRange();
     handlers.reject(new Error("range error"));
     await expect(promise).rejects.toThrow("range error");
   });

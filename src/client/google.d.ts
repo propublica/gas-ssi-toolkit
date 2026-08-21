@@ -13,12 +13,14 @@ declare global {
     withFailureHandler(fn: (error: Error) => void): this;
     runTool(functionName: string, jobId?: string): void;
     getSheetHeaders(): void;
+    getGeminiGemUrl(): void;
     runBatchAI(config: RunConfig, jobId?: string): RunStats | null;
     importDriveLinks(config: ImportDriveLinksConfig, jobId?: string): void;
     extractText(config: ExtractTextConfig, jobId?: string): void;
     prepRecipe(params: PrepRecipeParams): PrepRecipeResult;
     getJobProgress(jobId: string): void;
     getActiveRangeInfo(): void;
+    getDefaultRowRange(): void;
     formatMarkdownSelection(): void;
   }
 

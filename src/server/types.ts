@@ -150,7 +150,7 @@ export type GeminiTool =
 export type PromptInput = {
   kind: PromptColumnSpec["kind"];
   value: unknown;
-  /** Optional label prepended to text parts as "<label>: <value>". If absent or empty, no prefix is applied. Ignored for file inputs. */
+  /** Optional label used as the source for an XML tag name (via sanitizeTagName) that wraps this input's contributed parts, when wrapPromptsInTags is enabled. If absent, no wrapping is applied. Applies uniformly to text, file, and auto-kind inputs. */
   label?: string;
 };
 

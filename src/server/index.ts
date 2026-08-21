@@ -87,6 +87,13 @@ export function getSheetHeaders(): string[] {
   return sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
 }
 
+/** Configurable via a GEMINI_GEM_URL Script Property (Project Settings > Script
+ * Properties) -- not a secret, so it's read directly here rather than through
+ * gemini-auth.ts, which is the sole reader of the Gemini API credential. */
+export function getGeminiGemUrl(): string | null {
+  return PropertiesService.getScriptProperties().getProperty("GEMINI_GEM_URL");
+}
+
 export function showSidebar(): void {
   const html = HtmlService.createTemplateFromFile("Sidebar");
   const output = html.evaluate().setTitle("SSI Toolkit").setWidth(300);
@@ -398,14 +405,14 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
     }
 
     const cache = CacheService.getUserCache();
-    const hasFileInputs = config.promptCols.some((pc) => pc.kind === "file");
+    const hasFileInputs = config.promptCols.some((pc) => pc.kind === "file" || pc.kind === "auto");
 
     // Build all prompt input arrays (one per row) — pure, no I/O
     const allPromptInputs: PromptInput[][] = dataValues.map((row) =>
       config.promptCols.map((pc, colIdx) => ({
         kind: pc.kind,
         value: row[promptIdxs[colIdx]],
-        ...(config.prefixWithColName ? { label: pc.col } : {}),
+        label: pc.col,
       })),
     );
 
@@ -420,7 +427,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
       const allFileIds = new Set<string>();
       for (const inputs of allPromptInputs) {
         for (const input of inputs) {
-          if (input.kind === "file") {
+          if (input.kind === "file" || input.kind === "auto") {
             flattenArg(input.value)
               .filter(isValidDriveLink)
               .map(extractId)
@@ -507,7 +514,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
       // error string for the post-batch write loop and skip inference.
       if (fileErrors.size > 0) {
         const failedIds = allPromptInputs[i]
-          .filter((inp) => inp.kind === "file")
+          .filter((inp) => inp.kind === "file" || inp.kind === "auto")
           .flatMap((inp) => flattenArg(inp.value).filter(isValidDriveLink).map(extractId))
           .filter((id) => fileErrors.has(id));
         if (failedIds.length > 0) {
@@ -524,6 +531,7 @@ export function runBatchAI(config: RunConfig, jobId?: string): RunStats | null {
         allPromptInputs[i],
         systemPrompt,
         config.tools,
+        config.wrapPromptsInTags ?? true,
         hasFileInputs ? fileUriMap : undefined,
       );
       if (req !== null) {
@@ -631,7 +639,16 @@ export function runTool(functionName: string, jobId?: string): void {
 export function prepRecipe({ cols, inputValues }: PrepRecipeParams): PrepRecipeResult {
   return withErrorScrubbing("Recipe Setup", () => {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    let numRows = 1;
+    const hasFolderSpec = cols.some((col) => col.fillStrategy.kind === "list-drive-folder");
+    // When nothing in this call determines a row count from an actual listing
+    // (no list-drive-folder spec), fall back to however many rows the sheet
+    // already has data in. Without this, a fill-value/template-only call (e.g.
+    // Guided AI Inference's system-prompt step, writing into a column
+    // alongside pre-existing data) silently wrote exactly 1 row regardless of
+    // the sheet's real size. Existing list-drive-folder-driven recipes are
+    // unaffected: numRows still starts at 1 and is only ever raised by the
+    // folder scan below, exactly as before.
+    let numRows = hasFolderSpec ? 1 : Math.max(1, sheet.getLastRow() - 1);
 
     // Pass 1: scan Drive folders, cache results, determine numRows
     const folderCache = new Map<string, string[]>();
@@ -704,4 +721,11 @@ export function getActiveRangeInfo(): { start: number; end: number } | null {
   const range = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getActiveRange();
   if (!range) return null;
   return { start: range.getRow(), end: range.getRow() + range.getNumRows() - 1 };
+}
+
+export function getDefaultRowRange(): { start: number; end: number } | null {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+  return { start: 2, end: lastRow };
 }

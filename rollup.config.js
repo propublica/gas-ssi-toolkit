@@ -85,6 +85,7 @@ function showSidebar() { _GASEntry.showSidebar(); }
 function formatMarkdownSelection() { _GASEntry.formatMarkdownSelection(); }
 function runTool(fn, jobId) { _GASEntry.runTool(fn, jobId); }
 function getSheetHeaders() { return _GASEntry.getSheetHeaders(); }
+function getGeminiGemUrl() { return _GASEntry.getGeminiGemUrl(); }
 function runBatchAI(config, jobId) { return _GASEntry.runBatchAI(config, jobId); }
 function importDriveLinks(config, jobId) { _GASEntry.importDriveLinks(config, jobId); }
 function extractText(config, jobId) { _GASEntry.extractText(config, jobId); }
@@ -102,12 +103,10 @@ function SSI(userTexts, systemPrompt, toolNames) { return _GASEntry.SSI(userText
 function prepRecipe(params) { return _GASEntry.prepRecipe(params); }
 function getJobProgress(jobId) { return _GASEntry.getJobProgress(jobId); }
 function getActiveRangeInfo() { return _GASEntry.getActiveRangeInfo(); }
+function getDefaultRowRange() { return _GASEntry.getDefaultRowRange(); }
 `,
     },
-    plugins: [
-      nodeResolve({ preferBuiltins: false }),
-      typescript({ tsconfig: "./tsconfig.json" }),
-    ],
+    plugins: [nodeResolve({ preferBuiltins: false }), typescript({ tsconfig: "./tsconfig.json" })],
   },
 
   // ── Config 2: Client bundle → dist/Sidebar.html ──────────────────────────────
