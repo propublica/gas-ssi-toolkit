@@ -105,8 +105,9 @@ src/server/index.ts          (entry point — menu, 4 tool orchestrators, UI han
 │                                 pure layer between GeminiResponse and Sheets cell content; no GAS globals)
 ├── src/server/customFunctions.ts  (SSI — Sheets custom function; calls callGeminiAPI directly; always returns string,
 │                                 uses "[SSI Error: ...]" format)
-├── src/server/utils.ts          (extractId, isValidDriveLink, createSeededRandom, getAllFilesRecursive, sampleRows,
-│                                 truncateText, findOrCreateColumn, writeColumn, flattenArg)
+├── src/server/utils.ts          (extractId, isValidDriveLink, isValidYouTubeLink, createSeededRandom,
+│                                 getAllFilesRecursive, sampleRows, truncateText, findOrCreateColumn,
+│                                 writeColumn, flattenArg)
 └── src/shared/types.ts          (RPC boundary ONLY — ToolId union, RunConfig, PrepRecipeParams, PrepRecipeResult,
                                   ImportDriveLinksConfig, ExtractTextConfig; all with optional tools?: ToolId[])
 ```
