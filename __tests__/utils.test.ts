@@ -9,6 +9,7 @@
 import {
   extractId,
   isValidDriveLink,
+  isValidYouTubeLink,
   createSeededRandom,
   getAllFilesRecursive,
   sampleRows,
@@ -68,6 +69,66 @@ describe("isValidDriveLink", () => {
     expect(isValidDriveLink(null)).toBe(false);
     expect(isValidDriveLink(42)).toBe(false);
     expect(isValidDriveLink(undefined)).toBe(false);
+  });
+});
+
+describe("isValidYouTubeLink", () => {
+  it("returns true for a standard watch URL", () => {
+    expect(isValidYouTubeLink("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBe(true);
+  });
+
+  it("returns true for a youtu.be short link", () => {
+    expect(isValidYouTubeLink("https://youtu.be/dQw4w9WgXcQ")).toBe(true);
+  });
+
+  it("returns true for a Shorts URL", () => {
+    expect(isValidYouTubeLink("https://www.youtube.com/shorts/dQw4w9WgXcQ")).toBe(true);
+  });
+
+  it("returns true for a mobile watch URL", () => {
+    expect(isValidYouTubeLink("https://m.youtube.com/watch?v=dQw4w9WgXcQ")).toBe(true);
+  });
+
+  it("returns true for a watch URL with extra query params", () => {
+    expect(isValidYouTubeLink("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s&list=PLxyz")).toBe(
+      true,
+    );
+  });
+
+  it("returns false for a playlist URL", () => {
+    expect(isValidYouTubeLink("https://www.youtube.com/playlist?list=PLBDA2E52FB1EF80C9")).toBe(
+      false,
+    );
+  });
+
+  it("returns false for a channel URL", () => {
+    expect(isValidYouTubeLink("https://www.youtube.com/@crashcourse")).toBe(false);
+  });
+
+  it("returns false for a channel search URL", () => {
+    expect(isValidYouTubeLink("https://www.youtube.com/@crashcourse/search?query=science")).toBe(
+      false,
+    );
+  });
+
+  it("returns false for non-YouTube URLs", () => {
+    expect(isValidYouTubeLink("https://example.com/watch?v=dQw4w9WgXcQ")).toBe(false);
+  });
+
+  it("returns false for a spoofed URL with a YouTube-shaped path on another host", () => {
+    // Since the raw string is passed straight through as file_uri (not just an
+    // extracted ID like Drive links), classification must not be foolable by
+    // embedding a YouTube-shaped path on an attacker-controlled host.
+    expect(isValidYouTubeLink("https://evil.example.com/youtube.com/watch?v=xyz")).toBe(false);
+    expect(isValidYouTubeLink("https://evil.example.com/redirect?to=youtu.be/dQw4w9WgXcQ")).toBe(
+      false,
+    );
+  });
+
+  it("returns false for non-string inputs", () => {
+    expect(isValidYouTubeLink(null)).toBe(false);
+    expect(isValidYouTubeLink(42)).toBe(false);
+    expect(isValidYouTubeLink(undefined)).toBe(false);
   });
 });
 

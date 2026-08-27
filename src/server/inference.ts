@@ -12,7 +12,13 @@
 
 import { callGeminiAPI } from "./api";
 import { prepareDriveAttachments } from "./drive";
-import { flattenArg, isValidDriveLink, extractId, sanitizeTagName } from "./utils";
+import {
+  flattenArg,
+  isValidDriveLink,
+  isValidYouTubeLink,
+  extractId,
+  sanitizeTagName,
+} from "./utils";
 import type { GeminiRequest, GeminiResponse, GeminiUserPart, PromptInput } from "./types";
 import type { ToolId } from "../shared/types";
 
@@ -34,6 +40,21 @@ function resolveFileParts(
   return prepareDriveAttachments(fileIds).map((inline_data) => ({ inline_data }));
 }
 
+/**
+ * Resolve a single raw cell value to file parts if it looks like a Drive link
+ * or a YouTube link, or null if it's neither. YouTube URLs are passed straight
+ * through as a file_uri — Gemini resolves them server-side, no download/upload
+ * pipeline needed.
+ */
+function tryFileParts(
+  raw: string,
+  fileUriMap?: Map<string, { uri: string; mimeType: string }>,
+): GeminiUserPart[] | null {
+  if (isValidDriveLink(raw)) return resolveFileParts([extractId(raw)], fileUriMap);
+  if (isValidYouTubeLink(raw)) return [{ file_data: { file_uri: raw } }];
+  return null;
+}
+
 function buildInputParts(
   input: PromptInput,
   fileUriMap?: Map<string, { uri: string; mimeType: string }>,
@@ -43,17 +64,17 @@ function buildInputParts(
   }
 
   if (input.kind === "file") {
-    const fileIds = flattenArg(input.value).filter(isValidDriveLink).map(extractId);
-    return resolveFileParts(fileIds, fileUriMap);
+    return flattenArg(input.value).flatMap((raw) => tryFileParts(raw, fileUriMap) ?? []);
   }
 
   // "auto" — classify each flattened value individually; a column can mix
-  // plain text and Drive links across rows, so the decision is per-value,
-  // not per-column.
+  // plain text, Drive links, and YouTube links across rows, so the decision
+  // is per-value, not per-column.
   const parts: GeminiUserPart[] = [];
   for (const raw of flattenArg(input.value)) {
-    if (isValidDriveLink(raw)) {
-      parts.push(...resolveFileParts([extractId(raw)], fileUriMap));
+    const fileParts = tryFileParts(raw, fileUriMap);
+    if (fileParts) {
+      parts.push(...fileParts);
     } else {
       parts.push({ text: raw });
     }
@@ -123,8 +144,8 @@ export function buildInferenceRequest(
  *                     "auto") and a raw cell value. Iterated in declaration
  *                     order to preserve the caller's intended part sequence.
  *                     Text values are flattened via flattenArg; file values are
- *                     resolved via prepareDriveAttachments after filtering for
- *                     valid Drive links.
+ *                     resolved via prepareDriveAttachments for Drive links, or
+ *                     passed straight through as a file_uri for YouTube links.
  * @param systemPrompt Cell value for the system instruction. First non-empty
  *                     string is used. Omit or pass `undefined` to use the model default.
  * @param tools        Tool IDs to enable for this inference call.

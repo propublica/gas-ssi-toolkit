@@ -399,3 +399,58 @@ describe("auto kind classification", () => {
     expect(buildInferenceRequest([{ kind: "auto", value: "" }])).toBeNull();
   });
 });
+
+describe("YouTube link classification", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("treats a YouTube URL as a file_data part with no mime_type, for file kind", () => {
+    const req = buildInferenceRequest([
+      { kind: "file", value: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
+    ]);
+    expect(req!.userParts).toEqual([
+      { file_data: { file_uri: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } },
+    ]);
+  });
+
+  it("treats a YouTube URL as a file_data part with no mime_type, for auto kind", () => {
+    const req = buildInferenceRequest([{ kind: "auto", value: "https://youtu.be/dQw4w9WgXcQ" }]);
+    expect(req!.userParts).toEqual([{ file_data: { file_uri: "https://youtu.be/dQw4w9WgXcQ" } }]);
+  });
+
+  it("does not touch DriveApp or a provided fileUriMap for a YouTube URL", () => {
+    const fileUriMap = new Map<string, { uri: string; mimeType: string }>();
+    buildInferenceRequest(
+      [{ kind: "file", value: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" }],
+      undefined,
+      undefined,
+      true,
+      fileUriMap,
+    );
+    expect(DriveApp.getFileById).not.toHaveBeenCalled();
+  });
+
+  it("classifies text, a Drive link, and a YouTube link independently in one auto column, preserving order", () => {
+    (DriveApp.getFileById as jest.Mock).mockReturnValue({
+      getMimeType: () => "application/pdf",
+      getSize: () => 1000,
+      getBlob: () => ({ getBytes: () => [1, 2, 3] }),
+      getName: () => "test.pdf",
+    });
+    (Utilities.base64Encode as jest.Mock).mockReturnValue("encoded==");
+    const req = buildInferenceRequest([
+      {
+        kind: "auto",
+        value: [
+          ["plain text"],
+          ["https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs/view"],
+          ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"],
+        ],
+      },
+    ]);
+    expect(req!.userParts[0]).toEqual({ text: "plain text" });
+    expect(req!.userParts[1]).toHaveProperty("inline_data");
+    expect(req!.userParts[2]).toEqual({
+      file_data: { file_uri: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
+    });
+  });
+});

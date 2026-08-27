@@ -38,8 +38,9 @@ export interface GeminiInlineData {
 }
 
 export interface GeminiFileApiData {
-  mime_type: string;
-  /** URI returned by the Gemini Files API after uploading a file. */
+  /** Omitted for a YouTube URL passed straight through — Gemini resolves it server-side. */
+  mime_type?: string;
+  /** URI returned by the Gemini Files API after uploading a file, or a YouTube video URL. */
   file_uri: string;
 }
 
@@ -50,9 +51,9 @@ export interface GeminiFileApiData {
  * - { text }        — plain text content in the user turn.
  * - { inline_data } — base64-encoded file bytes embedded in the request body; used when
  *                     file size is within the inline limit (~100 MB encoded).
- * - { file_data }   — reference to a file uploaded via the Gemini Files API (up to 2 GB);
- *                     no producer exists yet. Type reserved for a future phase when
- *                     large-file support is wired up in drive.ts.
+ * - { file_data }   — either a reference to a file uploaded via the Gemini Files API
+ *                     (up to 2 GB, mime_type set), or a YouTube video URL passed straight
+ *                     through for Gemini to resolve server-side (no mime_type).
  *
  * Order within userParts[] is preserved through to the Gemini REST payload.
  */
