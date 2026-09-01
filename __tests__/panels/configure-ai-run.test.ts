@@ -25,6 +25,7 @@ import type { SavedState } from "../../src/client/panels/configure-ai-run";
 import * as services from "../../src/client/services";
 import type { NavigationContext } from "../../src/client/types";
 import type { RunConfig, RunStats } from "../../src/shared/types";
+import { MODEL_CATALOG } from "../../src/client/models";
 
 const mockNav: NavigationContext = {
   navigate: jest.fn(),
@@ -789,9 +790,10 @@ describe("ConfigureAIRunPanel — model selector", () => {
   it("renders a row for each model in MODEL_CATALOG", async () => {
     const { container } = await mountAndLoad();
     const rows = container.querySelectorAll<HTMLButtonElement>("#model-list .model-option");
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(MODEL_CATALOG.length);
     const ids = Array.from(rows).map((r) => r.getAttribute("data-value"));
     expect(ids).toContain("gemini-3.1-flash-lite");
+    expect(ids).toContain("gemini-3.7-flash");
     expect(ids).toContain("gemini-3.1-pro-preview");
   });
 
