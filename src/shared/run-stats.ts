@@ -19,7 +19,7 @@ export function buildConfigSnapshot(config: Partial<RunConfig>): RunStatsConfigS
     // doesn't register as a config change.
     systemPromptCol: config.systemPromptCol ?? undefined,
     tools: config.tools ?? [],
-    prefixWithColName: config.prefixWithColName ?? false,
+    wrapPromptsInTags: config.wrapPromptsInTags ?? true,
     model: config.model ?? undefined,
   };
 }

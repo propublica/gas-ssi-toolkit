@@ -8,6 +8,7 @@
 
 import { Router } from "./router";
 import { ToolListPanel } from "./panels/tool-list";
+import { GuidedAIInferencePanel } from "./panels/guided-ai-inference";
 import { ConfigureAIRunPanel } from "./panels/configure-ai-run";
 import { RecipesListPanel } from "./panels/recipes-list";
 import { RecipePanel } from "./panels/recipe";
@@ -28,6 +29,7 @@ function init(): void {
 
   const panels = new Map<PanelId, Panel>([
     ["tool-list", new ToolListPanel()],
+    ["guided-ai-inference", new GuidedAIInferencePanel()],
     ["configure-ai-run", new ConfigureAIRunPanel()],
     ["recipes-list", new RecipesListPanel()],
     ["recipe", new RecipePanel()],

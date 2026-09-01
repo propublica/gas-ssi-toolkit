@@ -1,40 +1,24 @@
 import type { NavigationContext, Panel, TestRunDisplay } from "../types";
 import type { RunConfig, ToolId, ModelId } from "../../shared/types";
-import { TagList } from "../components/tag-list";
 import { TokenInput } from "../components/token-input";
 import { PromptColList } from "../components/prompt-col-list";
-import { RowRange, sanitizeRowRange, type RowRangeValue } from "../components/row-range";
 import { PanelLoader } from "../components/panel-loader";
-import { getSheetHeaders, runBatchAI, getActiveRangeInfo } from "../services";
-import { jobStore } from "../job-store";
-import { TOOL_CATALOG } from "../tools";
-import { MODEL_CATALOG } from "../models";
-import { buildConfigSnapshot, configsMatch } from "../../shared/run-stats";
-import { AsyncActionButton } from "../components/async-action-button";
-import { formatDuration } from "../format";
-
-export const CHUNK_SIZE = 40;
-
-export function computeChunks(
-  rowRange: { start: number; end: number },
-  chunkSize: number,
-): Array<{ start: number; end: number }> {
-  const chunks: Array<{ start: number; end: number }> = [];
-  for (let start = rowRange.start; start <= rowRange.end; start += chunkSize) {
-    chunks.push({ start, end: Math.min(start + chunkSize - 1, rowRange.end) });
-  }
-  return chunks;
-}
+import { getSheetHeaders } from "../services";
+import {
+  RunControls,
+  type PromptConfig,
+  type RunControlsSavedState,
+} from "../components/run-controls";
 
 export type SavedState = Required<
   Omit<
     RunConfig,
-    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "prefixWithColName" | "model"
+    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "wrapPromptsInTags" | "model"
   >
 > &
   Pick<
     RunConfig,
-    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "prefixWithColName" | "model"
+    "rowRange" | "tools" | "includeGrounding" | "applyMarkdown" | "wrapPromptsInTags" | "model"
   > & {
     toolsExpanded?: boolean;
     modelExpanded?: boolean;
@@ -45,19 +29,12 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
   private promptColList: PromptColList | null = null;
   private systemPromptList: TokenInput | null = null;
   private outputColList: TokenInput | null = null;
-  private rowRangeComp: RowRange | null = null;
-  private toolsList: TagList | null = null;
-  private includeGroundingCb: HTMLInputElement | null = null;
   private applyMarkdownCb: HTMLInputElement | null = null;
-  private prefixWithColNameCb: HTMLInputElement | null = null;
+  private wrapPromptsInTagsCb: HTMLInputElement | null = null;
   private outputColObserver: MutationObserver | null = null;
   private nav: NavigationContext | null = null;
   private headersLoaded = false;
-  private toolsExpanded = false;
-  private modelListEl: HTMLElement | null = null;
-  private modelExpanded = false;
-  private lastTest: TestRunDisplay | undefined = undefined;
-  private testButton: AsyncActionButton | null = null;
+  private runControls: RunControls | null = null;
 
   mount(
     container: HTMLElement,
@@ -68,13 +45,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     this.nav = nav;
     this.promptColList = null; // reset so unmount() guards correctly before load
     this.headersLoaded = false;
-    this.lastTest = savedState?.lastTest;
     container.innerHTML = this.template();
     this.wireNavButtons(container);
-    this.testButton = new AsyncActionButton(
-      container.querySelector<HTMLButtonElement>("#test-btn")!,
-      { idleLabel: "Test", loadingLabel: "Testing...", doneLabel: "Tested ✓" },
-    );
 
     const preset: Partial<RunConfig> = savedState
       ? {
@@ -85,98 +57,64 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           tools: savedState.tools,
           includeGrounding: savedState.includeGrounding,
           applyMarkdown: savedState.applyMarkdown,
-          prefixWithColName: savedState.prefixWithColName,
+          wrapPromptsInTags: savedState.wrapPromptsInTags,
           model: savedState.model,
         }
       : (params ?? {});
-
-    this.toolsList = new TagList(
-      container.querySelector("#tools-list")!,
-      TOOL_CATALOG.map((t) => ({ label: t.name, value: t.id })),
-      preset.tools ?? [],
-    );
-
-    this.includeGroundingCb = container.querySelector<HTMLInputElement>("#include-grounding-cb");
-    if (this.includeGroundingCb && preset.includeGrounding) {
-      this.includeGroundingCb.checked = true;
-    }
 
     this.applyMarkdownCb = container.querySelector<HTMLInputElement>("#apply-markdown-cb");
     if (this.applyMarkdownCb && preset.applyMarkdown) {
       this.applyMarkdownCb.checked = true;
     }
 
-    this.prefixWithColNameCb = container.querySelector<HTMLInputElement>("#prefix-col-name-cb");
-    if (this.prefixWithColNameCb && preset.prefixWithColName) {
-      this.prefixWithColNameCb.checked = true;
+    this.wrapPromptsInTagsCb = container.querySelector<HTMLInputElement>(
+      "#wrap-prompts-in-tags-cb",
+    );
+    if (this.wrapPromptsInTagsCb) {
+      this.wrapPromptsInTagsCb.checked = preset.wrapPromptsInTags ?? true;
     }
 
-    const updateGroundingVisibility = (): void => {
-      const group = container.querySelector<HTMLElement>("#include-grounding-group");
-      if (group) {
-        group.style.display = (this.toolsList?.getValue().length ?? 0) > 0 ? "block" : "none";
-      }
-    };
-    updateGroundingVisibility();
-    container.querySelector("#tools-list")?.addEventListener("click", updateGroundingVisibility);
-
-    // Restore and wire collapsible Tools section
-    this.toolsExpanded = savedState?.toolsExpanded ?? false;
-    this.applyToolsExpandState(container);
-    container.querySelector("#tools-toggle")?.addEventListener("click", () => {
-      this.toolsExpanded = !this.toolsExpanded;
-      this.applyToolsExpandState(container);
-    });
-
-    const updateToolsSummary = (): void => {
-      const summary = container.querySelector<HTMLElement>("#tools-summary");
-      if (!summary) return;
-      const selected = this.toolsList?.getValue() ?? [];
-      if (selected.length === 0) {
-        summary.textContent = "No tools selected";
-      } else {
-        const names = selected.map((id) => {
-          const entry = TOOL_CATALOG.find((t) => t.id === id);
-          return entry?.name ?? id;
-        });
-        summary.textContent = names.join(", ");
-      }
-    };
-    updateToolsSummary();
-    container.querySelector("#tools-list")?.addEventListener("click", updateToolsSummary);
-
-    // Model selection
-    const initialModel: ModelId = preset.model ?? "gemini-3.1-flash-lite";
-    this.modelListEl = container.querySelector<HTMLElement>("#model-list");
-    const modelButtons = this.modelListEl?.querySelectorAll<HTMLButtonElement>(".model-option");
-
-    const updateModelSummary = (): void => {
-      const entry = MODEL_CATALOG.find((m) => m.id === this.getSelectedModel());
-      const summary = container.querySelector<HTMLElement>("#model-summary");
-      if (summary) summary.textContent = entry?.name ?? "";
-    };
-
-    modelButtons?.forEach((btn) => {
-      if (btn.getAttribute("data-value") === initialModel) btn.classList.add("selected");
-      btn.addEventListener("click", () => {
-        modelButtons.forEach((b) => b.classList.remove("selected"));
-        btn.classList.add("selected");
-        updateModelSummary();
-      });
-    });
-
-    updateModelSummary();
-
-    this.modelExpanded = savedState?.modelExpanded ?? false;
-    this.applyModelExpandState(container);
-    container.querySelector("#model-toggle")?.addEventListener("click", () => {
-      this.modelExpanded = !this.modelExpanded;
-      this.applyModelExpandState(container);
+    this.runControls = new RunControls(container.querySelector("#run-controls-mount")!, {
+      getPromptConfig: (): PromptConfig => this.getPromptConfig(),
+      savedState: this.buildRunControlsSavedState(savedState, preset),
     });
 
     const loader = new PanelLoader(container);
     loader.setState({ status: "loading", message: "Loading columns..." });
-    this.loadHeaders(container, preset).finally(() => loader.setState({ status: "idle" }));
+    Promise.all([this.loadHeaders(container, preset), this.runControls.ready])
+      .then(() => this.runControls?.checkTestStatsFreshness())
+      .finally(() => loader.setState({ status: "idle" }));
+  }
+
+  private buildRunControlsSavedState(
+    savedState: SavedState | undefined,
+    preset: Partial<RunConfig>,
+  ): RunControlsSavedState {
+    const source = savedState ?? preset;
+    return {
+      rowRange: source.rowRange,
+      tools: source.tools,
+      includeGrounding: source.includeGrounding,
+      model: source.model,
+      toolsExpanded: savedState?.toolsExpanded,
+      modelExpanded: savedState?.modelExpanded,
+      lastTest: savedState?.lastTest,
+    };
+  }
+
+  private getPromptConfig(): PromptConfig {
+    const promptCols = this.promptColList?.getValue() ?? [];
+    const systemPromptCol = this.systemPromptList?.getValue()[0] || undefined;
+    const outputCol = this.outputColList?.getValue()[0] ?? "";
+    const wrapPromptsInTags = this.wrapPromptsInTagsCb?.checked ? undefined : false;
+    const applyMarkdown = this.applyMarkdownCb?.checked || undefined;
+    return {
+      promptCols,
+      systemPromptCol,
+      outputCol,
+      wrapPromptsInTags,
+      applyMarkdown,
+    };
   }
 
   private loadHeaders(container: HTMLElement, preset: Partial<RunConfig>): Promise<void> {
@@ -204,7 +142,10 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         this.systemPromptList = new TokenInput(
           container.querySelector("#system-prompt-col")!,
           headers,
-          { multi: false, selected: preset.systemPromptCol ? [preset.systemPromptCol] : [] },
+          {
+            multi: false,
+            selected: preset.systemPromptCol ? [preset.systemPromptCol] : [],
+          },
         );
         this.outputColList = new TokenInput(container.querySelector("#output-col")!, headers, {
           multi: false,
@@ -212,10 +153,6 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           newDefault: "ai_",
           selected: preset.outputCol ? [preset.outputCol] : [],
         });
-        this.rowRangeComp = new RowRange(
-          container.querySelector("#row-range-container")!,
-          preset.rowRange,
-        );
 
         const updateGroundingLabel = (): void => {
           const val = this.outputColList?.getValue()[0] ?? "";
@@ -232,19 +169,11 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
 
         if (!this.headersLoaded) {
           container.querySelector<HTMLElement>("#config-form")!.style.display = "block";
-          container
-            .querySelector<HTMLButtonElement>("#run-btn")!
-            .addEventListener("click", () => this.handleRun(container));
-          container
-            .querySelector<HTMLButtonElement>("#test-btn")!
-            .addEventListener("click", () => this.handleTest(container));
           this.headersLoaded = true;
         }
-
-        this.checkTestStatsFreshness(container);
       },
       (err: Error) => {
-        globalThis.alert("Error loading headers: " + err.message);
+        globalThis.alert("Couldn't load headers: " + err.message);
         this.nav?.back();
       },
     );
@@ -257,39 +186,21 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     this.promptColList.destroy();
     this.systemPromptList?.destroy();
     this.outputColList?.destroy();
+    const runControlsState = this.runControls?.getValue();
     return {
       promptCols,
       systemPromptCol: this.systemPromptList?.getValue()[0] ?? "",
       outputCol: this.outputColList?.getValue()[0] ?? "",
-      rowRange: this.rowRangeComp?.getValue(),
-      tools: (this.toolsList?.getValue() ?? []) as ToolId[],
-      includeGrounding: this.includeGroundingCb?.checked ?? false,
+      rowRange: runControlsState?.rowRange,
+      tools: (runControlsState?.tools ?? []) as ToolId[],
+      includeGrounding: runControlsState?.includeGrounding ?? false,
       applyMarkdown: this.applyMarkdownCb?.checked ?? false,
-      prefixWithColName: this.prefixWithColNameCb?.checked ?? false,
-      toolsExpanded: this.toolsExpanded,
-      model: this.getSelectedModel(),
-      modelExpanded: this.modelExpanded,
-      lastTest: this.lastTest,
+      wrapPromptsInTags: this.wrapPromptsInTagsCb?.checked ?? true,
+      toolsExpanded: runControlsState?.toolsExpanded ?? false,
+      model: (runControlsState?.model ?? "gemini-3.1-flash-lite") as ModelId,
+      modelExpanded: runControlsState?.modelExpanded ?? false,
+      lastTest: runControlsState?.lastTest,
     };
-  }
-
-  private applyToolsExpandState(container: HTMLElement): void {
-    const content = container.querySelector<HTMLElement>("#tools-content");
-    const toggle = container.querySelector<HTMLButtonElement>("#tools-toggle");
-    if (content) content.hidden = !this.toolsExpanded;
-    if (toggle) toggle.setAttribute("aria-expanded", String(this.toolsExpanded));
-  }
-
-  private applyModelExpandState(container: HTMLElement): void {
-    const content = container.querySelector<HTMLElement>("#model-content");
-    const toggle = container.querySelector<HTMLButtonElement>("#model-toggle");
-    if (content) content.hidden = !this.modelExpanded;
-    if (toggle) toggle.setAttribute("aria-expanded", String(this.modelExpanded));
-  }
-
-  private getSelectedModel(): ModelId {
-    const selected = this.modelListEl?.querySelector<HTMLButtonElement>(".model-option.selected");
-    return (selected?.getAttribute("data-value") as ModelId) ?? "gemini-3.1-flash-lite";
   }
 
   private wireNavButtons(container: HTMLElement): void {
@@ -302,258 +213,30 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
       const btn = container.querySelector<HTMLButtonElement>("#refresh-btn")!;
       btn.classList.add("spinning");
       btn.disabled = true;
-      this.loadHeaders(container, this.currentPreset()).finally(() => {
-        btn.classList.remove("spinning");
-        btn.disabled = false;
-      });
+      Promise.all([
+        this.loadHeaders(container, this.currentPreset()),
+        this.runControls!.refreshRowRange(),
+      ])
+        .then(() => this.runControls?.checkTestStatsFreshness())
+        .finally(() => {
+          btn.classList.remove("spinning");
+          btn.disabled = false;
+        });
     });
   }
 
   private currentPreset(): Partial<RunConfig> {
+    const runControlsState = this.runControls?.getValue();
     return {
       promptCols: this.promptColList?.getValue() ?? [],
       systemPromptCol: this.systemPromptList?.getValue()[0] || undefined,
       outputCol: this.outputColList?.getValue()[0] || undefined,
-      rowRange: this.rowRangeComp?.getValue(),
-      tools: (this.toolsList?.getValue() ?? []) as ToolId[],
-      includeGrounding: this.includeGroundingCb?.checked,
+      rowRange: runControlsState?.rowRange,
+      tools: runControlsState?.tools as ToolId[] | undefined,
+      includeGrounding: runControlsState?.includeGrounding,
       applyMarkdown: this.applyMarkdownCb?.checked,
-      prefixWithColName: this.prefixWithColNameCb?.checked,
-      model: this.getSelectedModel(),
-    };
-  }
-
-  private resolveRowRange(range: RowRangeValue): RowRangeValue | null {
-    const sanitized = sanitizeRowRange(range);
-    if (!sanitized) {
-      globalThis.alert(
-        "Row 1 is the header row and can't be processed. Please select a data row range.",
-      );
-    }
-    return sanitized;
-  }
-
-  /**
-   * Resolves the row range *before* deciding anything, so both input modes share one
-   * dispatch path. The previous split — an explicit-rowRange branch plus a branch that
-   * resolved the selection inside the dispatch callback — meant the pre-run warning could
-   * only live in the first, and "Use highlighted rows" (the default) never warned at all.
-   */
-  private handleRun(_container: HTMLElement): void {
-    const config = this.assembleRunConfig();
-    if (!config) return;
-
-    const resolveRange: Promise<RowRangeValue | undefined> = config.rowRange
-      ? Promise.resolve(config.rowRange)
-      : getActiveRangeInfo();
-
-    resolveRange
-      .then((range) => {
-        if (!range) {
-          // The old fallback dispatched runBatchAI with no rowRange here, but the server
-          // resolves the active range the same way and returns null when there isn't one —
-          // so that path was a silent no-op. Say so instead.
-          globalThis.alert(
-            "No rows to process. Select the rows you want to run on, or use “Specify range” to enter one.",
-          );
-          return;
-        }
-        const sanitized = this.resolveRowRange(range);
-        if (!sanitized) return;
-        if (!this.confirmUntestedRun(sanitized)) return;
-
-        const jobId = `batch-ai-${Date.now()}`;
-        const chunks = computeChunks(sanitized, CHUNK_SIZE);
-        jobStore
-          .dispatch(jobId, "Batch AI Run", this.runChunks(jobId, config, chunks))
-          .catch((err: Error) => {
-            globalThis.alert("Error: " + err.message);
-          });
-      })
-      .catch((err: Error) => {
-        globalThis.alert("Error: " + err.message);
-      });
-    // NOTE: loadHeaders() is intentionally NOT called here.
-    // Reloading after dispatch caused flicker and re-initialization mid-run.
-  }
-
-  /**
-   * Warns before a run large enough to matter that has no test measurement behind it.
-   * "Has a measurement" reuses the same snapshot comparison as checkTestStatsFreshness(),
-   * so this dialog and the on-panel test results can never disagree about whether an
-   * earlier test still applies — editing the config invalidates both.
-   *
-   * CHUNK_SIZE is the threshold rather than a dedicated constant: it already marks where
-   * a run starts chunking and where the panel tells the user to keep the sidebar open.
-   *
-   * Returns false only when the user explicitly cancels.
-   */
-  private confirmUntestedRun(range: RowRangeValue): boolean {
-    const rowCount = range.end - range.start + 1;
-    if (rowCount <= CHUNK_SIZE) return true;
-    if (
-      this.lastTest &&
-      configsMatch(buildConfigSnapshot(this.currentPreset()), this.lastTest.stats.config)
-    ) {
-      return true;
-    }
-    return globalThis.confirm(
-      `You're about to process ${rowCount} rows without testing first.\n\n` +
-        `A test run on 10 rows checks quality and cost before you commit to the full run.\n\n` +
-        `Run anyway?`,
-    );
-  }
-
-  private async runChunks(
-    jobId: string,
-    config: RunConfig,
-    chunks: Array<{ start: number; end: number }>,
-  ): Promise<void> {
-    const lastRow = chunks[chunks.length - 1].end;
-    for (let i = 0; i < chunks.length; i++) {
-      if (jobStore.isCancelled(jobId)) break;
-      jobStore.setProgress(jobId, `Rows ${chunks[i].start}–${chunks[i].end} of ${lastRow}`);
-      await runBatchAI({ ...config, rowRange: chunks[i] }, jobId);
-    }
-  }
-
-  private handleTest(container: HTMLElement): void {
-    const config = this.assembleRunConfig();
-    if (!config) return;
-
-    const jobId = `test-ai-${Date.now()}`;
-    this.testButton?.setLoading();
-
-    const resolveRange: Promise<{ start: number; end: number } | undefined> = config.rowRange
-      ? Promise.resolve(config.rowRange)
-      : getActiveRangeInfo();
-
-    jobStore
-      .dispatch(
-        jobId,
-        "Test AI Run",
-        resolveRange.then((range) => {
-          const sanitized = range ? this.resolveRowRange(range) : null;
-          if (!sanitized) return undefined;
-          const fullRowCount = sanitized.end - sanitized.start + 1;
-          const cappedEnd = Math.min(sanitized.start + 9, sanitized.end);
-          return runBatchAI(
-            { ...config, rowRange: { start: sanitized.start, end: cappedEnd } },
-            jobId,
-          ).then((stats) => (stats ? { stats, fullRowCount } : undefined));
-        }),
-      )
-      .then((test) => {
-        if (test) {
-          this.lastTest = test;
-          this.renderTestStats(container, test);
-          this.testButton?.setDone();
-        } else {
-          this.renderTestMessage(
-            container,
-            "Test didn't produce measurable results — check the sheet for errors in the tested rows.",
-          );
-          this.testButton?.setIdle();
-        }
-      })
-      .catch((err: Error) => {
-        globalThis.alert("Error: " + err.message);
-        this.testButton?.setIdle();
-      });
-  }
-
-  private renderTestStats(container: HTMLElement, test: TestRunDisplay): void {
-    const el = container.querySelector<HTMLElement>("#test-results")!;
-    const { stats, fullRowCount } = test;
-    const totalCost = stats.totalTokenCost + stats.totalGroundingCost;
-    const avgCost = totalCost / stats.rowCount;
-
-    const parts = [
-      `<p><strong>Test run:</strong> ${stats.rowCount} row${stats.rowCount === 1 ? "" : "s"} · ` +
-        `$${totalCost.toFixed(4)} · ${formatDuration(stats.totalTimeMs)}</p>`,
-    ];
-
-    if (fullRowCount > stats.rowCount) {
-      const fullCost = avgCost * fullRowCount;
-      const chunkCount = Math.ceil(fullRowCount / CHUNK_SIZE);
-      const fullTimeMs = chunkCount * stats.totalTimeMs;
-      parts.push(
-        `<p><strong>Full run estimate:</strong> ${fullRowCount} rows · ` +
-          `~$${fullCost.toFixed(2)} · ~${formatDuration(fullTimeMs)}</p>`,
-      );
-    }
-
-    if (stats.config.promptCols.some((pc) => pc.kind === "file")) {
-      parts.push(`<p>⚠ Unusually large files may throw off cost and time estimates.</p>`);
-    }
-
-    el.innerHTML = parts.join("");
-    el.hidden = false;
-  }
-
-  private renderTestMessage(container: HTMLElement, message: string): void {
-    const el = container.querySelector<HTMLElement>("#test-results")!;
-    el.innerHTML = `<p>${message}</p>`;
-    el.hidden = false;
-  }
-
-  /**
-   * Re-validates the displayed test results against the live config. Called after
-   * every loadHeaders() resolution (initial mount AND refresh), not just the first
-   * load — otherwise refreshing after an external sheet edit (e.g. a column
-   * disappearing) could leave a stale "Tested ✓" display unvalidated indefinitely.
-   * Skipped while a test is actively running: refresh isn't disabled during a
-   * test, and re-checking against last completion's stats would incorrectly
-   * clobber the in-flight loading state.
-   */
-  private checkTestStatsFreshness(container: HTMLElement): void {
-    if (!this.lastTest || this.testButton?.getState() === "loading") return;
-    const liveSnapshot = buildConfigSnapshot(this.currentPreset());
-    if (configsMatch(liveSnapshot, this.lastTest.stats.config)) {
-      this.renderTestStats(container, this.lastTest);
-      this.testButton?.setDone();
-    } else {
-      this.renderTestMessage(
-        container,
-        "Configuration changed since last test — click Test to refresh.",
-      );
-      this.testButton?.setIdle();
-    }
-  }
-
-  private assembleRunConfig(): RunConfig | null {
-    const promptCols = this.promptColList?.getValue() ?? [];
-    if (promptCols.length === 0) {
-      globalThis.alert("Please select at least one User prompt column.");
-      return null;
-    }
-    const systemPromptCol = this.systemPromptList?.getValue()[0] || undefined;
-    const outputCol = this.outputColList?.getValue()[0] ?? "";
-    if (!outputCol) {
-      globalThis.alert("Please select an output column.");
-      return null;
-    }
-    const rawRowRange = this.rowRangeComp?.getValue();
-    let rowRange: RowRangeValue | undefined;
-    if (rawRowRange) {
-      rowRange = this.resolveRowRange(rawRowRange) ?? undefined;
-      if (!rowRange) return null;
-    }
-    const tools = (this.toolsList?.getValue() ?? []) as ToolId[];
-    const includeGrounding = this.includeGroundingCb?.checked ?? false;
-    const applyMarkdown = this.applyMarkdownCb?.checked ?? false;
-    const prefixWithColName = this.prefixWithColNameCb?.checked ?? false;
-    const model = this.getSelectedModel();
-    return {
-      promptCols,
-      systemPromptCol,
-      outputCol,
-      rowRange,
-      tools: tools.length > 0 ? tools : undefined,
-      includeGrounding: includeGrounding || undefined,
-      applyMarkdown: applyMarkdown || undefined,
-      prefixWithColName: prefixWithColName || undefined,
-      model,
+      wrapPromptsInTags: this.wrapPromptsInTagsCb?.checked,
+      model: runControlsState?.model,
     };
   }
 
@@ -561,7 +244,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
     return `
     <div class="panel-header">
       <button id="back-btn" class="back-btn">← Back</button>
-      <span class="panel-title">▶️ Run AI Inference</span>
+      <span class="panel-title">▶️ Freeform AI Inference</span>
       <button id="refresh-btn" class="refresh-btn" title="Refresh columns">↻</button>
     </div>
     <div id="panel-loader" class="panel-loader" hidden>
@@ -585,8 +268,8 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
         <p class="field-helper">The content the AI acts on — what it reads, summarizes, classifies, or answers, one row at a time.</p>
         <div id="prompt-col-list"></div>
         <label class="checkbox-option">
-          <input type="checkbox" id="prefix-col-name-cb" />
-          <span>Prefix with column name</span>
+          <input type="checkbox" id="wrap-prompts-in-tags-cb" checked />
+          <span>Tag each input with its column name</span>
         </label>
       </div>
       <div class="field-group">
@@ -598,52 +281,7 @@ export class ConfigureAIRunPanel implements Panel<Partial<RunConfig>, SavedState
           <span>Apply markdown formatting</span>
         </label>
       </div>
-      <div class="field-group">
-        <button type="button" id="model-toggle" class="collapsible-header">
-          <span class="collapsible-label">MODEL</span>
-          <span id="model-summary" class="collapsible-summary"></span>
-          <span class="collapsible-chevron">▶</span>
-        </button>
-        <div id="model-content" class="collapsible-content" hidden>
-          <div id="model-list" class="model-option-list">
-            ${MODEL_CATALOG.map((m) => `<button type="button" class="model-option" data-value="${m.id}"><span class="model-option-name">${m.name}</span><span class="model-option-desc">${m.description}</span></button>`).join("")}
-          </div>
-        </div>
-      </div>
-      <div class="field-group">
-        <button type="button" id="tools-toggle" class="collapsible-header">
-          <span class="collapsible-label">TOOLS <span class="optional">(optional)</span></span>
-          <span id="tools-summary" class="collapsible-summary">No tools selected</span>
-          <span class="collapsible-chevron">▶</span>
-        </button>
-        <div id="tools-content" class="collapsible-content" hidden>
-          <p class="field-helper">Give the AI extra capabilities. Google Search lets it look up current information; URL Context lets it read web pages you provide; Code Execution lets it run and verify calculations.</p>
-          <div id="tools-list" class="tag-list"></div>
-          <div id="include-grounding-group" style="display:none">
-            <label class="checkbox-option">
-              <input type="checkbox" id="include-grounding-cb" />
-              <span>Include grounding column <span class="grounding-col-badge" id="grounding-col-name">_grounding</span></span>
-            </label>
-          </div>
-        </div>
-      </div>
-      <div class="field-group">
-        <span class="field-label">Rows to process</span>
-        <div id="row-range-container"></div>
-      </div>
-      <div class="finish-panel">
-        <div class="field-group">
-          <p class="step-title">Test your setup</p>
-          <p class="field-helper">Try it out on the first 10 rows — check quality and cost before committing to a full run.</p>
-          <button id="test-btn" class="btn-outline">Test</button>
-          <div id="test-results" class="test-results" hidden></div>
-        </div>
-        <div class="field-group field-group--joined">
-          <p class="step-title">Run on all rows</p>
-          <p class="field-helper">Run across your entire selection. For large runs above ${CHUNK_SIZE} rows, make sure you keep this sidebar open.</p>
-          <button id="run-btn" class="btn-run">Run AI</button>
-        </div>
-      </div>
+      <div id="run-controls-mount"></div>
     </div>
   `;
   }

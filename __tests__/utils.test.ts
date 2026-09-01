@@ -9,10 +9,12 @@
 import {
   extractId,
   isValidDriveLink,
+  isValidYouTubeLink,
   createSeededRandom,
   getAllFilesRecursive,
   sampleRows,
   truncateText,
+  sanitizeTagName,
   flattenArg,
   resolveColumns,
   writeJobProgress,
@@ -67,6 +69,66 @@ describe("isValidDriveLink", () => {
     expect(isValidDriveLink(null)).toBe(false);
     expect(isValidDriveLink(42)).toBe(false);
     expect(isValidDriveLink(undefined)).toBe(false);
+  });
+});
+
+describe("isValidYouTubeLink", () => {
+  it("returns true for a standard watch URL", () => {
+    expect(isValidYouTubeLink("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBe(true);
+  });
+
+  it("returns true for a youtu.be short link", () => {
+    expect(isValidYouTubeLink("https://youtu.be/dQw4w9WgXcQ")).toBe(true);
+  });
+
+  it("returns true for a Shorts URL", () => {
+    expect(isValidYouTubeLink("https://www.youtube.com/shorts/dQw4w9WgXcQ")).toBe(true);
+  });
+
+  it("returns true for a mobile watch URL", () => {
+    expect(isValidYouTubeLink("https://m.youtube.com/watch?v=dQw4w9WgXcQ")).toBe(true);
+  });
+
+  it("returns true for a watch URL with extra query params", () => {
+    expect(isValidYouTubeLink("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s&list=PLxyz")).toBe(
+      true,
+    );
+  });
+
+  it("returns false for a playlist URL", () => {
+    expect(isValidYouTubeLink("https://www.youtube.com/playlist?list=PLBDA2E52FB1EF80C9")).toBe(
+      false,
+    );
+  });
+
+  it("returns false for a channel URL", () => {
+    expect(isValidYouTubeLink("https://www.youtube.com/@crashcourse")).toBe(false);
+  });
+
+  it("returns false for a channel search URL", () => {
+    expect(isValidYouTubeLink("https://www.youtube.com/@crashcourse/search?query=science")).toBe(
+      false,
+    );
+  });
+
+  it("returns false for non-YouTube URLs", () => {
+    expect(isValidYouTubeLink("https://example.com/watch?v=dQw4w9WgXcQ")).toBe(false);
+  });
+
+  it("returns false for a spoofed URL with a YouTube-shaped path on another host", () => {
+    // Since the raw string is passed straight through as file_uri (not just an
+    // extracted ID like Drive links), classification must not be foolable by
+    // embedding a YouTube-shaped path on an attacker-controlled host.
+    expect(isValidYouTubeLink("https://evil.example.com/youtube.com/watch?v=xyz")).toBe(false);
+    expect(isValidYouTubeLink("https://evil.example.com/redirect?to=youtu.be/dQw4w9WgXcQ")).toBe(
+      false,
+    );
+  });
+
+  it("returns false for non-string inputs", () => {
+    expect(isValidYouTubeLink(null)).toBe(false);
+    expect(isValidYouTubeLink(42)).toBe(false);
+    expect(isValidYouTubeLink(undefined)).toBe(false);
   });
 });
 
@@ -145,6 +207,33 @@ describe("truncateText", () => {
     const text = "a".repeat(101);
     const result = truncateText(text, 100);
     expect(result).toBe("a".repeat(100) + "... [TRUNCATED]");
+  });
+});
+
+describe("sanitizeTagName", () => {
+  it("returns the title unchanged when already a valid identifier", () => {
+    expect(sanitizeTagName("case_notes", 0)).toBe("case_notes");
+  });
+
+  it("replaces spaces with underscores", () => {
+    expect(sanitizeTagName("Drive Link", 0)).toBe("Drive_Link");
+  });
+
+  it("collapses a run of invalid characters into a single underscore", () => {
+    expect(sanitizeTagName("Case #2/Notes", 0)).toBe("Case_2_Notes");
+  });
+
+  it("prefixes a leading digit with an underscore", () => {
+    expect(sanitizeTagName("2024_report", 0)).toBe("_2024_report");
+  });
+
+  it("trims leading and trailing underscores produced by stripped characters", () => {
+    expect(sanitizeTagName("  Notes  ", 0)).toBe("Notes");
+  });
+
+  it("falls back to input_<index> when the title sanitizes to empty", () => {
+    expect(sanitizeTagName("###", 3)).toBe("input_3");
+    expect(sanitizeTagName("", 2)).toBe("input_2");
   });
 });
 
@@ -344,7 +433,7 @@ describe("writeRunStats", () => {
         promptCols: [{ col: "col_a", kind: "text" }],
         systemPromptCol: undefined,
         tools: [],
-        prefixWithColName: false,
+        wrapPromptsInTags: false,
         model: "gemini-3.1-flash-lite",
       },
     };

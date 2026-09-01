@@ -3,6 +3,13 @@ export interface RowRangeValue {
   end: number;
 }
 
+export interface RowRangeOptions {
+  /** The current value. Presence of this determines which radio is checked and pre-fills the inputs. */
+  selected?: RowRangeValue;
+  /** Used only when `selected` is absent — pre-fills the (hidden) Specify-range inputs' values without changing which mode is checked. */
+  fallback?: RowRangeValue;
+}
+
 // Never lets a run start on the header row; returns null if nothing valid remains.
 export function sanitizeRowRange(range: RowRangeValue): RowRangeValue | null {
   const start = Math.max(range.start, 2);
@@ -16,23 +23,26 @@ export class RowRange {
   private endInput: HTMLInputElement;
   private rangeRadio: HTMLInputElement;
 
-  constructor(container: HTMLElement, selected?: RowRangeValue) {
+  constructor(container: HTMLElement, options?: RowRangeOptions) {
     this.container = container;
     const groupName = `row-range-${RowRange.instanceCount++}`;
-    const refs = this.render(selected, groupName);
+    const refs = this.render(options, groupName);
     this.startInput = refs.startInput;
     this.endInput = refs.endInput;
     this.rangeRadio = refs.rangeRadio;
   }
 
   private render(
-    selected: RowRangeValue | undefined,
+    options: RowRangeOptions | undefined,
     groupName: string,
   ): {
     startInput: HTMLInputElement;
     endInput: HTMLInputElement;
     rangeRadio: HTMLInputElement;
   } {
+    const selected = options?.selected;
+    const prefill = selected ?? options?.fallback;
+
     this.container.innerHTML = "";
     const wrapper = document.createElement("div");
     wrapper.className = "row-range-options";
@@ -61,13 +71,13 @@ export class RowRange {
     startInput.type = "number";
     startInput.placeholder = "Start row";
     startInput.min = "2";
-    if (selected) startInput.value = String(selected.start);
+    if (prefill) startInput.value = String(prefill.start);
 
     const endInput = document.createElement("input");
     endInput.type = "number";
     endInput.placeholder = "End row";
     endInput.min = "2";
-    if (selected) endInput.value = String(selected.end);
+    if (prefill) endInput.value = String(prefill.end);
 
     rangeInputs.append(startInput, endInput);
     wrapper.append(selLabel, rangeLabel, rangeInputs);

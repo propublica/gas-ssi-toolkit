@@ -15,11 +15,20 @@ export type AsyncButtonState = "idle" | "loading" | "done";
 export interface AsyncActionButtonConfig {
   idleLabel: string;
   loadingLabel: string;
-  doneLabel: string;
+  /** Defaults to idleLabel. Omit when a consumer never calls setDone() (e.g.
+   * a commit button whose success collapses the whole step, leaving no
+   * "done" state to display). */
+  doneLabel?: string;
 }
 
 export class AsyncActionButton {
   private state: AsyncButtonState = "idle";
+  /** Externally-imposed enablement, independent of `state` -- persisted rather
+   * than written straight to the DOM so a later state change (setIdle/setDone/
+   * setLoading) recomputes `disabled` from BOTH inputs instead of clobbering
+   * it. Without this, a step disabled by the editing-exclusivity gate silently
+   * re-enabled itself the next time its own button state changed. */
+  private interactive = true;
 
   constructor(
     private readonly button: HTMLButtonElement,
@@ -47,12 +56,22 @@ export class AsyncActionButton {
     this.render();
   }
 
+  /** Disables/enables the button independent of its own loading/idle/done
+   * state -- used by a step to gray out its own action button while a
+   * DIFFERENT step is mid-edit. Re-enabling can't spring a button loose
+   * mid-request: render() keeps a loading button disabled whatever
+   * `interactive` says. */
+  setInteractive(enabled: boolean): void {
+    this.interactive = enabled;
+    this.render();
+  }
+
   private render(): void {
-    this.button.disabled = this.state === "loading";
+    this.button.disabled = this.state === "loading" || !this.interactive;
     if (this.state === "loading") {
       this.button.innerHTML = `<span class="btn-spinner"></span>${this.config.loadingLabel}`;
     } else if (this.state === "done") {
-      this.button.textContent = this.config.doneLabel;
+      this.button.textContent = this.config.doneLabel ?? this.config.idleLabel;
     } else {
       this.button.textContent = this.config.idleLabel;
     }

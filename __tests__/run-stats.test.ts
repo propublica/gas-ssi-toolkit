@@ -11,14 +11,14 @@ describe("buildConfigSnapshot", () => {
       tools: ["google_search"],
       includeGrounding: true,
       applyMarkdown: true,
-      prefixWithColName: true,
+      wrapPromptsInTags: true,
       model: "gemini-3.1-pro-preview",
     };
     expect(buildConfigSnapshot(config)).toEqual({
       promptCols: [{ col: "col_a", kind: "text" }],
       systemPromptCol: "sys",
       tools: ["google_search"],
-      prefixWithColName: true,
+      wrapPromptsInTags: true,
       model: "gemini-3.1-pro-preview",
     });
   });
@@ -28,9 +28,9 @@ describe("buildConfigSnapshot", () => {
     expect(buildConfigSnapshot(config).tools).toEqual([]);
   });
 
-  it("normalizes an absent prefixWithColName to false", () => {
+  it("normalizes an absent wrapPromptsInTags to true", () => {
     const config: Partial<RunConfig> = { promptCols: [], outputCol: "out" };
-    expect(buildConfigSnapshot(config).prefixWithColName).toBe(false);
+    expect(buildConfigSnapshot(config).wrapPromptsInTags).toBe(true);
   });
 
   it("defaults promptCols to [] when absent (Partial<RunConfig> input)", () => {
@@ -101,14 +101,14 @@ describe("configsMatch", () => {
       promptCols: [{ col: "Drive Link", kind: "file" as const }],
       systemPromptCol: "System Prompt",
       tools: [],
-      prefixWithColName: false,
+      wrapPromptsInTags: false,
       model: "gemini-3.1-flash-lite" as const,
     };
     const cached = {
       systemPromptCol: "System Prompt",
       promptCols: [{ col: "Drive Link", kind: "file" as const }],
       model: "gemini-3.1-flash-lite" as const,
-      prefixWithColName: false,
+      wrapPromptsInTags: false,
       tools: [],
     };
     expect(configsMatch(live, cached)).toBe(true);

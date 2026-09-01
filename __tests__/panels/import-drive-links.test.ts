@@ -179,6 +179,6 @@ describe("ImportDriveLinksPanel", () => {
     selectColumn(c, "output-col", "source_drive");
     c.querySelector<HTMLButtonElement>("#import-btn")!.click();
     await new Promise((r) => setTimeout(r, 0));
-    expect(globalThis.alert).toHaveBeenCalledWith("Error: job failed");
+    expect(globalThis.alert).toHaveBeenCalledWith("job failed");
   });
 });

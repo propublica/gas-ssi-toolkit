@@ -36,10 +36,43 @@ beforeEach(() => {
 });
 
 describe("ToolListPanel", () => {
+  it("clicking Guided AI Inference navigates to guided-ai-inference", () => {
+    const c = mountPanel();
+    c.querySelector<HTMLButtonElement>("#btn-guided-ai")!.click();
+    expect(mockNav.navigate).toHaveBeenCalledWith("guided-ai-inference");
+  });
+
   it("clicking Run AI navigates to configure-ai-run", () => {
     const c = mountPanel();
     c.querySelector<HTMLButtonElement>("#btn-run-ai")!.click();
     expect(mockNav.navigate).toHaveBeenCalledWith("configure-ai-run");
+  });
+
+  it("renders Guided AI Inference, Freeform AI Inference, and Recipes first, in that order", () => {
+    const c = mountPanel();
+    const ids = Array.from(c.querySelectorAll(".tool-btn")).map((btn) => btn.id);
+    expect(ids.slice(0, 3)).toEqual(["btn-guided-ai", "btn-run-ai", "btn-recipes"]);
+  });
+
+  it("renders the AI section header (not the old 'Main Tools' label)", () => {
+    const c = mountPanel();
+    const headers = Array.from(c.querySelectorAll("h3")).map((h) => h.textContent);
+    expect(headers).toContain("AI");
+    expect(headers).not.toContain("Main Tools");
+  });
+
+  it("renders short names with descriptive captions for the three AI buttons", () => {
+    const c = mountPanel();
+    const expectations: Array<[string, string, string]> = [
+      ["#btn-guided-ai", "Guided", "Not sure where to begin? Start here."],
+      ["#btn-run-ai", "Freeform", "Full control over inputs, prompts and settings"],
+      ["#btn-recipes", "Recipes", "Ready-made presets for common tasks"],
+    ];
+    for (const [selector, name, caption] of expectations) {
+      const btn = c.querySelector(selector)!;
+      expect(btn.querySelector(".tool-btn-name")!.textContent).toBe(name);
+      expect(btn.querySelector(".tool-btn-sub")!.textContent).toBe(caption);
+    }
   });
 
   it("clicking Recipes navigates to recipes-list", () => {
@@ -119,7 +152,7 @@ describe("ToolListPanel", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(btn.disabled).toBe(false);
-    expect(mockAlert).toHaveBeenCalledWith("Error: GAS error");
+    expect(mockAlert).toHaveBeenCalledWith("GAS error");
 
     globalThis.alert = origAlert;
   });

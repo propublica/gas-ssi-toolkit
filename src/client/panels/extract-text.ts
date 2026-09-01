@@ -1,16 +1,16 @@
 import type { NavigationContext, Panel } from "../types";
 import type { ExtractTextConfig } from "../../shared/types";
 import { TokenInput } from "../components/token-input";
-import { RowRange } from "../components/row-range";
+import { RowRange, type RowRangeValue } from "../components/row-range";
 import { PanelLoader } from "../components/panel-loader";
-import { getSheetHeaders, extractText } from "../services";
+import { getSheetHeaders, extractText, getDefaultRowRange } from "../services";
 import { jobStore } from "../job-store";
 
 type SavedState = {
   sourceCol: string;
   outputCol: string;
-  startRow: number;
-  endRow: number;
+  startRow?: number;
+  endRow?: number;
 };
 
 export class ExtractTextPanel implements Panel<undefined, SavedState> {
@@ -51,7 +51,7 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
           loader.setState({ status: "idle" });
         },
         (err: Error) => {
-          globalThis.alert("Error loading headers: " + err.message);
+          globalThis.alert("Couldn't load headers: " + err.message);
           nav.back();
         },
       );
@@ -62,7 +62,15 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
         ? { start: savedState.startRow, end: savedState.endRow }
         : undefined;
 
-    this.rowRange = new RowRange(container.querySelector("#row-range")!, savedRowRange);
+    const buildRowRange = (defaultRowRange?: RowRangeValue): void => {
+      const el = container.querySelector<HTMLElement>("#row-range");
+      if (!el) return;
+      this.rowRange = new RowRange(el, {
+        selected: savedRowRange,
+        fallback: defaultRowRange,
+      });
+    };
+    getDefaultRowRange().then(buildRowRange, () => buildRowRange(undefined));
 
     container
       .querySelector<HTMLButtonElement>("#extract-btn")!
@@ -92,8 +100,8 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
     return {
       sourceCol,
       outputCol,
-      startRow: range?.start ?? 2,
-      endRow: range?.end ?? 2,
+      startRow: range?.start,
+      endRow: range?.end,
     };
   }
 
@@ -104,7 +112,7 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
     const jobId = `extract-text-${Date.now()}`;
     jobStore
       .dispatch(jobId, "Extract Text", extractText(config, jobId))
-      .catch((err: Error) => globalThis.alert("Error: " + err.message));
+      .catch((err: Error) => globalThis.alert(err.message));
   }
 
   private assembleConfig(): ExtractTextConfig | null {

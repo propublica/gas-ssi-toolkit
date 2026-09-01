@@ -27,6 +27,25 @@ export function isValidDriveLink(input: unknown): boolean {
 }
 
 /**
+ * Check whether a string looks like a single-video YouTube link (standard watch URL,
+ * youtu.be short link, or Shorts URL). Deliberately excludes playlist/channel/search
+ * URLs, which aren't single videos Gemini can process this way.
+ *
+ * Anchored to the start of the string (host must actually be youtube.com/youtu.be)
+ * rather than a loose substring match: unlike a Drive link, this value is passed
+ * straight through as the Gemini request's file_uri with no ID extraction, so a
+ * looser match would let a YouTube-shaped path on an attacker-controlled host
+ * (e.g. "https://evil.example.com/youtube.com/watch?v=xyz") get sent to Gemini
+ * as the fetch target.
+ */
+export function isValidYouTubeLink(input: unknown): boolean {
+  if (typeof input !== "string") return false;
+  return /^(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:\S*&)?v=[\w-]+|shorts\/[\w-]+)|youtu\.be\/[\w-]+)/.test(
+    input.trim(),
+  );
+}
+
+/**
  * Seeded pseudo-random number generator (LCG).
  * Returns a function that produces values in [0, 1).
  */
@@ -85,6 +104,17 @@ export function sampleRows(data: unknown[][], sampleSize: number, seed: number):
 export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + "... [TRUNCATED]";
+}
+
+/**
+ * Deterministic column-title → XML-tag-name mapping. Column headers are not
+ * valid tag names (spaces, #, /, leading digits, or empty titles are all
+ * legal headers) — this is the single place that rule is applied.
+ */
+export function sanitizeTagName(title: string, fallbackIndex: number): string {
+  const stripped = title.replace(/[^A-Za-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+  if (stripped === "") return `input_${fallbackIndex}`;
+  return /^[0-9]/.test(stripped) ? `_${stripped}` : stripped;
 }
 
 /**
