@@ -38,6 +38,15 @@ export function getSheetHeaders(): Promise<string[]> {
   });
 }
 
+export function getGeminiGemUrl(): Promise<string | undefined> {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler((url: unknown) => resolve(normalizeNulls(url) as string | undefined))
+      .withFailureHandler((err: Error) => reject(err))
+      .getGeminiGemUrl();
+  });
+}
+
 export function runBatchAI(config: RunConfig, jobId?: string): Promise<RunStats | undefined> {
   return new Promise((resolve, reject) => {
     google.script.run
@@ -93,6 +102,17 @@ export function getActiveRangeInfo(): Promise<{ start: number; end: number } | u
       )
       .withFailureHandler((err: Error) => reject(err))
       .getActiveRangeInfo();
+  });
+}
+
+export function getDefaultRowRange(): Promise<{ start: number; end: number } | undefined> {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler((result: unknown) =>
+        resolve(normalizeNulls(result) as { start: number; end: number } | undefined),
+      )
+      .withFailureHandler((err: Error) => reject(err))
+      .getDefaultRowRange();
   });
 }
 

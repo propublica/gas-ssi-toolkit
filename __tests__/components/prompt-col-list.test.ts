@@ -72,6 +72,23 @@ describe("PromptColList — construction", () => {
     expect(toggleRow1?.textContent).toBe("File ⇄");
     list.destroy();
   });
+
+  it("preserves an 'auto' kind (e.g. from Guided AI Inference) instead of coercing it to text", () => {
+    const container = makeContainer();
+    const list = new PromptColList(container, HEADERS, [{ col: "col_a", kind: "auto" }]);
+    const toggle = container.querySelector<HTMLElement>(".pcol-kind-toggle");
+    expect(toggle?.textContent).toBe("Auto ⇄");
+    expect(list.getValue()).toEqual([{ col: "col_a", kind: "auto" }]);
+    list.destroy();
+  });
+
+  it("clicking the kind toggle on an 'auto' row moves it to 'text', not 'file'", () => {
+    const container = makeContainer();
+    const list = new PromptColList(container, HEADERS, [{ col: "col_a", kind: "auto" }]);
+    container.querySelector<HTMLElement>(".pcol-kind-toggle")!.click();
+    expect(list.getValue()).toEqual([{ col: "col_a", kind: "text" }]);
+    list.destroy();
+  });
 });
 
 describe("PromptColList — getValue()", () => {
@@ -95,7 +112,7 @@ describe("PromptColList — getValue()", () => {
     const list = new PromptColList(container, HEADERS);
     container.querySelector<HTMLElement>(".pcol-add-btn")!.click();
     selectColInRow(container, 0, "col_a");
-    expect(list.getValue()).toEqual([{ col: "col_a", kind: "text" }]);
+    expect(list.getValue()).toEqual([{ col: "col_a", kind: "auto" }]);
     list.destroy();
   });
 
@@ -131,13 +148,13 @@ describe("PromptColList — add row", () => {
     list.destroy();
   });
 
-  it("new row defaults to text kind", () => {
+  it("new row defaults to auto kind", () => {
     const container = makeContainer();
     const list = new PromptColList(container, HEADERS);
     container.querySelector<HTMLElement>(".pcol-add-btn")!.click();
     const rows = container.querySelectorAll(".pcol-row");
     const toggle = rows[0].querySelector<HTMLElement>(".pcol-kind-toggle");
-    expect(toggle?.textContent).toBe("Text ⇄");
+    expect(toggle?.textContent).toBe("Auto ⇄");
     list.destroy();
   });
 });
@@ -166,14 +183,38 @@ describe("PromptColList — kind toggle", () => {
     list.destroy();
   });
 
-  it("clicking toggle twice cycles back to text kind", () => {
+  it("clicking toggle twice from text lands on auto (the toggle cycles through all three kinds)", () => {
     const container = makeContainer();
     const list = new PromptColList(container, HEADERS, [{ col: "col_a", kind: "text" }]);
     const row = container.querySelector<HTMLElement>(".pcol-row")!;
     const toggle = row.querySelector<HTMLElement>(".pcol-kind-toggle")!;
-    toggle.click();
-    toggle.click();
+    toggle.click(); // text -> file
+    toggle.click(); // file -> auto
+    expect(list.getValue()).toEqual([{ col: "col_a", kind: "auto" }]);
+    list.destroy();
+  });
+
+  it("clicking toggle three times cycles all the way back to text kind", () => {
+    const container = makeContainer();
+    const list = new PromptColList(container, HEADERS, [{ col: "col_a", kind: "text" }]);
+    const row = container.querySelector<HTMLElement>(".pcol-row")!;
+    const toggle = row.querySelector<HTMLElement>(".pcol-kind-toggle")!;
+    toggle.click(); // text -> file
+    toggle.click(); // file -> auto
+    toggle.click(); // auto -> text
     expect(list.getValue()).toEqual([{ col: "col_a", kind: "text" }]);
+    list.destroy();
+  });
+
+  it("cycling forward from auto reaches file and back to auto -- 'auto' is fully reachable, not a one-way exit", () => {
+    const container = makeContainer();
+    const list = new PromptColList(container, HEADERS, [{ col: "col_a", kind: "auto" }]);
+    const row = container.querySelector<HTMLElement>(".pcol-row")!;
+    const toggle = row.querySelector<HTMLElement>(".pcol-kind-toggle")!;
+    toggle.click(); // auto -> text
+    toggle.click(); // text -> file
+    toggle.click(); // file -> auto
+    expect(list.getValue()).toEqual([{ col: "col_a", kind: "auto" }]);
     list.destroy();
   });
 });

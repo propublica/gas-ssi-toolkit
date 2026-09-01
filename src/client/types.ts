@@ -35,6 +35,70 @@ export interface Job {
   completedAt?: number;
 }
 
+// ── Step framework (Guided AI Inference) ──────────────────────────
+// Positional, not kind-based: whether completing a step collapses it and
+// unlocks a next step, or leaves it expanded forever, is decided by the
+// StepFlow shell based on array position — the last step behaves
+// differently, but nothing on the step itself declares that.
+
+export interface StepContext {
+  /** Called by the step, at its own discretion, when it considers its own
+   * designated action to have succeeded. May be called more than once —
+   * the shell's handling of this is idempotent. */
+  onComplete(): void;
+  /** Purely cosmetic — flips this step's checklist icon to a red ✕. Does
+   * NOT change locked/active/complete status. The step itself is
+   * responsible for surfacing the failure to the user — currently via
+   * `globalThis.alert()`, consistent with how every other RPC-failure path
+   * in this codebase reports errors. The shell only ever renders the icon,
+   * never message text. */
+  onError(): void;
+  /** Called by the step whenever its own committing action starts (true) or
+   * finishes (false) -- successfully or not. Gates the shell's own Cancel
+   * button for this step while a request is in flight, closing a race
+   * where Cancel reverts this row to "complete" and a still-in-flight
+   * request later calls onComplete()/onError() against a row that's
+   * already moved on. A step with no async commit action may simply never
+   * call it. */
+  onBusyChange(isBusy: boolean): void;
+}
+
+export interface Step<S = unknown> {
+  title: string;
+  flavorText: string;
+  mount(container: HTMLElement, ctx: StepContext, savedState?: S): void;
+  unmount(): { savedState: S; summary: string } | undefined;
+  /** Optional. Called by the shell immediately after construction for any
+   * step that is NOT being mounted this session (locked, or complete and
+   * collapsed) but has cached savedState from a prior session — so a later
+   * step's derived result (e.g. via getResult()) stays correct even when
+   * this step is never re-mounted after a panel reload. Steps whose result
+   * is entirely derivable from their own savedState should implement this;
+   * omit it if nothing downstream depends on this step's derived state. */
+  hydrate?(savedState: S): void;
+  /** Optional. Called by the shell to enable/disable this step's own
+   * action button(s) while a DIFFERENT step is mid-edit -- e.g. so the
+   * terminal step's Run button can't be clicked while an earlier step's
+   * edit is still unresolved. Must not alter mounted state, savedState, or
+   * in-progress form values -- purely a button-disable. A step with
+   * nothing to disable may omit this entirely. */
+  setInteractive?(enabled: boolean): void;
+  /** Optional. Tears down anything unmount() doesn't (and can't, since
+   * unmount() is also called on steps that remain visibly mounted -- see
+   * StepFlow.getValue()) -- e.g. a step's own TokenInput instances, whose
+   * document-level listeners outlive their container's DOM otherwise.
+   * Called by StepFlow.destroy() when the whole flow is being discarded. */
+  destroy?(): void;
+}
+
+export interface StepFlowSavedState {
+  activeStepIndex: number;
+  steps: Array<{
+    status: "locked" | "active" | "complete";
+    saved?: { savedState: unknown; summary: string };
+  }>;
+}
+
 // ── Recipe UI types ─────────────────────────────────────────────
 // These are client-only — they define the journalist-facing form, not RPC payloads.
 
@@ -45,7 +109,7 @@ export interface Job {
  */
 export type RecipeSettings = Pick<
   RunConfig,
-  "tools" | "applyMarkdown" | "includeGrounding" | "prefixWithColName" | "model"
+  "tools" | "applyMarkdown" | "includeGrounding" | "wrapPromptsInTags" | "model"
 >;
 
 export interface RecipeInput {
@@ -68,6 +132,7 @@ export interface RecipeInput {
  */
 export type PanelId =
   | "tool-list"
+  | "guided-ai-inference"
   | "configure-ai-run"
   | "recipes-list"
   | "recipe"

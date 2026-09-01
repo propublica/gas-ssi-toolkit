@@ -20,6 +20,7 @@
 // ── Import after mocks ─────────────────────────────────────────
 
 import { SSI } from "../src/server/customFunctions";
+import { GENERIC_FAILURE_MESSAGE } from "../src/server/error-handling";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ describe("SSI", () => {
   describe("toolNames", () => {
     it("returns an error string for an unknown tool name", () => {
       const result = SSI("prompt", undefined, "nonExistentTool");
-      expect(result).toMatch(/\[SSI Error:.*nonExistentTool/);
+      expect(result).toMatch(/\[Error:.*nonExistentTool/);
     });
 
     it("includes google_search in the API payload when specified", () => {
@@ -123,7 +124,7 @@ describe("SSI", () => {
     it("returns an error string when GEMINI_API_KEY is not set", () => {
       (PropertiesService.getScriptProperties().getProperty as jest.Mock).mockReturnValueOnce(null);
       const result = SSI("prompt");
-      expect(result).toMatch(/\[SSI Error:.*GEMINI_API_KEY/);
+      expect(result).toMatch(/\[Error:.*GEMINI_API_KEY/);
     });
   });
 
@@ -133,13 +134,26 @@ describe("SSI", () => {
     it("returns an error string on API error response", () => {
       mockFetchResponse({ error: { message: "quota exceeded" } });
       const result = SSI("prompt");
-      expect(result).toMatch(/\[SSI Error:.*quota exceeded/);
+      expect(result).toMatch(/\[Error:.*quota exceeded/);
     });
 
     it("returns the model text on success", () => {
       mockOkResponse("The answer is 42");
       const result = SSI("What is the answer?");
       expect(result).toBe("The answer is 42");
+    });
+
+    it("returns a generic message and logs (without the raw detail) for an unexpected exception", () => {
+      const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+      (UrlFetchApp.fetch as jest.Mock).mockImplementation(() => {
+        throw new Error("DNS resolution failed for generativelanguage.googleapis.com");
+      });
+
+      const result = SSI("prompt");
+
+      expect(result).toBe(`[Error: ${GENERIC_FAILURE_MESSAGE}]`);
+      expect(consoleErrorSpy).toHaveBeenCalledWith("SSI", { kind: "Error" });
+      consoleErrorSpy.mockRestore();
     });
   });
 });

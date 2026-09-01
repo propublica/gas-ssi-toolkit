@@ -32,3 +32,14 @@ export function formatDuration(ms: number): string {
   const remainingMinutes = totalMinutes % 60;
   return `${hours}h ${remainingMinutes}m`;
 }
+
+/**
+ * Truncates text to at most maxLength characters, appending an ellipsis when
+ * it was cut short. Applies to the whole string handed in — callers that
+ * want to cap a labeled summary (e.g. "Prompt: ...") pass the full
+ * "label: content" string, not just the content, so the label counts
+ * against the limit too.
+ */
+export function truncate(text: string, maxLength: number): string {
+  return text.length > maxLength ? text.slice(0, maxLength) + "…" : text;
+}

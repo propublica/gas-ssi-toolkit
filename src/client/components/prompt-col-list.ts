@@ -1,10 +1,10 @@
 import type { PromptColumnSpec } from "../../shared/types";
 import { TokenInput } from "./token-input";
 
-const PROMPT_KINDS: PromptColumnSpec["kind"][] = ["text", "file"];
+const PROMPT_KINDS: Array<PromptColumnSpec["kind"]> = ["auto", "text", "file"];
 
 interface PromptRow {
-  kind: "text" | "file";
+  kind: PromptColumnSpec["kind"];
   tokenInput: TokenInput;
   el: HTMLElement;
 }
@@ -25,7 +25,7 @@ export class PromptColList {
     this.addBtn.type = "button";
     this.addBtn.className = "pcol-add-btn";
     this.addBtn.textContent = "+ Add column";
-    this.addBtn.addEventListener("click", () => this.addRow("text", ""));
+    this.addBtn.addEventListener("click", () => this.addRow("auto", ""));
 
     container.appendChild(this.listEl);
     container.appendChild(this.addBtn);
@@ -50,14 +50,14 @@ export class PromptColList {
     this.addBtn.remove();
   }
 
-  private addRow(kind: "text" | "file", initialCol: string): void {
+  private addRow(kind: PromptColumnSpec["kind"], initialCol: string): void {
     const row = this.buildRow(kind, initialCol);
     this.rows.push(row);
     this.listEl.appendChild(row.el);
     this.updateArrows();
   }
 
-  private buildRow(kind: "text" | "file", initialCol: string): PromptRow {
+  private buildRow(kind: PromptColumnSpec["kind"], initialCol: string): PromptRow {
     const el = document.createElement("div");
     el.className = "pcol-row";
 
