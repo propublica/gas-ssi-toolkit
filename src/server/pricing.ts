@@ -5,7 +5,7 @@
  * this app calls generateContent synchronously via UrlFetchApp.fetchAll, which
  * bills at Standard rates regardless of this codebase's own "runBatchAI" naming.
  *
- * Source: https://ai.google.dev/gemini-api/docs/pricing (fetched 2026-07-16).
+ * Source: https://ai.google.dev/gemini-api/docs/pricing (fetched 2026-08-31).
  */
 
 import type { ModelId } from "../shared/types";
@@ -19,6 +19,8 @@ export interface ModelPricing {
 
 export const PRICING_CATALOG: Record<ModelId, ModelPricing> = {
   "gemini-3.1-flash-lite": { inputPerMillion: 0.25, outputPerMillion: 1.5 },
+  // Promotional pricing through 12/31/26; reverts to $1.50/$7.50 after.
+  "gemini-3.7-flash": { inputPerMillion: 0.75, outputPerMillion: 3.75 },
   "gemini-3.1-pro-preview": {
     inputPerMillion: 2.0,
     outputPerMillion: 12.0,
