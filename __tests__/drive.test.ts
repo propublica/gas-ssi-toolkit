@@ -98,7 +98,7 @@ describe("extractTextUniversal", () => {
       getBody: () => ({ getText: () => "doc body text" }),
     });
 
-    expect(extractTextUniversal("docId123")).toBe("doc body text");
+    expect(extractTextUniversal("docId123")).toEqual({ text: "doc body text" });
   });
 
   it("performs OCR and returns text for a PDF", () => {
@@ -118,7 +118,7 @@ describe("extractTextUniversal", () => {
       getBody: () => ({ getText: () => "ocr text from pdf" }),
     });
 
-    expect(extractTextUniversal("pdfId123")).toBe("ocr text from pdf");
+    expect(extractTextUniversal("pdfId123")).toEqual({ text: "ocr text from pdf" });
     expect((Drive.Files as any).remove).toHaveBeenCalledWith("tempDocId");
   });
 
@@ -127,7 +127,7 @@ describe("extractTextUniversal", () => {
       getMimeType: () => "application/zip",
     });
 
-    expect(extractTextUniversal("zipId123")).toBe("[Skipped: Unsupported Type]");
+    expect(extractTextUniversal("zipId123")).toEqual({ text: "[Skipped: Unsupported Type]" });
   });
 
   it("reads text directly from a plain text file", () => {
@@ -136,7 +136,7 @@ describe("extractTextUniversal", () => {
       getBlob: () => ({ getDataAsString: () => "plain text body" }),
     });
 
-    expect(extractTextUniversal("txtId123")).toBe("plain text body");
+    expect(extractTextUniversal("txtId123")).toEqual({ text: "plain text body" });
   });
 
   it("returns a generic access-error message and logs (without the raw detail) when fetching the file throws", () => {
@@ -147,9 +147,9 @@ describe("extractTextUniversal", () => {
 
     const result = extractTextUniversal("badId");
 
-    expect(result).toBe(
-      "[Error: couldn't access this file — check that it still exists and you have permission to view it]",
-    );
+    expect(result).toEqual({
+      text: "[Error: couldn't access this file — check that it still exists and you have permission to view it]",
+    });
     expect(consoleErrorSpy).toHaveBeenCalledWith("extractTextUniversal:read", { kind: "Error" });
     consoleErrorSpy.mockRestore();
   });
@@ -168,9 +168,9 @@ describe("extractTextUniversal", () => {
       },
     };
 
-    expect(extractTextUniversal("pdfId123")).toBe(
-      "[Error: couldn't convert this file for text extraction — it may be too large or in an unsupported format]",
-    );
+    expect(extractTextUniversal("pdfId123")).toEqual({
+      text: "[Error: couldn't convert this file for text extraction — it may be too large or in an unsupported format]",
+    });
   });
 
   it("returns a generic OCR-read error message when reading the converted doc throws", () => {
@@ -189,9 +189,10 @@ describe("extractTextUniversal", () => {
       throw new Error("Document temporarily unavailable");
     });
 
-    expect(extractTextUniversal("pdfId123")).toBe(
-      "[Error: OCR text extraction failed after conversion]",
-    );
+    expect(extractTextUniversal("pdfId123")).toEqual({
+      text: "[Error: OCR text extraction failed after conversion]",
+    });
+    expect((Drive.Files as any).remove).toHaveBeenCalledWith("tempDocId");
   });
 
   it("still returns the extracted text when temp-doc cleanup fails", () => {
@@ -212,7 +213,10 @@ describe("extractTextUniversal", () => {
       getBody: () => ({ getText: () => "ocr text from pdf" }),
     });
 
-    expect(extractTextUniversal("pdfId123")).toBe("ocr text from pdf");
+    expect(extractTextUniversal("pdfId123")).toEqual({
+      text: "ocr text from pdf",
+      orphanedTempDocName: "[SSI-TEMP] report.pdf",
+    });
   });
 
   it("performs OCR for image files", () => {
@@ -232,8 +236,47 @@ describe("extractTextUniversal", () => {
       getBody: () => ({ getText: () => "ocr text from image" }),
     });
 
-    expect(extractTextUniversal("imgId123")).toBe("ocr text from image");
+    expect(extractTextUniversal("imgId123")).toEqual({ text: "ocr text from image" });
     expect((Drive.Files as any).remove).toHaveBeenCalledWith("tempImgDocId");
+  });
+
+  it("names the temporary OCR doc with an [SSI-TEMP] prefix", () => {
+    const createMock = jest.fn().mockReturnValue({ id: "tempDocId" });
+    (DriveApp.getFileById as jest.Mock).mockReturnValue({
+      getMimeType: () => "application/pdf",
+      getName: () => "report.pdf",
+      getBlob: () => ({}),
+    });
+    (globalThis as any).Drive = { Files: { create: createMock, remove: jest.fn() } };
+    (DocumentApp.openById as jest.Mock).mockReturnValue({
+      getBody: () => ({ getText: () => "ocr text from pdf" }),
+    });
+
+    extractTextUniversal("pdfId123");
+
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "[SSI-TEMP] report.pdf" }),
+      expect.anything(),
+    );
+  });
+
+  it("deletes the temp OCR doc even when reading its content throws (T15/AI-85)", () => {
+    const removeMock = jest.fn();
+    (DriveApp.getFileById as jest.Mock).mockReturnValue({
+      getMimeType: () => "application/pdf",
+      getName: () => "report.pdf",
+      getBlob: () => ({}),
+    });
+    (globalThis as any).Drive = {
+      Files: { create: jest.fn().mockReturnValue({ id: "tempDocId" }), remove: removeMock },
+    };
+    (DocumentApp.openById as jest.Mock).mockImplementation(() => {
+      throw new Error("Document temporarily unavailable");
+    });
+
+    extractTextUniversal("pdfId123");
+
+    expect(removeMock).toHaveBeenCalledWith("tempDocId");
   });
 });
 

@@ -30,6 +30,15 @@ export function checkDriveService(ui: GoogleAppsScript.Base.Ui): boolean {
   }
 }
 
+/** Prefix applied to temp OCR docs so orphaned ones are identifiable in Drive (T15/R19). */
+const TEMP_OCR_DOC_PREFIX = "[SSI-TEMP] ";
+
+export interface ExtractTextResult {
+  text: string;
+  /** Set when the temp OCR doc could not be deleted, so the caller can alert the user (T15/R19). */
+  orphanedTempDocName?: string;
+}
+
 /**
  * Extract text from a Drive file. Handles:
  * - Google Docs (native text extraction)
@@ -37,7 +46,7 @@ export function checkDriveService(ui: GoogleAppsScript.Base.Ui): boolean {
  * - PDFs and images (OCR via temporary conversion to Google Doc)
  * - Everything else returns a skip message.
  */
-export function extractTextUniversal(fileId: string): string {
+export function extractTextUniversal(fileId: string): ExtractTextResult {
   let file: GoogleAppsScript.Drive.File;
   let mimeType: string;
   try {
@@ -46,29 +55,32 @@ export function extractTextUniversal(fileId: string): string {
 
     // Native Google Doc — read directly
     if (mimeType === MimeType.GOOGLE_DOCS) {
-      return DocumentApp.openById(fileId).getBody().getText();
+      return { text: DocumentApp.openById(fileId).getBody().getText() };
     }
 
     // Plain text — read the blob content directly, no conversion needed
     if (mimeType === MimeType.PLAIN_TEXT) {
-      return file.getBlob().getDataAsString();
+      return { text: file.getBlob().getDataAsString() };
     }
   } catch (e) {
     logError("extractTextUniversal:read", e);
-    return formatCellError(
-      "couldn't access this file — check that it still exists and you have permission to view it",
-    );
+    return {
+      text: formatCellError(
+        "couldn't access this file — check that it still exists and you have permission to view it",
+      ),
+    };
   }
 
   if (!(mimeType === MimeType.PDF || mimeType.includes("image/"))) {
-    return "[Skipped: Unsupported Type]";
+    return { text: "[Skipped: Unsupported Type]" };
   }
 
   // PDF or image — OCR via temporary Doc conversion (Drive API v3)
   let tempId: string;
+  const tempDocName = TEMP_OCR_DOC_PREFIX + file.getName();
   try {
     const resource = {
-      name: "Temp_" + file.getName(),
+      name: tempDocName,
       mimeType: MimeType.GOOGLE_DOCS,
     };
     // Drive.Files.create with content triggers server-side OCR
@@ -77,28 +89,35 @@ export function extractTextUniversal(fileId: string): string {
     tempId = tempFile.id!;
   } catch (e) {
     logError("extractTextUniversal:ocrConvert", e);
-    return formatCellError(
-      "couldn't convert this file for text extraction — it may be too large or in an unsupported format",
-    );
+    return {
+      text: formatCellError(
+        "couldn't convert this file for text extraction — it may be too large or in an unsupported format",
+      ),
+    };
   }
 
+  // The read and cleanup share one try/finally so the temp doc is deleted even
+  // if reading its content throws — previously a read failure returned early
+  // and skipped cleanup entirely, orphaning the temp doc (T15/AI-85).
   let text: string;
+  let orphanedTempDocName: string | undefined;
   try {
     text = DocumentApp.openById(tempId).getBody().getText();
   } catch (e) {
     logError("extractTextUniversal:ocrRead", e);
-    return formatCellError("OCR text extraction failed after conversion");
+    text = formatCellError("OCR text extraction failed after conversion");
+  } finally {
+    try {
+      Drive.Files.remove(tempId);
+    } catch (e) {
+      // Cleanup failure must not discard a successful extraction — surface the
+      // orphaned doc name so the caller can alert the user instead (T15/R19).
+      logError("extractTextUniversal:ocrCleanup", e);
+      orphanedTempDocName = tempDocName;
+    }
   }
 
-  try {
-    Drive.Files.remove(tempId);
-  } catch (e) {
-    // Cleanup failure must not discard a successful extraction — the orphaned
-    // temp doc is a separate concern (T15/R19, tracked in AI-85).
-    logError("extractTextUniversal:ocrCleanup", e);
-  }
-
-  return text;
+  return { text, orphanedTempDocName };
 }
 
 /**
