@@ -23,6 +23,7 @@ import {
 } from "../../src/client/components/run-controls";
 import * as services from "../../src/client/services";
 import type { RunStats } from "../../src/shared/types";
+import { MODEL_CATALOG } from "../../src/client/models";
 
 function makeContainer(): HTMLElement {
   document.body.innerHTML = '<div id="app"></div>';
@@ -115,7 +116,9 @@ describe("RunControls — mount", () => {
 
   it("renders a model row for each MODEL_CATALOG entry", async () => {
     const { container } = await mountAndSettle();
-    expect(container.querySelectorAll("#model-list .model-option")).toHaveLength(2);
+    expect(container.querySelectorAll("#model-list .model-option")).toHaveLength(
+      MODEL_CATALOG.length,
+    );
   });
 
   it("selects gemini-3.1-flash-lite by default", async () => {
