@@ -61,7 +61,13 @@ mv .clasp.json.bak .clasp.json
 
 (Replace `TEMPLATE_SCRIPT_ID` with the real value from Step 3.) Open the template Sheet and confirm the **📐 SSI Toolkit** menu appears. Then, in the script editor, check **Editor → Services** and confirm **Drive API** is still listed (this empirically settles an open question from the design spec — whether `appsscript.json`'s advanced-service declaration survives a `clasp push` the same way it does for the canonical project; it should, since the declaration lives in the pushed manifest itself, but this step is the actual proof rather than an assumption). Finally, confirm your original `.clasp.json` was restored (`cat .clasp.json` should show the canonical project's script ID, not the template's).
 
-- [ ] **Step 6: Add the "Start Here" tab**
+**Do not set a real `GEMINI_API_KEY` on the template project's Script Properties at any point** — not now, not later for your own testing. The README and the Start Here tab (Step 6 below) both promise every copy gets "its own API key," which depends on `File → Make a copy` producing an empty Script Properties store on the copy. That's a GAS runtime behavior, not something this plan verifies elsewhere — if you set a real key on the template to make your own testing more convenient and the assumption turns out to be wrong, every copier would receive your live billing key. If you need to test the AI features against a live key, do it from your own personal copy (made via the same `File → Make a copy` flow everyone else uses), never on the template itself.
+
+- [ ] **Step 6: Verify copy independence from a non-owner account**
+
+Before sharing the link with anyone: have a second Google account (one without owner/editor access to the template) go through the actual flow — open the share link, use **Request access** if prompted, get approved, then **File → Make a copy**. On the resulting copy, confirm: the **📐 SSI Toolkit** menu appears (the bound script came along with the copy), and **Project Settings → Script Properties** is empty (no inherited `GEMINI_API_KEY` — this is the actual proof behind the "its own API key" claim in the README and Start Here tab, not an assumption). If you don't have a second Google account handy, ask a colleague to be the test copier instead of skipping this step.
+
+- [ ] **Step 7: Add the "Start Here" tab**
 
 In the template Sheet, rename (or add) the first tab to **Start Here**, and enter the following in column A, one row per line (leave row 2, 4, 6, 8, 14, 16 blank as spacers; bold rows 1, 5, 7, 9, 15 using Sheets' normal text formatting):
 
@@ -81,7 +87,7 @@ Row 15: Need access for a colleague?
 Row 16: Have them open this same Sheet's link and click "Request access" — we'll approve it and follow up. Don't forward them your own copy; they need their own so their API key and data stay separate from yours.
 ```
 
-- [ ] **Step 7: Record both values for later tasks**
+- [ ] **Step 8: Record both values for later tasks**
 
 Confirm you have `TEMPLATE_SCRIPT_ID` (from Step 3) and `TEMPLATE_SHEET_URL` (from Step 4) recorded. Task 2 needs the former; Tasks 3 and 4 need the latter.
 
