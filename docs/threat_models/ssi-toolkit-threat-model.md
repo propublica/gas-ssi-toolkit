@@ -4,8 +4,8 @@
 | --- | --- |
 | Project | SSI Toolkit (Google Apps Script add-on for Google Sheets) |
 | Description | ProPublica journalism tool providing Drive file listing, OCR text extraction, reproducible row sampling, and batch Gemini AI inference |
-| Version | 1.5 |
-| Last updated | 2026-08-21 |
+| Version | 1.6 |
+| Last updated | 2026-09-09 |
 
 ---
 
@@ -73,6 +73,7 @@ flowchart LR
     end
 
     SERVER["Apps Script Server (production)"]
+    SERVER_TEMPLATE["Template Apps Script Server\n(public-facing distribution copy)"]
 
     CONTRIB -->|"submits PR"| GH
     GH -->|"triggers"| GHA
@@ -81,6 +82,7 @@ flowchart LR
     DEV -->|"reviews & merges"| GH
     DEV -->|"runs deploy"| CLASP
     CLASP -->|"pushes compiled bundle\n(requires project editor access)"| SERVER
+    CLASP -->|"pushes compiled bundle\n(second target, same release)"| SERVER_TEMPLATE
 ```
 
 ---
@@ -129,6 +131,7 @@ flowchart LR
 | C9 | GitHub | Public source code repository |
 | C10 | GitHub Actions | CI pipeline; runs lint, typecheck, and tests on push and PRs to `main` and `develop` |
 | C11 | clasp | Deployment tool; pushes compiled bundle to the Apps Script project via the Apps Script API |
+| C12 | Template Apps Script Project | Second, separate container-bound Apps Script project bound to the public-facing template Sheet used for self-serve onboarding; receives the same compiled bundle as C2 via a second `clasp` push target in `release.sh` (AI-112) |
 
 ### Assets
 
@@ -160,6 +163,7 @@ flowchart LR
 | F13 | Contributor → GitHub | Public contributor submits a pull request |
 | F14 | GitHub → GitHub Actions | CI pipeline triggers on push and PR events |
 | F15 | Developer → clasp → Server | Credentialed developer pulls code, builds, and pushes bundle to Apps Script |
+| F16 | Developer → clasp → Template Server | Same release; the identical compiled bundle is also pushed to C12's script ID. No versioned-deployment repoint applies to this target — a container-bound script always runs HEAD |
 
 ### External Dependencies
 
@@ -188,10 +192,10 @@ flowchart LR
 | T1 | API key exfiltration | A1, C3 | `GEMINI_API_KEY` stored in Script Properties could be read by anyone with Apps Script project editor access, or by a malicious add-on if script project permissions are misconfigured |
 | T2 | Sensitive data sent to external AI endpoint | A2, A3, C8, S1 | Spreadsheet row data and Drive file content — potentially including PII or confidential source material — is sent to the Gemini Inference API, which is outside the organization's Google Workspace boundary |
 | T3 | File content persists on GCP for 48 hours | A3, C7 | Files uploaded via the Gemini Files API are cached on Google Cloud for 48 hours. The file URI is not guessable, but the data is held outside the user's Drive for that window |
-| T4 | Malicious code contribution via public PR | A6, C2, C9, C10, C11 | A malicious contributor submits a PR that passes CI (lint/typecheck/tests cannot detect malicious intent). A credentialed developer merges and deploys it without catching the harmful logic; the code then runs inside users' spreadsheets. A variant of this attack targets `appsscript.json` directly: expanding the declared OAuth scopes causes every user to be re-prompted on their next interaction, likely granting broader permissions without scrutiny |
+| T4 | Malicious code contribution via public PR | A6, C2, C9, C10, C11 | A malicious contributor submits a PR that passes CI (lint/typecheck/tests cannot detect malicious intent). A credentialed developer merges and deploys it without catching the harmful logic; the code then runs inside users' spreadsheets. A variant of this attack targets `appsscript.json` directly: expanding the declared OAuth scopes causes every user to be re-prompted on their next interaction, likely granting broader permissions without scrutiny. Security review (2026-09-09, AI-112): the same merged-and-deployed malicious code now also reaches C12 (the template project) via F16, since both targets are pushed from the same `release.sh` run — this widens blast radius but does not introduce a new mechanism; R5/R6 already govern both |
 | T5 | Overly broad Drive read access | A2, A3, C4, C6 | The `drive.readonly` scope grants read access to the user's entire Drive. A compromised add-on (e.g., via T4) could exfiltrate files beyond what the user intended to share. Security review (2026-07): the manifest also requests the full read/write `documents` scope though the code only ever performs read-only Doc operations (`getBody().getText()`) during OCR conversion — broader than necessary |
 | T6 | Formula injection via untrusted-origin cell writes | A4, C5 | Six Apps Script functions write content to spreadsheet cells that the acting user did not directly and knowingly type into that specific cell: `runBatchAI` (AI-generated text, plain/markdown/grounding), `extractText` (Drive document/OCR text), `formatMarkdownSelection` (re-parses and rewrites a selection's existing cell content), `sampleRowsToEvaluation` (bulk-copies existing cell content, including previously-written AI/Extract-Text output, into a new `_evaluation` sheet), and `writeColumn`/`findOrCreateColumn` (the shared write primitives used by `importDriveLinks` and `prepRecipe`, including form-field values a collaborator typed into a recipe input rather than a cell). Because Sheets evaluates any string beginning with `=`, `+`, or `-` as a formula regardless of which API wrote it, and none of these six functions' contract genuinely requires producing a *live* formula (Apps Script provides `setFormula()`/`setFormulas()` as the distinct, explicit API for that intent, unused by any of the six), a value assembled by our own code can become an auto-executing formula the moment it's written — most dangerously via Sheets' web-fetch functions (IMAGE, IMPORTDATA, IMPORTXML, IMPORTHTML, IMPORTRANGE, IMPORTFEED), which can encode adjacent cell values into an outbound HTTP request. This is the general vulnerability class underlying the point-fixes previously tracked as R8 (AI-56), R21 (AI-75), and R22 (AI-76) — all three are superseded by R45's structural fix (see below). Considered: the Gemini grounding-markdown write (`groundingToMarkdown`) always wraps variable/attacker-influenceable content (citation titles, URLs) behind a fixed literal prefix (`"Sources (...)"`, `"Search queries: ..."`), so its assembled string's first character can never be a formula-trigger character regardless of grounding-source content — not itself a live gap, but routed through the same safe-write primitive anyway per R45's blanket policy. Out of scope (accepted residual risk, see R45): a human user manually copy-pasting (Ctrl+C/Ctrl+V, paste-special-values, drag-fill) an already-neutralized cell's content into a new cell in the Sheets UI — no Apps Script code or trigger runs before/during a native clipboard paste, so this cannot be intercepted by anything in this add-on's control; consistent with the existing note that user-authored formulas are outside this add-on's threat model |
-| T7 | Developer account compromise | C2, C11 | If a Google account with project editor access is compromised (e.g., phishing, credential reuse), an attacker could deploy arbitrary code to the production Apps Script project |
+| T7 | Developer account compromise | C2, C11 | If a Google account with project editor access is compromised (e.g., phishing, credential reuse), an attacker could deploy arbitrary code to the production Apps Script project. Security review (2026-09-09, AI-112): "the production Apps Script project" now means both C2 and C12 — a compromised developer account with clasp deploy access can push to either or both in one `release.sh` run |
 | T8 | RPC boundary abuse | A1, C1, C2, C3, C7, C8 | Every server-side function exposed to the client — i.e., every function stubbed in the `rollup.config.js` footer for Apps Script discovery — is reachable directly via `google.script.run` from the sidebar, with no argument shape enforced beyond whatever the client happens to send. Realistic threat actor: anyone with view/edit access to the spreadsheet and the add-on (able to load the sidebar, open devtools on that iframe, and call any exposed function directly, bypassing all client-side guardrails and validation) or a supply-chain-compromised client dependency (T10) — not an anonymous internet caller, since calls execute with the caller's own OAuth authorization rather than an elevated context (see Trust Boundaries above). Two abuse patterns follow from this exposure: (1) calling an exposed function with unexpected, malformed, or adversarial arguments that the server processes without sufficient validation (e.g. an unbounded `rowRange`, an unrecognized `tools`/`model` value, a malformed `PrepColSpec`); (2) inducing an exposed function to eject sensitive information back across the RPC boundary that the calling context should not receive (e.g. verbose exception detail, internal state). The real escalation risk from pattern (1) is when it combines with a confused-deputy pattern (T16): a lower-privileged collaborator's planted RPC input is later acted on by a higher-privileged user through the normal UI, not by breaking the RPC boundary's authentication itself. Security review (2026-07): confirmed unimplemented — `config.model`, `config.tools` (index.ts, inference.ts), and `prepRecipe`'s `cols`/`fillStrategy` all cross the RPC boundary with no server-side allow-list or shape validation before being used to build Gemini requests or write columns. Security review (2026-07-13): audited every function exposed via the `rollup.config.js` footer against both abuse patterns above. New gaps confirmed — `importDriveLinks`'s `folderUrl`/`mimeTypes` and `extractText`'s `rowRange` have no input validation at all (R41); `importDriveLinks`, `extractText`, `prepRecipe`, and `sampleRowsToEvaluation` have no try/catch whatsoever, so any Drive/Sheets exception propagates to the client's failure handler completely unscrubbed (R42), a gap distinct from and broader than T17/R25's original scope (which only covered `runInference`/`SSI`'s already-caught errors). Confirmed safe, not a gap: `runTool`'s dispatch table (`index.ts:586-591`) is a hardcoded closed allow-list, so a client-supplied function name cannot reach arbitrary server functions; `SSI`'s `toolNames` is already validated inline against `TOOL_REGISTRY`. Security review (2026-08-12): reviewed the newly `rollup.config.js`-exposed `getDefaultRowRange()` against this threat — it takes no arguments and returns only a row range trivially derivable from data the caller can already read directly (the sheet's own row count), so it introduces no new argument-validation or information-disclosure surface. Fixed 2026-08-17 (AI-79/R42): `importDriveLinks`, `extractText`, `prepRecipe`, `sampleRowsToEvaluation`, and (as a defense-in-depth backstop) `runBatchAI` each wrap their body in `error-handling.ts`'s `withErrorScrubbing()`, which logs the exception server-side and throws a generic message instead of letting it reach the client raw — see R42 below |
 | T9 | Prompt injection via spreadsheet data | A2, C2, C8, S1 | Cell values read from the spreadsheet are passed verbatim into the Gemini prompt. If data originates from an external source (scraped content, third-party datasets, interview responses), a malicious cell value could hijack model behavior — distinct from T6, which targets the spreadsheet renderer rather than the model |
 | T10 | npm build dependency compromise | A6, C2, C11 | A compromised npm package in the build toolchain (Rollup, ts-jest, etc.) could inject malicious code into the compiled bundle at build time, before any PR review. The attack surface is `node_modules`, not the repo. Security review (2026-07): `devDependencies` including `@google/clasp` are pinned with caret ranges rather than exact versions, so a regenerated lockfile could silently accept a compromised minor/patch release under the same major version |
@@ -266,7 +270,7 @@ flowchart LR
 
 ### Review Status
 
-First draft — not yet formally reviewed by the security team. A full OWASP/LLM Top 10 automated security review was conducted on 2026-07-08, surfacing threats T16–T18 and the gap items below (R21–R39).
+First draft — not yet formally reviewed by the security team. A full OWASP/LLM Top 10 automated security review was conducted on 2026-07-08, surfacing threats T16–T18 and the gap items below (R21–R39). Reviewed again 2026-09-09 (AI-112) for the template Sheet distribution channel — added C12/F16 and the T4/T7 blast-radius notes above; no new threat number or open item was needed since existing R5/R6/R9 (branch protection, limited deploy access, 2FA) already govern the second project the same way they govern the first.
 
 ### Open Items
 
