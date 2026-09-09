@@ -30,6 +30,7 @@ import {
   getAllFilesRecursive,
   sampleRows,
   truncateText,
+  markTruncationHighlight,
   resolveColumns,
   writeJobProgress,
   writeRunStats,
@@ -188,7 +189,9 @@ export function extractText(config: ExtractTextConfig, jobId?: string): void {
       const fileId = extractId(cellValue);
       const { text, orphanedTempDocName } = extractTextUniversal(fileId);
       if (orphanedTempDocName) orphanedTempDocNames.push(orphanedTempDocName);
-      writeSafeValue(sheet.getRange(rowIdx, outputCol), truncateText(text, 49000));
+      const cell = sheet.getRange(rowIdx, outputCol);
+      writeSafeValue(cell, truncateText(text, 49000));
+      markTruncationHighlight(cell, text.length > 49000);
       SpreadsheetApp.flush();
     }
 

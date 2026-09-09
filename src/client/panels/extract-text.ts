@@ -157,7 +157,10 @@ export class ExtractTextPanel implements Panel<undefined, SavedState> {
         </div>
         <div class="field-group">
           <span class="field-label">Output Column <span class="required">*</span></span>
-          <p class="field-helper">Truncated at 49,000 characters.</p>
+          <p class="field-helper">
+            Text output truncated at 49,000 characters. Truncated text cells are highlighted and
+            denoted by "... [TRUNCATED]" suffix.
+          </p>
           <div id="output-col" class="tag-list"></div>
         </div>
         <div class="field-group">
