@@ -78,3 +78,42 @@ echo "→ Creating GitHub release..."
 gh release create "$TAG" --generate-notes --title "$TAG"
 
 echo "✓ Released version $VERSION to deployment $DEPLOYMENT_ID (tagged $TAG)"
+
+# Sync main back into develop before bumping the version, so the version-bump
+# PR below stays a clean, single-line diff instead of also carrying forward
+# whatever else has landed only on main. This only opens the PR — merging it
+# still requires human review (main and develop both require it), so we pause
+# here rather than merging it ourselves.
+echo "→ Opening back-merge PR (main → develop) to keep branches in sync..."
+if BACKMERGE_PR_URL=$(gh pr create --base develop --head main \
+  --title "chore: sync main back into develop after v$VERSION" \
+  --body "Back-merges main into develop after releasing v$VERSION, so develop reflects everything that shipped." 2>&1); then
+  echo "✓ Opened back-merge PR: $BACKMERGE_PR_URL"
+  read -p "Merge that PR in GitHub, then press Enter here to continue (or Ctrl+C to stop and handle the version bump manually later)... "
+else
+  echo "  No back-merge needed (main and develop already match): $BACKMERGE_PR_URL"
+fi
+
+# The sidebar footer and package.json version are meant to already read "vN" by
+# the time release N ships — which only works if we bump to N+1 right after
+# release N completes, so the bump has a full development cycle to land before
+# the next release. See docs/releasing.md.
+NEXT_VERSION=$((VERSION + 1))
+read -p "Bump internal version to v$NEXT_VERSION for the next release cycle? (y/N) " BUMP_CONFIRM
+if [ "$BUMP_CONFIRM" = "y" ] || [ "$BUMP_CONFIRM" = "Y" ]; then
+  BUMP_BRANCH="chore/bump-version-v$NEXT_VERSION"
+  echo "→ Bumping version to $NEXT_VERSION.0.0..."
+  git checkout -b "$BUMP_BRANCH"
+  # --no-git-tag-version: npm's default vX.Y.Z tag would collide with this
+  # script's own release tags (e.g. v8).
+  npm version --no-git-tag-version "$NEXT_VERSION.0.0"
+  git add package.json package-lock.json
+  git commit -m "chore: bump version to v$NEXT_VERSION"
+  git push origin "$BUMP_BRANCH"
+  PR_URL=$(gh pr create --base develop --title "chore: bump version to v$NEXT_VERSION" \
+    --body "Prepares the sidebar and package.json version for the next release cycle (v$NEXT_VERSION), following release of v$VERSION.")
+  echo "✓ Opened bump PR: $PR_URL"
+  git checkout main
+else
+  echo "Skipped version bump. Remember to bump package.json to $NEXT_VERSION.0.0 before v$NEXT_VERSION ships."
+fi
