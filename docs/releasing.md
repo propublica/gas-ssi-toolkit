@@ -2,13 +2,30 @@
 
 ## Deployment States
 
-The SSI Toolkit uses a single Apps Script project with two deployment states:
+The SSI Toolkit's canonical Apps Script project has two deployment states:
 
 **HEAD** is the active development surface. `npm run deploy` pushes your local build here. You can test HEAD changes using Apps Script's test deployments (Deploy → Test deployments in the script editor) without affecting users who have the add-on installed. 
 
 **Versioned deployment** is what Marketplace-installed users run. It is a pinned snapshot that only changes when a human explicitly runs `scripts/release.sh` from `main`.
 
 Container-bound Scripts use the **HEAD** by default. Once you've run `npm run deploy`—regardless of what branch you are in—you should see any changes immediately reflected in your attached Google Sheet.
+
+## Template Sheet
+
+In addition to the canonical project above, `release.sh` also pushes `dist/` to a second, separate Apps Script project — the one bound to the public-facing template Google Sheet used for [self-serve onboarding](../README.md#get-your-own-copy). Unlike the canonical project, this target has no versioned-deployment step: it's a container-bound script, so it always runs whatever was last pushed to HEAD.
+
+This requires a local `.clasp.template.json` (gitignored, same shape as `.clasp.json`) pointing at the template project's script ID:
+
+```zsh
+cat > .clasp.template.json << 'EOF'
+{
+  "scriptId": "<template-script-id>",
+  "rootDir": "./dist"
+}
+EOF
+```
+
+Only whoever runs `release.sh` needs this file locally — `release.sh` fails fast with a clear error if it's missing, rather than silently skipping the template deploy.
 
 ## Branch Workflow
 

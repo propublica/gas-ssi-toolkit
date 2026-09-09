@@ -53,6 +53,33 @@ fi
 echo "→ Deploying to HEAD..."
 npm run deploy
 
+# Push the same freshly-built dist/ to the public template Sheet's separate
+# Apps Script project. Unlike the canonical project below, this target has no
+# versioned-deployment concept to repoint — a container-bound script always
+# runs whatever's at HEAD, so a push is the whole job.
+#
+# clasp reads a single .clasp.json from the current directory, so we swap it
+# in and back out around the push. The swap is guarded so a failed push still
+# restores your original .clasp.json rather than leaving it pointed at the
+# template project (which would make the *next* `npm run deploy` you run
+# silently push to the wrong place).
+if [ ! -f .clasp.template.json ]; then
+  echo "Error: .clasp.template.json not found."
+  echo "This holds the template Sheet's script ID and is required to keep it in sync."
+  echo "See the 'Template Sheet' section of docs/releasing.md for how to create it."
+  exit 1
+fi
+
+echo "→ Deploying to template container-bound project..."
+cp .clasp.json .clasp.json.bak
+cp .clasp.template.json .clasp.json
+if ! npx clasp push; then
+  mv .clasp.json.bak .clasp.json
+  echo "Error: template deploy failed; restored your original .clasp.json."
+  exit 1
+fi
+mv .clasp.json.bak .clasp.json
+
 TIMESTAMP=$(date +%Y-%m-%d\ %H:%M:%S)
 
 echo "→ Creating version snapshot..."
