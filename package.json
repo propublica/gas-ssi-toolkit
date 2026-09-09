@@ -1,6 +1,6 @@
 {
   "name": "gas-project",
-  "version": "1.0.0",
+  "version": "8.0.0",
   "description": "Google Apps Script project with TypeScript, Rollup, and Clasp",
   "private": true,
   "type": "module",

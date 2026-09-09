@@ -23,6 +23,16 @@ import { resolve } from "path";
  */
 
 /**
+ * Extracts the major version number from package.json (e.g. "8.0.0" -> "8").
+ * This is the single source of truth for the sidebar's displayed version —
+ * see the {{VERSION}} placeholder in tool-list.ts's footer.
+ */
+function readMajorVersion() {
+  const pkg = JSON.parse(readFileSync(resolve("package.json"), "utf-8"));
+  return pkg.version.split(".")[0];
+}
+
+/**
  * Inline plugin: assembles dist/Sidebar.html from template + compiled JS + CSS.
  */
 function inlineSidebarHtml({ template, css }) {
@@ -31,18 +41,21 @@ function inlineSidebarHtml({ template, css }) {
     buildStart() {
       this.addWatchFile(resolve(css));
       this.addWatchFile(resolve(template));
+      this.addWatchFile(resolve("package.json"));
     },
     generateBundle(_options, bundle) {
       const chunkKey = Object.keys(bundle).find((k) => bundle[k].type === "chunk");
-      const code = chunkKey ? bundle[chunkKey].code : "";
+      const rawCode = chunkKey ? bundle[chunkKey].code : "";
 
       const templateContent = readFileSync(resolve(template), "utf-8");
       const cssContent = readFileSync(resolve(css), "utf-8");
+      const version = readMajorVersion();
 
       // Replacer functions (not plain strings) — String.replace() treats a string
       // replacement's "$" sequences specially ($$, $&, $1, etc.), which would
       // silently corrupt any such sequence occurring in the compiled JS or CSS
       // (e.g. a literal "$" immediately before a template-literal interpolation).
+      const code = rawCode.replace("{{VERSION}}", () => version);
       const assembled = templateContent
         .replace("{{STYLES}}", () => `<style>\n${cssContent}\n</style>`)
         .replace("{{SCRIPTS}}", () => `<script>\n${code}\n</script>`);
