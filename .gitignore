@@ -50,6 +50,5 @@ Thumbs.db
 .clasp.json
 
 # Clasp project file for the public template Sheet (second push target in
-# release.sh) and its backup during the swap — see docs/releasing.md
+# release.sh) — see docs/releasing.md
 .clasp.template.json
-.clasp.json.bak

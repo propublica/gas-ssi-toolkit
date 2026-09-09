@@ -15,7 +15,7 @@ Want to try the toolkit without installing Node, clasp, or anything else? We mai
 1. Open the template Sheet: TEMPLATE_SHEET_URL
 2. Our Workspace doesn't allow public sharing, so you'll likely see a **Request access** prompt — click it. We approve individual requests as they come in.
 3. Once you have access, go to **File → Make a copy** to get your own independent copy — its own script, its own data, its own API key.
-4. In your copy, open **Extensions → Apps Script → Project Settings → Script Properties** and add a `GEMINI_API_KEY` — see [Prerequisites](#prerequisites) below for how to get one.
+4. In your copy, open **Extensions → Apps Script → Project Settings → Script Properties** and add a `GEMINI_API_KEY` — [AI Studio](https://aistudio.google.com/api-keys) makes it easy to mint a key and [set a monthly spend cap](https://aistudio.google.com/spend) to avoid surprise billing.
 5. Open the **📐 SSI Toolkit** menu in your copy to get started, or check the **Start Here** tab in the template for a walkthrough of each tool.
 
 If you want to build, modify, or contribute to the toolkit itself, keep reading — the rest of this README covers the developer setup.

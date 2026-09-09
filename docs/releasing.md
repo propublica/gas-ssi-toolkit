@@ -25,7 +25,17 @@ cat > .clasp.template.json << 'EOF'
 EOF
 ```
 
-Only whoever runs `release.sh` needs this file locally — `release.sh` fails fast with a clear error if it's missing, rather than silently skipping the template deploy.
+Only whoever runs `release.sh` needs this file locally. `release.sh` checks for it in its preflight block — alongside the branch, CI, and clean-tree checks, *before* any deploy starts — so a missing config aborts the release before anything has been pushed anywhere, rather than leaving the canonical project already updated.
+
+The push itself is a single line:
+
+```zsh
+clasp_config_project=.clasp.template.json npx clasp push -f
+```
+
+`clasp_config_project` is the environment-variable form of clasp's global `--project <file>` option. It points clasp at the template's config for that one invocation and never touches the working directory's `.clasp.json` — which matters, since that file may be a symlink shared across git worktrees.
+
+`-f` is required rather than a convenience. Without it, clasp prompts before overwriting a changed `appsscript.json`, and defaults to "no" (or answers itself "no" when non-interactive) — then prints `Skipping push.` and **exits 0**. The release would report success while the template Sheet still ran the previous bundle. `npm run deploy` deliberately stays prompt-guarded; the template push does not, because the manifest it pushes is our own already-reviewed committed file and the template exists precisely to mirror the release exactly.
 
 ## Branch Workflow
 
@@ -45,7 +55,7 @@ main           → develop   (back-merge PR, opened automatically by release.sh 
 ./scripts/release.sh
 ```
 
-This script builds the project, pushes to HEAD, snapshots it as a new immutable version, and repoints the Marketplace deployment. It enforces the `main` branch requirement and will exit with an error if run from any other branch.
+This script builds the project, pushes to HEAD, pushes the same build to the template Sheet's project (see [Template Sheet](#template-sheet) above), snapshots it as a new immutable version, and repoints the Marketplace deployment. It enforces the `main` branch requirement and will exit with an error if run from any other branch.
 
 > **Note:** `scripts/release.sh` is a human-only operation. It must never be run by automated tooling or CI.
 
