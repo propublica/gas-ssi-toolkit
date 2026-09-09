@@ -44,24 +44,22 @@ On the Sheet itself: **Share** → confirm general access is **Restricted** (thi
 
 - [ ] **Step 5: Smoke-test the deploy pipeline**
 
-From the repo root, on your machine (not via `release.sh` — this is a one-time manual proof that the config shape works, done before Task 2 wires it into the release script):
+From the repo root, on your machine (not via `release.sh` — this is a one-time manual proof that the config shape works, done before Task 2 wires it into the release script). This uses the same `.clasp.template.json` file and `clasp_config_project` mechanism Task 2 wires into `release.sh` — creating it here doubles as your one-time local setup for that task too:
 
 ```zsh
 npm run build
-cp .clasp.json .clasp.json.bak
-cat > .clasp.json << EOF
+cat > .clasp.template.json << EOF
 {
   "scriptId": "TEMPLATE_SCRIPT_ID",
   "rootDir": "./dist"
 }
 EOF
-clasp push
-mv .clasp.json.bak .clasp.json
+clasp_config_project=.clasp.template.json npx clasp push -f
 ```
 
-(Replace `TEMPLATE_SCRIPT_ID` with the real value from Step 3.) Open the template Sheet and confirm the **📐 SSI Toolkit** menu appears. Then, in the script editor, check **Editor → Services** and confirm **Drive API** is still listed (this empirically settles an open question from the design spec — whether `appsscript.json`'s advanced-service declaration survives a `clasp push` the same way it does for the canonical project; it should, since the declaration lives in the pushed manifest itself, but this step is the actual proof rather than an assumption). Finally, confirm your original `.clasp.json` was restored (`cat .clasp.json` should show the canonical project's script ID, not the template's).
+(Replace `TEMPLATE_SCRIPT_ID` with the real value from Step 3.) `clasp_config_project` points clasp at `.clasp.template.json` directly, without ever touching your working `.clasp.json` — so there's no swap-and-restore to verify here, and your `.clasp.json` was never at risk. Open the template Sheet and confirm the **📐 SSI Toolkit** menu appears. Then, in the script editor, check **Editor → Services** and confirm **Drive API** is still listed (this empirically settles an open question from the design spec — whether `appsscript.json`'s advanced-service declaration survives a `clasp push` the same way it does for the canonical project; it should, since the declaration lives in the pushed manifest itself, but this step is the actual proof rather than an assumption).
 
-**Do not set a real `GEMINI_API_KEY` on the template project's Script Properties at any point** — not now, not later for your own testing. The README and the Start Here tab (Step 6 below) both promise every copy gets "its own API key," which depends on `File → Make a copy` producing an empty Script Properties store on the copy. That's a GAS runtime behavior, not something this plan verifies elsewhere — if you set a real key on the template to make your own testing more convenient and the assumption turns out to be wrong, every copier would receive your live billing key. If you need to test the AI features against a live key, do it from your own personal copy (made via the same `File → Make a copy` flow everyone else uses), never on the template itself.
+**Do not set a real `GEMINI_API_KEY` on the template project's Script Properties at any point** — not now, not later for your own testing. The README and the Start Here tab (Step 7 below) both promise every copy gets "its own API key," which depends on `File → Make a copy` producing an empty Script Properties store on the copy. That's a GAS runtime behavior, not something this plan verifies elsewhere — if you set a real key on the template to make your own testing more convenient and the assumption turns out to be wrong, every copier would receive your live billing key. If you need to test the AI features against a live key, do it from your own personal copy (made via the same `File → Make a copy` flow everyone else uses), never on the template itself.
 
 - [ ] **Step 6: Verify copy independence from a non-owner account**
 
