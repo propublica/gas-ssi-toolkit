@@ -12,7 +12,7 @@ If you're looking for an SSI Toolkit usage guide, check out our [user onboarding
 
 Want to try the toolkit without installing Node, clasp, or anything else? We maintain a template Google Sheet with the toolkit already set up as a container-bound script.
 
-1. Open the template Sheet: TEMPLATE_SHEET_URL
+1. Open the template Sheet: https://docs.google.com/spreadsheets/d/1Nti37ya2PzO7LeJ03YFCmRdNn2U2RsHNPa58Hzi8HzI/edit?usp=sharing
 2. Our Workspace doesn't allow public sharing, so you'll likely see a **Request access** prompt — click it. We approve individual requests as they come in.
 3. Once you have access, go to **File → Make a copy** to get your own independent copy — its own script, its own data, its own API key.
 4. In your copy, open **Extensions → Apps Script → Project Settings → Script Properties** and add a `GEMINI_API_KEY` — [AI Studio](https://aistudio.google.com/api-keys) makes it easy to mint a key and [set a monthly spend cap](https://aistudio.google.com/spend) to avoid surprise billing.
