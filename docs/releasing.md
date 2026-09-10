@@ -2,13 +2,40 @@
 
 ## Deployment States
 
-The SSI Toolkit uses a single Apps Script project with two deployment states:
+The SSI Toolkit's canonical Apps Script project has two deployment states:
 
 **HEAD** is the active development surface. `npm run deploy` pushes your local build here. You can test HEAD changes using Apps Script's test deployments (Deploy → Test deployments in the script editor) without affecting users who have the add-on installed. 
 
 **Versioned deployment** is what Marketplace-installed users run. It is a pinned snapshot that only changes when a human explicitly runs `scripts/release.sh` from `main`.
 
 Container-bound Scripts use the **HEAD** by default. Once you've run `npm run deploy`—regardless of what branch you are in—you should see any changes immediately reflected in your attached Google Sheet.
+
+## Template Sheet
+
+In addition to the canonical project above, `release.sh` also pushes `dist/` to a second, separate Apps Script project — the one bound to the public-facing template Google Sheet used for [self-serve onboarding](../README.md#get-your-own-copy). Unlike the canonical project, this target has no versioned-deployment step: it's a container-bound script, so it always runs whatever was last pushed to HEAD.
+
+This requires a local `.clasp.template.json` (gitignored, same shape as `.clasp.json`) pointing at the template project's script ID:
+
+```zsh
+cat > .clasp.template.json << 'EOF'
+{
+  "scriptId": "<template-script-id>",
+  "rootDir": "./dist"
+}
+EOF
+```
+
+Only whoever runs `release.sh` needs this file locally. `release.sh` checks for it in its preflight block — alongside the branch, CI, and clean-tree checks, *before* any deploy starts — so a missing config aborts the release before anything has been pushed anywhere, rather than leaving the canonical project already updated.
+
+The push itself is a single line:
+
+```zsh
+clasp_config_project=.clasp.template.json npx clasp push -f
+```
+
+`clasp_config_project` is the environment-variable form of clasp's global `--project <file>` option. It points clasp at the template's config for that one invocation and never touches the working directory's `.clasp.json` — which matters, since that file may be a symlink shared across git worktrees.
+
+`-f` is required rather than a convenience. Without it, clasp prompts before overwriting a changed `appsscript.json`, and defaults to "no" (or answers itself "no" when non-interactive) — then prints `Skipping push.` and **exits 0**. The release would report success while the template Sheet still ran the previous bundle. `npm run deploy` deliberately stays prompt-guarded; the template push does not, because the manifest it pushes is our own already-reviewed committed file and the template exists precisely to mirror the release exactly.
 
 ## Branch Workflow
 
@@ -28,7 +55,7 @@ main           → develop   (back-merge PR, opened automatically by release.sh 
 ./scripts/release.sh
 ```
 
-This script builds the project, pushes to HEAD, snapshots it as a new immutable version, and repoints the Marketplace deployment. It enforces the `main` branch requirement and will exit with an error if run from any other branch.
+This script builds the project, pushes to HEAD, pushes the same build to the template Sheet's project (see [Template Sheet](#template-sheet) above), snapshots it as a new immutable version, and repoints the Marketplace deployment. It enforces the `main` branch requirement and will exit with an error if run from any other branch.
 
 > **Note:** `scripts/release.sh` is a human-only operation. It must never be run by automated tooling or CI.
 
