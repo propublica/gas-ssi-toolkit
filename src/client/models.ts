@@ -27,7 +27,13 @@ export const MODEL_CATALOG: ModelCatalogEntry[] = [
     id: "gemini-3.1-flash-lite",
     name: "Gemini 3.1 Flash Lite",
     description:
-      "Good for almost all tasks — summarizing documents, pulling out key facts, translation, and categorizing records in bulk.",
+      "Fastest and cheapest — good for high-volume, straightforward tasks like pulling out key facts, translation, and categorizing records in bulk.",
+  },
+  {
+    id: "gemini-3.7-flash",
+    name: "Gemini 3.7 Flash",
+    description:
+      "A balance of speed and quality — good for summarizing documents and everyday analysis that needs more nuance than Flash Lite.",
   },
   {
     id: "gemini-3.1-pro-preview",

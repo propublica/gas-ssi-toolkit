@@ -6,7 +6,23 @@ Built with TypeScript, bundled by Rollup, and deployed via clasp.
 
 > **Note:** Avoid making changes in the online Apps Script editor — they will be overwritten on the next deploy.
 
-## Prerequisites
+If you're looking for an SSI Toolkit usage guide, check out our [user onboarding documentation](./docs/user-guide.md).
+
+## Get your own copy
+
+Want to try the toolkit without installing Node, clasp, or anything else? We maintain a template Google Sheet with the toolkit already set up as a container-bound script.
+
+1. Open the template Sheet: https://docs.google.com/spreadsheets/d/1Nti37ya2PzO7LeJ03YFCmRdNn2U2RsHNPa58Hzi8HzI/edit?usp=sharing
+2. Our Workspace doesn't allow public sharing, so you'll likely see a **Request access** prompt — click it. We approve individual requests as they come in.
+3. Once you have access, go to **File → Make a copy** to get your own independent copy — its own script, its own data, its own API key.
+4. In your copy, open **Extensions → Apps Script → Project Settings → Script Properties** and add a `GEMINI_API_KEY` — [AI Studio](https://aistudio.google.com/api-keys) makes it easy to mint a key and [set a monthly spend cap](https://aistudio.google.com/spend) to avoid surprise billing.
+5. Open the **📐 SSI Toolkit** menu in your copy to get started, or check the **Start Here** tab in the template for a walkthrough of each tool.
+
+If you want to build, modify, or contribute to the toolkit itself, keep reading — the rest of this README covers the developer setup.
+
+## Deployment (for contributors)
+
+### Prerequisites
 
 - A Google account
 - Node.js 22+
@@ -15,10 +31,6 @@ Built with TypeScript, bundled by Rollup, and deployed via clasp.
   - Tip: [AI Studio](https://aistudio.google.com/api-keys) makes it easy to mint a key and [set a monthly spend cap](https://aistudio.google.com/spend) to avoid surprise billing
 
 `@google/clasp` is included as a devDependency — no global install needed.
-
-## Deployment
-
-If you're looking for an SSI Toolkit usage guide, check out our [user onboarding documentation](./docs/user-guide.md).
 
 ### 1. Create an Apps Script project
 

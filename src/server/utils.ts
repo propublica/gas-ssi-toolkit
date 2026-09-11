@@ -99,11 +99,18 @@ export function sampleRows(data: unknown[][], sampleSize: number, seed: number):
 }
 
 /**
+ * Suffix appended by truncateText, and the marker ensureTruncatedCellHighlighting
+ * matches on to highlight incomplete extractions — kept in one place so the two
+ * never drift apart.
+ */
+export const TRUNCATION_SUFFIX = "... [TRUNCATED]";
+
+/**
  * Truncate text to maxLength characters, appending a suffix if truncated.
  */
 export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength) + "... [TRUNCATED]";
+  return text.substring(0, maxLength) + TRUNCATION_SUFFIX;
 }
 
 /**
@@ -198,6 +205,20 @@ export function markAIOutputRange(
     "Some cells in this column may be AI-generated — exercise good judgement when using",
   );
   sheet.getRange(startRow, colIdx, numRows, 1).setBackground("#FFF8E1");
+}
+
+/**
+ * Highlights a truncated-text cell, or clears the highlight when the cell is
+ * no longer truncated (e.g. a re-extraction that comes back short enough to
+ * fit) so the background never goes stale. Called on every extract-text write,
+ * mirroring markAIOutputRange's direct-write approach rather than a
+ * conditional format rule.
+ */
+export function markTruncationHighlight(
+  cell: GoogleAppsScript.Spreadsheet.Range,
+  truncated: boolean,
+): void {
+  cell.setBackground(truncated ? "#FCE8E6" : null);
 }
 
 /**

@@ -48,3 +48,7 @@ Thumbs.db
 
 # Clasp project file (contains project ID and rootDir)
 .clasp.json
+
+# Clasp project file for the public template Sheet (second push target in
+# release.sh) — see docs/releasing.md
+.clasp.template.json

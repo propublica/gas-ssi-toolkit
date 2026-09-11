@@ -13,6 +13,10 @@ The following steps only apply if your organization distributes SSI Toolkit as a
 
 Open the sidebar using the **📐 Open SSI Toolkit** menu option. If installed as an Editor add-on, the SSI Toolkit will be available as an item under **Extensions**.
 
+### Don't have an org-wide install?
+
+You can get your own personal copy instead — no admin required. Open our [template Sheet](https://docs.google.com/spreadsheets/d/1Nti37ya2PzO7LeJ03YFCmRdNn2U2RsHNPa58Hzi8HzI/edit?usp=sharing), click **Request access** if prompted (we approve these individually — see the note on the template's Start Here tab), then **File → Make a copy**. See the main [README](../README.md#get-your-own-copy) for the full walkthrough, including setting your own Gemini API key.
+
 ## But first, don't forget about other spreadsheet tools
 
 SSI is best leveraged in conjunction with all the trappings of traditional spreadsheet work. Don't forget about [functions](https://support.google.com/docs/table/25273?hl=en) (`=IF()`, `=CONCAT()`, etc), column [filters and sorts](https://support.google.com/docs/answer/3540681?hl=en&co=GENIE.Platform%3DDesktop), [data validation rules](https://spreadsheetpoint.com/data-validation-google-sheets/), your [conditional formatting](https://support.google.com/docs/answer/78413?hl=en&co=GENIE.Platform%3DDesktop), [pivot tables](https://support.google.com/docs/answer/1272900?hl=en&co=GENIE.Platform%3DDesktop), etc. These remain powerful tools in your toolkit. The more you use them, the more likely you are to get reliable results. Remember, **we get better results when we ask the AI to do less**.

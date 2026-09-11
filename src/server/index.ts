@@ -30,6 +30,7 @@ import {
   getAllFilesRecursive,
   sampleRows,
   truncateText,
+  markTruncationHighlight,
   resolveColumns,
   writeJobProgress,
   writeRunStats,
@@ -138,8 +139,9 @@ export function importDriveLinks(config: ImportDriveLinksConfig, jobId?: string)
 export function extractText(config: ExtractTextConfig, jobId?: string): void {
   withErrorScrubbing("Extract Text", () => {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    const ui = SpreadsheetApp.getUi();
 
-    if (!checkDriveService(SpreadsheetApp.getUi())) return;
+    if (!checkDriveService(ui)) return;
 
     const lastCol = sheet.getLastColumn();
     const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
@@ -165,6 +167,8 @@ export function extractText(config: ExtractTextConfig, jobId?: string): void {
       total = activeRange.getNumRows();
     }
 
+    const orphanedTempDocNames: string[] = [];
+
     for (let i = 0; i < total; i++) {
       const rowIdx = startRow + i; // sheet row number (1-indexed; start=2 = first data row)
 
@@ -183,9 +187,26 @@ export function extractText(config: ExtractTextConfig, jobId?: string): void {
       }
 
       const fileId = extractId(cellValue);
-      const text = truncateText(extractTextUniversal(fileId), 49000);
-      writeSafeValue(sheet.getRange(rowIdx, outputCol), text);
+      const { text, orphanedTempDocName } = extractTextUniversal(fileId);
+      if (orphanedTempDocName) orphanedTempDocNames.push(orphanedTempDocName);
+      const cell = sheet.getRange(rowIdx, outputCol);
+      writeSafeValue(cell, truncateText(text, 49000));
+      markTruncationHighlight(cell, text.length > 49000);
       SpreadsheetApp.flush();
+    }
+
+    // T15/R19: a temp OCR doc that failed automatic cleanup is named with the
+    // [SSI-TEMP] prefix (extractTextUniversal), so it's identifiable in Drive
+    // even if this alert is missed.
+    if (orphanedTempDocNames.length > 0) {
+      const plural = orphanedTempDocNames.length > 1;
+      ui.alert(
+        "Manual cleanup needed",
+        `${orphanedTempDocNames.length} temporary OCR document${plural ? "s" : ""} could not be ` +
+          `deleted automatically. Please delete ${plural ? "them" : "it"} from Drive:\n\n` +
+          orphanedTempDocNames.join("\n"),
+        ui.ButtonSet.OK,
+      );
     }
   });
 }

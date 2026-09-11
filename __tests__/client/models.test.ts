@@ -6,7 +6,11 @@ import type { ModelId } from "../../src/shared/types";
 
 describe("MODEL_CATALOG", () => {
   it("contains an entry for every ModelId", () => {
-    const knownIds: ModelId[] = ["gemini-3.1-flash-lite", "gemini-3.1-pro-preview"];
+    const knownIds: ModelId[] = [
+      "gemini-3.1-flash-lite",
+      "gemini-3.7-flash",
+      "gemini-3.1-pro-preview",
+    ];
     const catalogIds = MODEL_CATALOG.map((m) => m.id);
     expect(catalogIds).toEqual(expect.arrayContaining(knownIds));
     expect(MODEL_CATALOG).toHaveLength(knownIds.length);
