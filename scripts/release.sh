@@ -50,8 +50,39 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
   exit 1
 fi
 
+# Checked here, in the preflight block, rather than next to the push that uses
+# it further down: the template push happens *after* the canonical HEAD deploy,
+# so discovering a missing config there would abort with the canonical project
+# already updated and no version snapshot cut yet — an inconsistent half-release.
+if [ ! -f .clasp.template.json ]; then
+  echo "Error: .clasp.template.json not found."
+  echo "This holds the template Sheet's script ID and is required to keep it in sync."
+  echo "See the 'Template Sheet' section of docs/releasing.md for how to create it."
+  exit 1
+fi
+
 echo "→ Deploying to HEAD..."
 npm run deploy
+
+# Push the same freshly-built dist/ to the public template Sheet's separate
+# Apps Script project. Unlike the canonical project below, this target has no
+# versioned-deployment concept to repoint — a container-bound script always
+# runs whatever's at HEAD, so a push is the whole job.
+#
+# `clasp_config_project` is the environment-variable form of clasp's global
+# `--project <file>` option: it points clasp at a specific project config for
+# this one invocation, leaving the working directory's .clasp.json untouched
+# (which matters — it may be a symlink shared across git worktrees).
+#
+# `-f` is required, not optional. Without it, clasp prompts before overwriting
+# a changed appsscript.json — and answers itself "no" when non-interactive —
+# then prints "Skipping push." and exits 0, so the release would report success
+# while the template Sheet still ran the previous bundle. Unlike `npm run
+# deploy` above, which stays prompt-guarded, the manifest being pushed here is
+# our own already-reviewed committed file and the template's entire purpose is
+# to mirror this release exactly, so there is nothing for a human to weigh in on.
+echo "→ Deploying to template container-bound project..."
+clasp_config_project=.clasp.template.json npx clasp push -f
 
 TIMESTAMP=$(date +%Y-%m-%d\ %H:%M:%S)
 
