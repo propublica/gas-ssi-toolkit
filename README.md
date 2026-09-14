@@ -18,6 +18,12 @@ Want to try the toolkit without installing Node, clasp, or anything else? We mai
 4. In your copy, open **Extensions → Apps Script → Project Settings → Script Properties** and add a `GEMINI_API_KEY` — [AI Studio](https://aistudio.google.com/api-keys) makes it easy to mint a key and [set a monthly spend cap](https://aistudio.google.com/spend) to avoid surprise billing.
 5. Open the **📐 SSI Toolkit** menu in your copy to get started, or check the **Start Here** tab in the template for a walkthrough of each tool.
 
+### About the "Google hasn't verified this app" screen
+
+The first time you run anything from the menu, Google will show a **"Google hasn't verified this app"** warning before it asks you to grant access. This is expected — it isn't specific to this toolkit or a sign anything is wrong with your copy. Google shows this for any project that hasn't gone through its formal app-review process, which is normal for a personal copy like the one you just made.
+
+To continue: click **Advanced** (near the bottom of the warning), then click **Go to [your sheet's name] (unsafe)**. "Unsafe" here just means Google hasn't reviewed the app — you're granting access to your own independent copy of code you can inspect in this repo, not to a stranger's app. You'll only need to do this once per copy.
+
 If you want to build, modify, or contribute to the toolkit itself, keep reading — the rest of this README covers the developer setup.
 
 ## Deployment (for contributors)
