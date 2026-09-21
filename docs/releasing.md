@@ -1,6 +1,6 @@
 # Releasing
 
-This release process updates three distribution points at once: the public template Google Sheet used for [self-serve onboarding](../README.md#get-your-own-copy), the ProPublica canonical Apps Script project backing our private internal listing on the Google Workspace Marketplace, and this public GitHub repository, which any external organization can clone to build their own independent copy. `scripts/release.sh` handles the first two directly and is walked through step by step below.
+This release process updates three distribution points at once: the public template Google Sheet used for [self-serve onboarding](../README.md#get-your-own-copy), a canonical Apps Script project backing a Google Workspace Marketplace listing, and this public GitHub repository, which any external organization can clone to build their own independent copy.
 
 ## Release Process
 
