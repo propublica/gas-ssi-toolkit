@@ -1,76 +1,32 @@
 # Releasing
 
-## Deployment States
-
-The SSI Toolkit's canonical Apps Script project has two deployment states:
-
-**HEAD** is the active development surface. `npm run deploy` pushes your local build here. You can test HEAD changes using Apps Script's test deployments (Deploy → Test deployments in the script editor) without affecting users who have the add-on installed. 
-
-**Versioned deployment** is what Marketplace-installed users run. It is a pinned snapshot that only changes when a human explicitly runs `scripts/release.sh` from `main`.
-
-Container-bound Scripts use the **HEAD** by default. Once you've run `npm run deploy`—regardless of what branch you are in—you should see any changes immediately reflected in your attached Google Sheet.
-
-## Template Sheet
-
-In addition to the canonical project above, `release.sh` also pushes `dist/` to a second, separate Apps Script project — the one bound to the public-facing template Google Sheet used for [self-serve onboarding](../README.md#get-your-own-copy). Unlike the canonical project, this target has no versioned-deployment step: it's a container-bound script, so it always runs whatever was last pushed to HEAD.
-
-This requires a local `.clasp.template.json` (gitignored, same shape as `.clasp.json`) pointing at the template project's script ID:
-
-```zsh
-cat > .clasp.template.json << 'EOF'
-{
-  "scriptId": "<template-script-id>",
-  "rootDir": "./dist"
-}
-EOF
-```
-
-Only whoever runs `release.sh` needs this file locally. `release.sh` checks for it in its preflight block — alongside the branch, CI, and clean-tree checks, *before* any deploy starts — so a missing config aborts the release before anything has been pushed anywhere, rather than leaving the canonical project already updated.
-
-The push itself is a single line:
-
-```zsh
-clasp_config_project=.clasp.template.json npx clasp push -f
-```
-
-`clasp_config_project` is the environment-variable form of clasp's global `--project <file>` option. It points clasp at the template's config for that one invocation and never touches the working directory's `.clasp.json` — which matters, since that file may be a symlink shared across git worktrees.
-
-`-f` is required rather than a convenience. Without it, clasp prompts before overwriting a changed `appsscript.json`, and defaults to "no" (or answers itself "no" when non-interactive) — then prints `Skipping push.` and **exits 0**. The release would report success while the template Sheet still ran the previous bundle. `npm run deploy` deliberately stays prompt-guarded; the template push does not, because the manifest it pushes is our own already-reviewed committed file and the template exists precisely to mirror the release exactly.
-
-## Branch Workflow
-
-```
-feature-branch → develop   (PR + code review)
-develop        → main      (PR containing manual QA instructions = release gate)
-main                       (run ./scripts/release.sh to publish)
-main           → develop   (back-merge PR, opened automatically by release.sh — see below)
-```
+This release process updates three distribution points at once: the public template Google Sheet used for [self-serve onboarding](../README.md#get-your-own-copy), the ProPublica canonical Apps Script project backing our private internal listing on the Google Workspace Marketplace, and this public GitHub repository, which any external organization can clone to build their own independent copy. `scripts/release.sh` handles the first two directly and is walked through step by step below.
 
 ## Release Process
 
-1. Merge `develop` → `main` via PR, including manual QA instructions in the PR body.
-2. Once merged, from `main`:
+1. Merge `develop` → `main` via PR, including manual QA instructions in the PR body — this is also the moment the public GitHub repository (the third distribution point) updates.
 
-```zsh
-./scripts/release.sh
-```
+2. From `main`, run:
 
-This script builds the project, pushes to HEAD, pushes the same build to the template Sheet's project (see [Template Sheet](#template-sheet) above), snapshots it as a new immutable version, and repoints the Marketplace deployment. It enforces the `main` branch requirement and will exit with an error if run from any other branch.
+   ```zsh
+   ./scripts/release.sh
+   ```
 
-> **Note:** `scripts/release.sh` is a human-only operation. It must never be run by automated tooling or CI.
+   It enforces the `main` branch requirement and exits with an error if run from anywhere else. This is a human-only operation — it must never be run by automated tooling or CI.
 
-After the release completes, `release.sh` walks through two more steps — a back-merge and a version bump — described below. Both open PRs for you to review and merge; the script never merges anything itself, since `main` and `develop` both require PR review.
+3. **Confirm the release.** The script warns that this updates the add-on for everyone who has it installed; type `y` to continue.
 
-## Back-Merge (main → develop)
+4. The script then runs its checks automatically, with no input needed — it verifies `main` is in sync with `origin/main`, CI has passed, the working tree is clean, and `.clasp.template.json` exists (any failure prints an `Error:` and aborts here) — and pushes: `→ Deploying to HEAD...` and `→ Deploying to template container-bound project...` push the build to both projects, then `→ Creating version snapshot...` and `→ Repointing Apps Script deployment...` snapshot and repoint the canonical project alone.
 
-`release.sh` automatically opens a PR from `main` into `develop` (or reports that there's nothing to sync, if they already match) and pauses, waiting for you to merge it in GitHub before continuing. This exists so the version-bump PR that follows lands as a clean, single-line diff — if the bump were cut from `main` before `develop` had caught up, its PR would also carry forward everything else `main` has that `develop` doesn't yet.
+5. **Update the Marketplace SDK App Configuration.** Repointing the deployment in the previous step doesn't by itself publish the update to Marketplace-installed users — the script pauses here for that manual step. Follow [Marketplace SDK App Configuration](#marketplace-sdk-app-configuration) below, then press Enter to let the script continue.
 
-## Version Number
+6. The script tags the release and opens a GitHub release automatically: `→ Creating GitHub release...`.
 
-`package.json`'s `version` field (`N.0.0`, where `N` is the release/Apps Script version number) is the single source of truth for the version shown in the sidebar footer. The build injects it into `dist/Sidebar.html` at compile time — nothing else needs to be hand-edited.
+7. **Merge the back-merge PR.** `→ Opening back-merge PR...` opens a PR merging `main` into `develop` (or reports there's nothing to sync) and pauses for you to merge it in GitHub.
 
-Because clasp only assigns a version number *after* a release deploys, the version can't be bumped to `N` until release `N` is already live — bumping then would mean release `N`'s own sidebar still shows `N-1`. Instead, once the back-merge above is done, `release.sh` prompts to bump to `N+1`, giving that bump a full development cycle to land on `develop` before release `N+1` actually ships. If you accept the prompt, it opens a small PR (`chore/bump-version-vN+1`) against `develop` — review and merge it before the next release.
+8. **Confirm the version bump.** The script offers to open a PR bumping `package.json`'s version to `N+1`, so the sidebar footer and version file are ready to read correctly by the time the next release ships.
 
-## Note on Concurrent Development
+## Marketplace SDK App Configuration
 
-This pipeline assumes a single developer. `npm run deploy` pushes to a shared HEAD — concurrent development will cause conflicts. This should be revisited before a second developer joins the project.
+1. Navigate to `https://console.cloud.google.com/apis/api/appsmarket-component.googleapis.com/googleapps_sdk?project=<projectId>`.
+2. Under **App Configuration → App Integrations → Sheets add-on**, update **Sheets add-on script version** to the version number the script printed after `→ Creating version snapshot...`, then click **Save**.

@@ -1,7 +1,10 @@
 #!/bin/bash
 set -e
 
-# Stable Marketplace deployment ID (from `clasp list-deployments`).
+# Stable Apps Script deployment ID (from `clasp list-deployments`). Whether the
+# Marketplace SDK relies on this deployment, or only on the raw version number
+# entered by hand on its App Configuration page, is unconfirmed — see the
+# Marketplace SDK App Configuration section of docs/releasing.md.
 DEPLOYMENT_ID="AKfycbx1DUg1j_MW2KNDFsfqhHaW5D7ngPaweMr4GZ8LGkINJF_5HbugCrnaDNqZ7Xeg2KIDGA"
 
 echo "⚠️  This will update the SSI Toolkit for everyone who has it installed."
@@ -57,7 +60,7 @@ fi
 if [ ! -f .clasp.template.json ]; then
   echo "Error: .clasp.template.json not found."
   echo "This holds the template Sheet's script ID and is required to keep it in sync."
-  echo "See the 'Template Sheet' section of docs/releasing.md for how to create it."
+  echo "See docs/releasing.md for how to create it."
   exit 1
 fi
 
@@ -95,8 +98,20 @@ if [ -z "$VERSION" ]; then
   exit 1
 fi
 
-echo "→ Repointing Marketplace deployment..."
+echo "→ Repointing Apps Script deployment..."
 npx clasp update-deployment "$DEPLOYMENT_ID" --versionNumber "$VERSION" --description "$TIMESTAMP ($COMMIT_SHA)"
+
+# This repoints the Apps Script deployment object only — it does NOT make this
+# version live for Marketplace-installed users. The Google Workspace Marketplace
+# SDK has its own, separate "Sheets add-on script version" field on its App
+# Configuration page that must be updated and saved by hand — there is no API
+# for it. Skipping this step leaves installed users on the previous version
+# while every line above (and below) reports success.
+echo ""
+echo "⚠️  Manual step required: update the Marketplace SDK App Configuration."
+echo "   Go to the Google Workspace Marketplace SDK → App Configuration page and set"
+echo "   \"Sheets add-on script version\" to $VERSION, then click Save."
+read -p "Press Enter once you've saved that change in the Marketplace SDK... "
 
 # Create an annotated git tag so there's a permanent record in git history of
 # exactly what commit was released and when. Push it to origin so it's visible
