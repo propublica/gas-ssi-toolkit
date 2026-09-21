@@ -60,7 +60,6 @@ fi
 if [ ! -f .clasp.template.json ]; then
   echo "Error: .clasp.template.json not found."
   echo "This holds the template Sheet's script ID and is required to keep it in sync."
-  echo "See docs/releasing.md for how to create it."
   exit 1
 fi
 
@@ -101,12 +100,12 @@ fi
 echo "→ Repointing Apps Script deployment..."
 npx clasp update-deployment "$DEPLOYMENT_ID" --versionNumber "$VERSION" --description "$TIMESTAMP ($COMMIT_SHA)"
 
-# This repoints the Apps Script deployment object only — it does NOT make this
-# version live for Marketplace-installed users. The Google Workspace Marketplace
-# SDK has its own, separate "Sheets add-on script version" field on its App
-# Configuration page that must be updated and saved by hand — there is no API
-# for it. Skipping this step leaves installed users on the previous version
-# while every line above (and below) reports success.
+# The command above repoints the Apps Script deployment object only — it does
+# NOT make this version live for Marketplace-installed users. The Google
+# Workspace Marketplace SDK has its own, separate "Sheets add-on script
+# version" field on its App Configuration page that must be updated and saved
+# by hand — there is no API for it. Skipping this step leaves installed users
+# on the previous version while every line above (and below) reports success.
 echo ""
 echo "⚠️  Manual step required: update the Marketplace SDK App Configuration."
 echo "   Go to the Google Workspace Marketplace SDK → App Configuration page and set"
