@@ -4,7 +4,7 @@ This release process updates three distribution points at once: the public templ
 
 ## Release Process
 
-1. Merge `develop` → `main` via PR, including manual QA instructions in the PR body — this is also the moment the public GitHub repository (the third distribution point) updates.
+1. Merge `develop` → `main` via PR, including manual QA instructions in the PR body.
 
 2. From `main`, run:
 
@@ -12,11 +12,15 @@ This release process updates three distribution points at once: the public templ
    ./scripts/release.sh
    ```
 
-   It enforces the `main` branch requirement and exits with an error if run from anywhere else. This is a human-only operation — it must never be run by automated tooling or CI.
+   **This is a human-only operation — it must never be run by automated tooling or CI.**
 
 3. **Confirm the release.** The script warns that this updates the add-on for everyone who has it installed; type `y` to continue.
 
-4. The script then runs its checks automatically, with no input needed — it verifies `main` is in sync with `origin/main`, CI has passed, the working tree is clean, and `.clasp.template.json` exists (any failure prints an `Error:` and aborts here) — and pushes: `→ Deploying to HEAD...` and `→ Deploying to template container-bound project...` push the build to both projects, then `→ Creating version snapshot...` and `→ Repointing Apps Script deployment...` snapshot and repoint the canonical project alone.
+4. The script then runs through this stretch automatically, with no input needed:
+
+   - **Checks** — verifies `main` is in sync with `origin/main`, CI has passed, the working tree is clean, and `.clasp.template.json` exists. Any failure prints an `Error:` and aborts here, before anything is pushed.
+   - **Pushes** — `→ Deploying to HEAD...` and `→ Deploying to template container-bound project...` push the build to both projects.
+   - **Snapshots & repoints** — `→ Creating version snapshot...` and `→ Repointing Apps Script deployment...` apply to the canonical project alone.
 
 5. **Update the Marketplace SDK App Configuration.** Repointing the deployment in the previous step doesn't by itself publish the update to Marketplace-installed users — the script pauses here for that manual step. Follow [Marketplace SDK App Configuration](#marketplace-sdk-app-configuration) below, then press Enter to let the script continue.
 
