@@ -1,0 +1,48 @@
+# Documentation Restructure — Tracker
+
+Tracks progress on reorganizing the repo's audience-facing documentation
+around a priority order of **container-bound script installers** →
+**editor add-on installers/distributors** → **SSI Toolkit developers**.
+Installation instructions are currently scattered unhelpfully between
+README.md and docs/user-guide.md, with no single authoritative source for
+either audience.
+
+Rather than one combined effort, each row below gets its own brainstorm →
+(spec, for the architectural ones) → implementation → PR. There is no
+single overarching spec document — this tracker is the coordination point
+across sessions.
+
+**Out of scope:** `docs/threat_models/`, `docs/superpowers/`,
+`docs/plans/`, and `docs/prototypes/` keep their current location and
+content unchanged. This effort only adds pointers to them where
+appropriate (see rows 1 and 5).
+
+The "Starting hypothesis" column below is this session's initial take on
+each doc's scope — not settled. Each row gets its own brainstorming
+session before any implementation, and that session can revise, expand,
+or reshape the scope, including moving content between rows or merging
+or splitting rows. Don't treat these descriptions as a ceiling.
+
+| #   | Doc                                           | Type          | Status      | Spec | Branch | Starting hypothesis                                                                                                                                                                                                                                                                                                                                                            |
+| --- | --------------------------------------------- | ------------- | ----------- | ---- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `docs/architecture.md`                        | Bounded       | Not started | —    | —      | Add a pointer to `docs/plans/` and `docs/superpowers/specs/` as historical design-decision records — an archive, not maintained documentation.                                                                                                                                                                                                                                 |
+| 2   | `docs/releasing.md`                           | Bounded       | Not started | —    | —      | Add a high-level description of the git tag + GitHub release step (`release.sh` already does this — annotated tag, `gh release create` — but it's undocumented today). Keep the doc a human-readable guide to running the script and what it does, not an internals walkthrough.                                                                                               |
+| 3   | `docs/user-guide.md`                          | Bounded       | Not started | —    | —      | Trim "Installing the add-on" down to one line + pointer to row 4's doc. Everything else (tool-by-tool guidance, tips) stays as-is.                                                                                                                                                                                                                                             |
+| 4   | `docs/deploying-as-an-editor-add-on.md` (new) | Architectural | Not started | —    | —      | Distributor guide: what an editor add-on is and why, how to create one (mostly linking to Google's own docs + a TK marketplace-listing asset packet), the manual clasp steps to push `main` → your own Apps Script project, the gotcha that a push isn't live until you repoint the Marketplace listing, and a "what to tell your users" section.                              |
+| 5   | `CONTRIBUTING.md`                             | Architectural | Not started | —    | —      | New "Local Setup" section up top, ported from README's current deployment steps (prerequisites, create your own Apps Script project, `.clasp.json`, `npm install`, deploy). Plus a one-line pointer to `docs/threat_models/`, which CLAUDE.md already requires checking before a PR but nothing currently surfaces to a contributor.                                           |
+| 6   | `README.md`                                   | Architectural | Not started | —    | —      | Landing-page rewrite: pitch (decomposition-for-investigations framing), evidence section (examples/screenshots — **blocked on Aaron supplying content**), "Get started" pointing at the CBS template rather than raw steps, a pointer to row 4's doc, and a links-out section. Drops "Deployment (for contributors)" and "Development" entirely — that content moves to row 5. |
+
+**Status values:** not started → brainstorming → spec approved (architectural rows only) → implemented → merged
+
+## Sequencing notes
+
+- Row 6 (README) should land after rows 4 and 5 exist, so its links point
+  somewhere real, and is blocked independently on Aaron supplying
+  evidence content (example reporting questions, screenshots).
+- Row 3 (user-guide.md) references row 4's filename and should land at or
+  after row 4, to avoid a dead link.
+- Rows 1 and 2 are fully independent and can happen in any order.
+- A simplified release script for editor-add-on distributors (referenced
+  conceptually in row 4) is explicitly out of scope for this effort. Row
+  4 documents the manual clasp steps and notes the script as a future
+  follow-up.
