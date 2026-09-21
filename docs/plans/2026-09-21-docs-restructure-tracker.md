@@ -12,6 +12,16 @@ Rather than one combined effort, each row below gets its own brainstorm →
 single overarching spec document — this tracker is the coordination point
 across sessions.
 
+**Branching model:** every row's branch is cut from
+`AI-102-docs-restructure-tracker`, not from `develop`, and its PR targets
+`AI-102-docs-restructure-tracker`, not `develop` — this deviates from
+CLAUDE.md's default (feature branch → `develop`), so say so explicitly if
+a session's PR step asks. Rows merge into `AI-102-docs-restructure-tracker`
+incrementally as they land; that branch merges into `develop` once, at
+the end, as a single PR. If you're starting a fresh session for a row,
+make sure your local `AI-102-docs-restructure-tracker` is up to date
+before branching from it, since earlier rows may have already merged in.
+
 **Out of scope:** `docs/threat_models/`, `docs/superpowers/`,
 `docs/plans/`, and `docs/prototypes/` keep their current location and
 content unchanged. This effort only adds pointers to them where
