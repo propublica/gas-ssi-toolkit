@@ -13,7 +13,15 @@ Feature work happens on branches, merged to `develop` via PR. When ready to ship
 
 ### Adding a new Gemini tool
 
-See [Tool System](docs/architecture.md#tool-system) in the architecture docs — it's a three-file change.
+The Gemini tool system spans three layers, linked by `ToolId` (a string union in `src/shared/types.ts`). `ToolId` is the only tool concept that crosses the `google.script.run` RPC boundary.
+
+**To add a new Gemini tool, touch exactly three files:**
+
+1. `src/shared/types.ts` — add the string literal to `ToolId`
+2. `src/server/tools.ts` — add a `GeminiTool` entry to `TOOL_REGISTRY` (`Record<ToolId, GeminiTool>` enforces exhaustiveness at compile time — omitting an entry is a type error)
+3. `src/client/tools.ts` — add a `ToolCatalogEntry` to `TOOL_CATALOG` for sidebar display
+
+`GeminiTool` is a discriminated union: `{ kind: "grounding" }` produces `{ [id]: {} }` in the Gemini REST payload; `{ kind: "function" }` produces `{ function_declarations: [...] }`.
 
 ### Adding a recipe
 
@@ -21,7 +29,14 @@ Recipes are defined in `src/client/recipes.ts` as entries in the `RECIPES` array
 
 ### Exposing a new server function
 
-See [Build Pipeline](docs/architecture.md#build-pipeline) in the architecture docs — you must both export from `index.ts` and add a footer stub in `rollup.config.js`. If the function is callable from the client, also update `src/client/google.d.ts`.
+Apps Script has no module system — it only sees top-level global functions. Rollup wraps everything in an IIFE assigned to `_GASEntry`, and `rollup.config.js`'s `footer` field appends plain global stubs that delegate into it (e.g. `function onOpen(e) { _GASEntry.onOpen(e); }`).
+
+**To expose a new function to Apps Script, you must do both:**
+
+1. `export` it from `src/server/index.ts`
+2. Add a matching global stub in the `footer` of `rollup.config.js`
+
+Skipping step 2 means Apps Script can't discover or call the function. If the function is also called from the client, also add it to `src/client/google.d.ts` — that file is **not auto-generated**, so a client-callable function typechecks against stale declarations and only fails at runtime if you skip this.
 
 ## Testing
 
