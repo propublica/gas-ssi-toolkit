@@ -73,3 +73,7 @@ Two tsconfigs cover the two build environments:
 - `tsconfig.client.json` — client build and all tests. Adds `"lib": ["ES2019", "DOM"]`.
 
 Do **not** add `"node"` to `tsconfig.client.json` — it causes `MimeType` collisions with the `google-apps-script` types. Use triple-slash directives (`/// <reference types="node" />`) in individual files that need Node.js types.
+
+## Historical Design Records
+
+`docs/plans/` and `docs/superpowers/` (its `specs/` and `plans/` subdirectories) hold dated design docs and implementation plans written before past features and refactors. They're a record of *why* a decision was made, not maintained documentation — treat each one as frozen at the date in its filename, not a description of the current codebase.
