@@ -12,11 +12,13 @@ An Editor add-on is installed once by an admin and appears in every user's **Ext
 
 ### 1. Create an Apps Script project
 
-Go to [script.google.com](https://script.google.com/u/0/home/all) and create a new, standalone project. You don't need to enable the Drive Advanced Service by hand — it's already declared in this repo's `appsscript.json`, and `clasp push` (see [Deploy your code](#deploy-your-code) below) carries that declaration over automatically.
+Go to [script.google.com](https://script.google.com/u/0/home/all) and create a new, standalone project. This repo's `appsscript.json` already declares the Drive Advanced Service in its manifest, and `clasp push` (see [Deploy your code](#deploy-your-code) below) carries that declaration over automatically — but see the next step for one more thing this requires.
 
 ### 2. Link your own Google Cloud project
 
 A script's default, Google-managed Cloud project can't back a Marketplace listing. Switch this project to a **standard**, user-owned GCP project before doing anything else here: **Project Settings → Change project**, in the script editor. Follow Google's [Google Cloud projects](https://developers.google.com/apps-script/guides/cloud-platform-projects) guide for the mechanics. Do this early — Google's own docs warn that switching later can force your users to re-authorize.
+
+Once you've switched, manually enable the **Drive API** in that Cloud project's console. Google only auto-enables an advanced service's underlying API for a script's *default* project — on a standard project, the manifest declaration alone isn't enough, and Extract Text / Import Drive Links will fail with a `SERVICE_DISABLED` error at runtime if you skip this.
 
 ### 3. Set your Gemini API key
 
@@ -28,11 +30,13 @@ Enable the Google Workspace Marketplace SDK on your GCP project and configure yo
 
 You don't need to publish publicly: **private publishing** makes your listing immediately available to everyone in your Google Workspace organization, with no Google review step. See [Publish apps to the Google Workspace Marketplace](https://developers.google.com/workspace/marketplace/how-to-publish) for the public/private distinction.
 
+**Skip the "unverified app" warning entirely.** Under **APIs & Services → OAuth consent screen** in your GCP project, set **User Type** to **Internal** rather than **External**. An Internal app is exempt from Google's verification warning for everyone in your domain — no review, no CASA, no "Advanced → Go to app (unsafe)" click for your users. This only works because your users are all in the same Workspace org as this deployment, which is exactly this doc's scenario.
+
 **TK:** a marketplace-listing asset packet (icon, screenshots, promotional copy) for this toolkit doesn't exist yet. Use your own placeholders for now — this is a known gap, not something to block on.
 
 ## Deploy your code
 
-You'll need Node.js 22+ and this repo cloned locally. [`clasp`](https://developers.google.com/apps-script/guides/clasp) is included as a devDependency — no global install needed.
+You'll need Node.js 22+, this repo cloned locally, and the Apps Script API enabled at [script.google.com/home/usersettings](https://script.google.com/home/usersettings) — without it, your first push fails with "User has not enabled the Apps Script API." [`clasp`](https://developers.google.com/apps-script/guides/clasp) is included as a devDependency — no global install needed.
 
 **First-time setup:**
 
@@ -60,7 +64,9 @@ npm run clasp:login    # authenticate with Google
 npm run deploy         # build + push to your project
 ```
 
-Create your first deployment from the Apps Script editor (**Deploy → New deployment**) — see Google's [Create and manage deployments](https://developers.google.com/apps-script/concepts/deployments) guide. Note the deployment ID (also visible later via `npx clasp list-deployments`); you'll reuse it for every future update.
+Create your first deployment from the Apps Script editor (**Deploy → New deployment**, type **Add-on**) — see Google's [Create and manage deployments](https://developers.google.com/apps-script/concepts/deployments) guide. Note the deployment ID (also visible later via `npx clasp list-deployments`); you'll reuse it for every future update.
+
+Before pointing your Marketplace listing at this deployment (next section), verify it works: create a [test deployment](https://developers.google.com/workspace/add-ons/how-tos/testing-editor-addons) and confirm the add-on behaves as expected before rolling it out to your whole org.
 
 **Every update after that:**
 

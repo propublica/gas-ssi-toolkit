@@ -37,6 +37,16 @@ contributing code back.
   `enabledAdvancedServices` is declared in `appsscript.json` and is carried
   over by `clasp push`, so no manual toggle in the Apps Script editor UI is
   needed as a distinct step.
+  **Correction (added after final review, 2026-09-25):** this only covers
+  the Apps Script editor's own manifest-driven toggle. Once the distributor
+  switches to a standard GCP project (a separate, required step — see
+  below), the underlying Drive API must still be enabled by hand in that
+  Cloud project's console; the manifest declaration doesn't reach a
+  standard project's Cloud APIs automatically. The published doc documents
+  this as part of linking the GCP project, not as a standalone step of its
+  own — so the decision to avoid a *separate* Drive-service step still
+  holds, but the original rationale as written overstated what the manifest
+  alone accomplishes.
 - **Added: linking a standard GCP project.** A script's default,
   Google-managed GCP project cannot back a Marketplace SDK listing — the
   reader must switch their Apps Script project to a standard, user-owned GCP
